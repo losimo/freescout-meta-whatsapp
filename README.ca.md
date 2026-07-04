@@ -4,6 +4,8 @@
 
 Mòdul per a FreeScout que integra **WhatsApp Business directament amb la Meta Cloud API**, sense intermediaris de pagament com 1msg.io o Twilio. Els missatges van de Meta a la teva instal·lació de FreeScout, amb control complet de credencials, dades i flux operatiu.
 
+El projecte està publicat i les proves internes són completes, però encara és especialment útil trobar una empresa o persona que pugui integrar-lo i fer-lo servir durant uns dies en un entorn real per validar el comportament en producció, detectar casos límit i confirmar que el flux operatiu encaixa amb l’ús diari.
+
 ## Característiques principals
 
 - **Channel-first**: configures un canal WhatsApp, no una bústia de correu.
