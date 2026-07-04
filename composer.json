@@ -1,0 +1,11 @@
+{
+    "name": "losimo/metawhatsapp",
+    "description": "WhatsApp Business channel for FreeScout via Meta Cloud API",
+    "license": "AGPL-3.0",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "Modules\\MetaWhatsApp\\": ""
+        }
+    }
+}

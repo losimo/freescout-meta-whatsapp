@@ -1,0 +1,25 @@
+{
+    "name": "MetaWhatsApp",
+    "alias": "metawhatsapp",
+    "description": "WhatsApp Business channel via Meta Cloud API",
+    "keywords": [
+        "whatsapp",
+        "meta",
+        "channel"
+    ],
+    "active": 1,
+    "order": 0,
+    "providers": [
+        "Modules\\MetaWhatsApp\\Providers\\MetaWhatsAppServiceProvider"
+    ],
+    "aliases": {},
+    "files": [
+        "start.php"
+    ],
+    "version": "1.0.0",
+    "freescout_version": "1.0.0",
+    "author": "losimo",
+    "license": "AGPL-3.0",
+    "latestVersionUrl": "https://github.com/losimo/freescout-meta-whatsapp/releases/latest/download/version.txt",
+    "latestVersionZipUrl": "https://github.com/losimo/freescout-meta-whatsapp/releases/latest/download/metawhatsapp.zip"
+}
