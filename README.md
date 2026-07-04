@@ -4,6 +4,8 @@
 
 FreeScout module that integrates **WhatsApp Business directly with the Meta Cloud API**, without paid intermediaries such as 1msg.io or Twilio. Messages travel from Meta to your FreeScout installation and nowhere else, with full control over credentials, data and the operational flow.
 
+The project is now public, and internal testing is complete, but it would still be especially valuable to find a company or person willing to integrate it and use it for a few days in a real environment to validate production behavior, uncover edge cases, and confirm that the operational flow fits day-to-day use.
+
 ## Key features
 
 - **Channel-first**: you configure a WhatsApp channel, not an email mailbox.
