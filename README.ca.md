@@ -15,6 +15,16 @@ El projecte està publicat i les proves internes són completes, però encara é
 - **Interfície neta de correu**: a les vistes del canal, el mòdul amaga els artefactes d'email del core (toggle Cc/Bcc, adreça tècnica interna), sense afectar les bústies de correu normals.
 - **Compatible amb FreeScout 1.8.x** sobre Laravel 5.8 i PHP 8.x.
 
+## Captures de pantalla
+
+*Llistat de canals WhatsApp configurats:*
+
+![Llistat de comptes WhatsApp](docs/accounts-list.png)
+
+*Alta d'un canal nou (formulari channel-first):*
+
+![Formulari d'alta del canal](docs/add-channel.png)
+
 ## Abast del MVP
 
 Aquesta v1 cobreix:

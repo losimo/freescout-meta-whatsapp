@@ -15,6 +15,16 @@ El proyecto ya está publicado y las pruebas internas están completas, pero sig
 - **Interfaz limpia de correo**: en las vistas del canal, el módulo oculta los artefactos de email del core (toggle Cc/Bcc, dirección técnica interna) sin afectar a los buzones de correo normales.
 - **Compatible con FreeScout 1.8.x** sobre Laravel 5.8 y PHP 8.x.
 
+## Capturas de pantalla
+
+*Listado de canales de WhatsApp configurados:*
+
+![Listado de cuentas de WhatsApp](docs/accounts-list.png)
+
+*Alta de un canal nuevo (formulario channel-first):*
+
+![Formulario de alta del canal](docs/add-channel.png)
+
 ## Alcance del MVP
 
 Esta v1 cubre:

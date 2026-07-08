@@ -15,6 +15,16 @@ The project is now public, and internal testing is complete, but it would still 
 - **Email-free interface**: on channel pages the module hides the core's email artifacts (Cc/Bcc toggle, internal technical address) without affecting regular email mailboxes.
 - **Compatible with FreeScout 1.8.x** on Laravel 5.8 and PHP 8.x.
 
+## Screenshots
+
+*List of configured WhatsApp channels:*
+
+![WhatsApp accounts list](docs/accounts-list.png)
+
+*Adding a new channel (channel-first form):*
+
+![Add channel form](docs/add-channel.png)
+
 ## MVP scope
 
 This v1 covers:
