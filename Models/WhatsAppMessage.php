@@ -23,6 +23,7 @@ class WhatsAppMessage extends Model
         'conversation_id',
         'thread_id',
         'contact_phone',
+        'contact_user_id',
         'direction',
         'status',
         'error_code',

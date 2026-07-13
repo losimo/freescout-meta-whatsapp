@@ -16,7 +16,7 @@
     "files": [
         "start.php"
     ],
-    "version": "1.0.0",
+    "version": "1.0.1",
     "freescout_version": "1.0.0",
     "author": "losimo",
     "license": "AGPL-3.0",

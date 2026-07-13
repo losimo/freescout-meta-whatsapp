@@ -64,7 +64,7 @@ class ProcessInboundWebhook implements ShouldQueue
                 }
 
                 foreach ($value['messages'] ?? [] as $message) {
-                    $this->processMessage($account, $message);
+                    $this->processMessage($account, $message, $value['contacts'] ?? []);
                 }
 
                 foreach ($value['statuses'] ?? [] as $status) {
@@ -74,7 +74,7 @@ class ProcessInboundWebhook implements ShouldQueue
         }
     }
 
-    protected function processMessage(WhatsAppAccount $account, array $message)
+    protected function processMessage(WhatsAppAccount $account, array $message, array $contacts = [])
     {
         $wamid = $message['id'] ?? null;
         $from  = $message['from'] ?? null;
@@ -99,27 +99,59 @@ class ProcessInboundWebhook implements ShouldQueue
             return;
         }
 
-        // El remitent ha de ser un número E.164 sense '+' (format de Meta).
-        // Valors estranys reventarien contact_phone (VARCHAR 20) i embrutarien
-        // customer_channel.
-        if (!preg_match('/^\d{6,15}$/', ltrim($from, '+'))) {
-            Log::warning('[MetaWhatsApp] Remitent amb format invàlid, descartat', [
+        // BSUID (Business-Scoped User ID): amb els usernames de WhatsApp,
+        // contacts[].user_id és l'identificador estable i 'from' pot deixar
+        // de ser un telèfon usable.
+        $userId = $this->extractContactUserId($account, $contacts, $from);
+
+        // Telèfon usable: E.164 sense '+' (format de Meta). Valors estranys
+        // reventarien contact_phone (VARCHAR 20) i embrutarien customer_channel.
+        // Un 'from' idèntic al user_id és el BSUID, encara que sigui numèric.
+        $phone      = null;
+        $fromDigits = ltrim($from, '+');
+        if ($fromDigits !== $userId && preg_match('/^\d{6,15}$/', $fromDigits)) {
+            // Normalització E.164 amb '+': coherent entre contact_phone,
+            // customer_channel i l'outbound.
+            $phone = '+' . $fromDigits;
+        }
+
+        if (!$phone && !$userId) {
+            Log::warning('[MetaWhatsApp] Remitent sense telèfon ni user_id vàlids, descartat', [
                 'account_id' => $account->id,
             ]);
             return;
         }
-
-        // Normalització E.164 amb '+': coherent entre contact_phone,
-        // customer_channel i l'outbound de la Fase 3.
-        $phone = '+' . ltrim($from, '+');
 
         // Idempotència: el mateix wamid ja processat és un no-op.
         if (WhatsAppMessage::where('wamid', $wamid)->exists()) {
             return;
         }
 
+        if (!$phone) {
+            // Fase 1 BSUID: es persisteix l'identificador però la resolució de
+            // customer/conversa encara depèn del telèfon (Fase 2).
+            Log::warning('[MetaWhatsApp] Inbound amb BSUID sense telèfon usable: es persisteix sense conversa', [
+                'account_id' => $account->id,
+            ]);
+            try {
+                WhatsAppMessage::create([
+                    'wamid'           => $wamid,
+                    'account_id'      => $account->id,
+                    'contact_user_id' => $userId,
+                    'direction'       => WhatsAppMessage::DIRECTION_INBOUND,
+                    'status'          => WhatsAppMessage::STATUS_RECEIVED,
+                ]);
+            } catch (\Illuminate\Database\QueryException $e) {
+                // Carrera de duplicats: el UNIQUE de wamid ha fet la seva feina.
+                if ((string) ($e->errorInfo[1] ?? '') !== '1062') {
+                    throw $e;
+                }
+            }
+            return;
+        }
+
         try {
-            DB::transaction(function () use ($account, $wamid, $phone, $text) {
+            DB::transaction(function () use ($account, $wamid, $phone, $userId, $text) {
                 $customer = $this->findOrCreateCustomer($phone);
 
                 $conversation = Conversation::where('mailbox_id', $account->mailbox_id)
@@ -186,6 +218,7 @@ class ProcessInboundWebhook implements ShouldQueue
                     'conversation_id' => $conversation->id,
                     'thread_id'       => $thread->id,
                     'contact_phone'   => $phone,
+                    'contact_user_id' => $userId,
                     'direction'       => WhatsAppMessage::DIRECTION_INBOUND,
                     'status'          => WhatsAppMessage::STATUS_RECEIVED,
                 ]);
@@ -199,6 +232,41 @@ class ProcessInboundWebhook implements ShouldQueue
             }
             throw $e;
         }
+    }
+
+    /**
+     * Extreu el BSUID (contacts[].user_id) del contacte que correspon al
+     * remitent. Preferència pel contacte amb wa_id/user_id igual a 'from';
+     * si no n'hi ha cap, el primer contacte del bloc.
+     */
+    protected function extractContactUserId(WhatsAppAccount $account, array $contacts, string $from): ?string
+    {
+        $selected = null;
+        foreach ($contacts as $contact) {
+            if (!is_array($contact)) {
+                continue;
+            }
+            if (($contact['wa_id'] ?? null) === $from || ($contact['user_id'] ?? null) === $from) {
+                $selected = $contact;
+                break;
+            }
+            $selected = $selected ?? $contact;
+        }
+
+        $userId = is_array($selected) ? ($selected['user_id'] ?? null) : null;
+        if (!is_string($userId) || $userId === '') {
+            return null;
+        }
+
+        // Sanejament: cap a VARCHAR(100); només ASCII imprimible sense espais.
+        if (!preg_match('/^[\x21-\x7E]{1,100}$/', $userId)) {
+            Log::warning('[MetaWhatsApp] contacts[].user_id amb format inesperat, ignorat', [
+                'account_id' => $account->id,
+            ]);
+            return null;
+        }
+
+        return $userId;
     }
 
     protected function findOrCreateCustomer(string $phone): Customer

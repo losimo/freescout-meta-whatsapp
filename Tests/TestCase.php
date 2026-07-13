@@ -75,10 +75,11 @@ abstract class TestCase extends BaseTestCase
 
     /**
      * Payload mínim de Meta amb un missatge de text.
+     * $contacts permet simular el bloc contacts[] (wa_id, user_id/BSUID).
      */
-    protected function inboundPayload(WhatsAppAccount $account, string $wamid, string $from, string $text): array
+    protected function inboundPayload(WhatsAppAccount $account, string $wamid, string $from, string $text, ?array $contacts = null): array
     {
-        return [
+        $payload = [
             'object' => 'whatsapp_business_account',
             'entry'  => [[
                 'id'      => $account->waba_id,
@@ -101,6 +102,12 @@ abstract class TestCase extends BaseTestCase
                 ]],
             ]],
         ];
+
+        if ($contacts !== null) {
+            $payload['entry'][0]['changes'][0]['value']['contacts'] = $contacts;
+        }
+
+        return $payload;
     }
 
     /**

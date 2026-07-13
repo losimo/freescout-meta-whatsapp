@@ -127,6 +127,103 @@ class ProcessInboundWebhookTest extends TestCase
         $this->assertEquals(0, WhatsAppMessage::where('wamid', 'wamid.in8')->count());
     }
 
+    public function test_inbound_amb_wa_id_i_user_id_persisteix_tots_dos()
+    {
+        $account = $this->createTestAccount();
+        $payload = $this->inboundPayload($account, 'wamid.bs1', '34611222333', 'hola', [[
+            'profile' => ['name' => 'Test'],
+            'wa_id'   => '34611222333',
+            'user_id' => '9876543210987654321',
+        ]]);
+
+        $this->runJob($account, $payload);
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.bs1')->first();
+        $this->assertNotNull($msg);
+        $this->assertEquals('+34611222333', $msg->contact_phone);
+        $this->assertEquals('9876543210987654321', $msg->contact_user_id);
+        // El flux per telèfon es conserva intacte: conversa i thread creats.
+        $this->assertNotNull($msg->conversation_id);
+        $this->assertNotNull($msg->thread_id);
+        $this->assertNotNull(Customer::getCustomerByChannel(WhatsAppAccount::CHANNEL, '+34611222333'));
+    }
+
+    public function test_inbound_nomes_amb_user_id_persisteix_lidentificador_sense_conversa()
+    {
+        $account = $this->createTestAccount();
+        // Usuari amb número ocult: 'from' porta el BSUID, no un telèfon usable.
+        $bsuid   = '1234567890123456789';
+        $payload = $this->inboundPayload($account, 'wamid.bs2', $bsuid, 'hola', [[
+            'profile' => ['name' => 'Test'],
+            'user_id' => $bsuid,
+        ]]);
+
+        $before = Conversation::where('mailbox_id', $account->mailbox_id)->count();
+        $this->runJob($account, $payload);
+
+        // El webhook no es rebutja: el BSUID queda persistit per a la Fase 2.
+        $msg = WhatsAppMessage::where('wamid', 'wamid.bs2')->first();
+        $this->assertNotNull($msg);
+        $this->assertEquals($bsuid, $msg->contact_user_id);
+        $this->assertNull($msg->contact_phone);
+        // Fase 1: sense telèfon no es pot resoldre customer/conversa encara.
+        $this->assertNull($msg->conversation_id);
+        $this->assertNull($msg->thread_id);
+        $this->assertEquals($before, Conversation::where('mailbox_id', $account->mailbox_id)->count());
+    }
+
+    public function test_from_numeric_igual_a_user_id_no_es_tracta_com_telefon()
+    {
+        $account = $this->createTestAccount();
+        // BSUID numèric de 15 dígits: passaria el regex de telèfon, però
+        // contacts[].user_id idèntic delata que no és un número real.
+        $bsuid   = '123456789012345';
+        $payload = $this->inboundPayload($account, 'wamid.bs3', $bsuid, 'hola', [[
+            'user_id' => $bsuid,
+        ]]);
+
+        $this->runJob($account, $payload);
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.bs3')->first();
+        $this->assertNotNull($msg);
+        $this->assertEquals($bsuid, $msg->contact_user_id);
+        $this->assertNull($msg->contact_phone);
+        $this->assertNull($msg->conversation_id);
+        // No s'ha de crear cap customer amb el BSUID com a telèfon.
+        $this->assertNull(Customer::getCustomerByChannel(WhatsAppAccount::CHANNEL, '+' . $bsuid));
+    }
+
+    public function test_inbound_nomes_amb_wa_id_deixa_contact_user_id_null()
+    {
+        $account = $this->createTestAccount();
+        $payload = $this->inboundPayload($account, 'wamid.bs4', '34611222333', 'hola', [[
+            'profile' => ['name' => 'Test'],
+            'wa_id'   => '34611222333',
+        ]]);
+
+        $this->runJob($account, $payload);
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.bs4')->first();
+        $this->assertNotNull($msg);
+        $this->assertEquals('+34611222333', $msg->contact_phone);
+        $this->assertNull($msg->contact_user_id);
+        $this->assertNotNull($msg->conversation_id);
+    }
+
+    public function test_idempotencia_bsuid_el_mateix_wamid_no_duplica_res()
+    {
+        $account = $this->createTestAccount();
+        $bsuid   = '1234567890123456789';
+        $payload = $this->inboundPayload($account, 'wamid.bs5', $bsuid, 'hola', [[
+            'user_id' => $bsuid,
+        ]]);
+
+        $this->runJob($account, $payload);
+        $this->runJob($account, $payload);
+
+        $this->assertEquals(1, WhatsAppMessage::where('wamid', 'wamid.bs5')->count());
+    }
+
     public function test_compte_inactiu_no_processa_res()
     {
         $account = $this->createTestAccount(['is_active' => false]);
