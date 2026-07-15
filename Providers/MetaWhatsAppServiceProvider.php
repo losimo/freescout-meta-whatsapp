@@ -32,6 +32,7 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
         // Registrar WhatsApp com a canal disponible.
         \Eventy::addFilter('channels.list', function ($channels) {
             $channels[WhatsAppAccount::CHANNEL] = WhatsAppAccount::CHANNEL_NAME;
+            $channels[WhatsAppAccount::CHANNEL_BSUID] = WhatsAppAccount::CHANNEL_BSUID_NAME;
             return $channels;
         }, 20, 1);
 
@@ -40,6 +41,9 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
         \Eventy::addFilter('channel.name', function ($name, $channel = null) {
             if ((int) $channel === WhatsAppAccount::CHANNEL) {
                 return WhatsAppAccount::CHANNEL_NAME;
+            }
+            if ((int) $channel === WhatsAppAccount::CHANNEL_BSUID) {
+                return WhatsAppAccount::CHANNEL_BSUID_NAME;
             }
             return $name;
         }, 20, 2);

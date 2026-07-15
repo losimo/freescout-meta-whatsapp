@@ -14,6 +14,14 @@ class WhatsAppAccount extends Model
     const CHANNEL = 100;
     const CHANNEL_NAME = 'WhatsApp';
 
+    /**
+     * Canal dedicat per als BSUID (user_id de Meta): el core només permet una
+     * fila de customer_channel per client i canal, així que el telèfon viu al
+     * canal 100 i el BSUID en aquest.
+     */
+    const CHANNEL_BSUID      = 101;
+    const CHANNEL_BSUID_NAME = 'WhatsApp ID';
+
     protected $table = 'meta_whatsapp_accounts';
 
     protected $fillable = [

@@ -4,6 +4,7 @@ namespace Modules\MetaWhatsApp\Jobs;
 
 use App\Conversation;
 use App\Customer;
+use App\CustomerChannel;
 use App\Events\CustomerCreatedConversation;
 use App\Events\CustomerReplied;
 use App\Thread;
@@ -102,7 +103,9 @@ class ProcessInboundWebhook implements ShouldQueue
         // BSUID (Business-Scoped User ID): amb els usernames de WhatsApp,
         // contacts[].user_id és l'identificador estable i 'from' pot deixar
         // de ser un telèfon usable.
-        $userId = $this->extractContactUserId($account, $contacts, $from);
+        $contact     = $this->selectContact($contacts, $from);
+        $userId      = $this->extractContactUserId($account, $contact);
+        $profileName = $this->extractProfileName($contact);
 
         // Telèfon usable: E.164 sense '+' (format de Meta). Valors estranys
         // reventarien contact_phone (VARCHAR 20) i embrutarien customer_channel.
@@ -122,37 +125,40 @@ class ProcessInboundWebhook implements ShouldQueue
             return;
         }
 
-        // Idempotència: el mateix wamid ja processat és un no-op.
-        if (WhatsAppMessage::where('wamid', $wamid)->exists()) {
-            return;
-        }
-
-        if (!$phone) {
-            // Fase 1 BSUID: es persisteix l'identificador però la resolució de
-            // customer/conversa encara depèn del telèfon (Fase 2).
-            Log::warning('[MetaWhatsApp] Inbound amb BSUID sense telèfon usable: es persisteix sense conversa', [
+        // BSUID massa llarg per a customer_channel (VARCHAR 64): sense telèfon
+        // no hi ha cap via de resolució. Es persisteix el missatge (VARCHAR 100)
+        // i es falla de manera controlada, com a la fase 1.
+        if (!$phone && strlen($userId) > 64) {
+            Log::warning('[MetaWhatsApp] BSUID exceeds customer_channel.channel_id length; stored in module message only, not learned as customer channel.', [
                 'account_id' => $account->id,
             ]);
-            try {
-                WhatsAppMessage::create([
-                    'wamid'           => $wamid,
-                    'account_id'      => $account->id,
-                    'contact_user_id' => $userId,
-                    'direction'       => WhatsAppMessage::DIRECTION_INBOUND,
-                    'status'          => WhatsAppMessage::STATUS_RECEIVED,
-                ]);
-            } catch (\Illuminate\Database\QueryException $e) {
-                // Carrera de duplicats: el UNIQUE de wamid ha fet la seva feina.
-                if ((string) ($e->errorInfo[1] ?? '') !== '1062') {
-                    throw $e;
+            if (!WhatsAppMessage::where('wamid', $wamid)->exists()) {
+                try {
+                    WhatsAppMessage::create([
+                        'wamid'           => $wamid,
+                        'account_id'      => $account->id,
+                        'contact_user_id' => $userId,
+                        'direction'       => WhatsAppMessage::DIRECTION_INBOUND,
+                        'status'          => WhatsAppMessage::STATUS_RECEIVED,
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // Carrera de duplicats: el UNIQUE de wamid ha fet la seva feina.
+                    if ((string) ($e->errorInfo[1] ?? '') !== '1062') {
+                        throw $e;
+                    }
                 }
             }
             return;
         }
 
+        // Idempotència: el mateix wamid ja processat és un no-op.
+        if (WhatsAppMessage::where('wamid', $wamid)->exists()) {
+            return;
+        }
+
         try {
-            DB::transaction(function () use ($account, $wamid, $phone, $userId, $text) {
-                $customer = $this->findOrCreateCustomer($phone);
+            DB::transaction(function () use ($account, $wamid, $phone, $userId, $profileName, $text) {
+                $customer = $this->resolveCustomer($account, $phone, $userId, $profileName);
 
                 $conversation = Conversation::where('mailbox_id', $account->mailbox_id)
                     ->where('customer_id', $customer->id)
@@ -167,7 +173,7 @@ class ProcessInboundWebhook implements ShouldQueue
                     $conversation = new Conversation();
                     $conversation->type                   = Conversation::TYPE_CHAT;
                     $conversation->state                  = Conversation::STATE_PUBLISHED;
-                    $conversation->subject                = __('metawhatsapp::metawhatsapp.conversation_subject', ['phone' => $phone]);
+                    $conversation->subject                = __('metawhatsapp::metawhatsapp.conversation_subject', ['phone' => $phone ?: ($profileName ?: $userId)]);
                     $conversation->mailbox_id             = $account->mailbox_id;
                     $conversation->customer_id            = $customer->id;
                     $conversation->customer_email         = '';
@@ -204,7 +210,7 @@ class ProcessInboundWebhook implements ShouldQueue
                 $thread->status                 = $conversation->status;
                 $thread->state                  = Thread::STATE_PUBLISHED;
                 $thread->body                   = $body;
-                $thread->from                   = $phone;
+                $thread->from                   = $phone ?: $userId;
                 $thread->source_via             = Thread::PERSON_CUSTOMER;
                 $thread->source_type            = Thread::SOURCE_TYPE_API;
                 $thread->customer_id            = $customer->id;
@@ -235,11 +241,10 @@ class ProcessInboundWebhook implements ShouldQueue
     }
 
     /**
-     * Extreu el BSUID (contacts[].user_id) del contacte que correspon al
-     * remitent. Preferència pel contacte amb wa_id/user_id igual a 'from';
-     * si no n'hi ha cap, el primer contacte del bloc.
+     * Tria el contacte de contacts[] que correspon al remitent: preferència
+     * pel que té wa_id/user_id igual a 'from'; si no, el primer del bloc.
      */
-    protected function extractContactUserId(WhatsAppAccount $account, array $contacts, string $from): ?string
+    protected function selectContact(array $contacts, string $from): ?array
     {
         $selected = null;
         foreach ($contacts as $contact) {
@@ -247,13 +252,20 @@ class ProcessInboundWebhook implements ShouldQueue
                 continue;
             }
             if (($contact['wa_id'] ?? null) === $from || ($contact['user_id'] ?? null) === $from) {
-                $selected = $contact;
-                break;
+                return $contact;
             }
             $selected = $selected ?? $contact;
         }
 
-        $userId = is_array($selected) ? ($selected['user_id'] ?? null) : null;
+        return $selected;
+    }
+
+    /**
+     * Extreu i saneja el BSUID (user_id) del contacte seleccionat.
+     */
+    protected function extractContactUserId(WhatsAppAccount $account, ?array $contact): ?string
+    {
+        $userId = is_array($contact) ? ($contact['user_id'] ?? null) : null;
         if (!is_string($userId) || $userId === '') {
             return null;
         }
@@ -267,6 +279,159 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         return $userId;
+    }
+
+    /**
+     * Nom visible del contacte (contacts[].profile.name), si n'hi ha.
+     */
+    protected function extractProfileName(?array $contact): ?string
+    {
+        $name = is_array($contact) ? ($contact['profile']['name'] ?? null) : null;
+        if (!is_string($name)) {
+            return null;
+        }
+        $name = trim($name);
+
+        return $name === '' ? null : $name;
+    }
+
+    /**
+     * Resol el client del missatge. Phone-first: si hi ha telèfon usable, el
+     * comportament és exactament l'actual; el BSUID només resol quan no n'hi ha.
+     */
+    protected function resolveCustomer(WhatsAppAccount $account, ?string $phone, ?string $userId, ?string $profileName): Customer
+    {
+        if ($phone) {
+            $customer = $this->findOrCreateCustomer($phone);
+            if ($userId) {
+                $this->learnBsuid($account, $customer, $userId);
+            }
+
+            return $customer;
+        }
+
+        return $this->findOrCreateCustomerByBsuid($userId, $profileName);
+    }
+
+    /**
+     * Client per BSUID: el troba pel canal o crea un placeholder sense telèfon.
+     */
+    protected function findOrCreateCustomerByBsuid(string $userId, ?string $profileName): Customer
+    {
+        $customer = Customer::getCustomerByChannel(WhatsAppAccount::CHANNEL_BSUID, $userId);
+        if ($customer) {
+            return $customer;
+        }
+
+        $customer = new Customer();
+        $customer->first_name = mb_substr($profileName ?: $userId, 0, 255);
+        $customer->save();
+        $customer->addChannel(WhatsAppAccount::CHANNEL_BSUID, $userId);
+
+        return $customer;
+    }
+
+    /**
+     * Aprèn el mapping BSUID→client quan telèfon i BSUID arriben junts.
+     * Període de transició de Meta: és el que permet reconèixer el client
+     * quan més endavant amagui el número.
+     */
+    protected function learnBsuid(WhatsAppAccount $account, Customer $customer, string $userId): void
+    {
+        if (strlen($userId) > 64) {
+            Log::warning('[MetaWhatsApp] BSUID exceeds customer_channel.channel_id length; stored in module message only, not learned as customer channel.', [
+                'account_id'  => $account->id,
+                'customer_id' => $customer->id,
+            ]);
+            return;
+        }
+
+        $row = CustomerChannel::where('channel', WhatsAppAccount::CHANNEL_BSUID)
+            ->where('channel_id', $userId)
+            ->first();
+
+        if (!$row) {
+            // addChannel és idempotent per al mateix client: actualitza la fila
+            // existent per (customer_id, channel) en lloc de duplicar-la. El
+            // UNIQUE(channel, channel_id) només cobreix la carrera entre
+            // clients diferents pel mateix BSUID.
+            $customer->addChannel(WhatsAppAccount::CHANNEL_BSUID, $userId);
+            return;
+        }
+
+        if ((int) $row->customer_id === (int) $customer->id) {
+            return;
+        }
+
+        $owner = $row->customer;
+        if ($owner && $this->isPurePlaceholder($owner, $userId)) {
+            $this->mergePlaceholder($owner, $customer, $row);
+            return;
+        }
+
+        // Client real amb el mateix BSUID: anomalia (Meta regenera el BSUID en
+        // canviar de número). Mai fusionem dos clients humans automàticament.
+        Log::warning('[MetaWhatsApp] BSUID already linked to a different non-placeholder customer; no merge performed', [
+            'account_id'        => $account->id,
+            'bsuid_customer_id' => $row->customer_id,
+            'phone_customer_id' => $customer->id,
+        ]);
+    }
+
+    /**
+     * Placeholder pur: el seu únic canal és exactament aquest BSUID i no té
+     * ni emails ni telèfons. És la porta de seguretat de la fusió automàtica.
+     */
+    protected function isPurePlaceholder(Customer $customer, string $userId): bool
+    {
+        $channels = CustomerChannel::where('customer_id', $customer->id)->get();
+        if ($channels->count() !== 1) {
+            return false;
+        }
+        $only = $channels->first();
+        if ((int) $only->channel !== WhatsAppAccount::CHANNEL_BSUID || $only->channel_id !== $userId) {
+            return false;
+        }
+        if ($customer->getMainEmail()) {
+            return false;
+        }
+        if (!empty($customer->getPhones())) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Fusiona un placeholder pur en el client real: mou les converses,
+     * re-apunta el canal BSUID i deixa el placeholder inert i anotat.
+     * No s'esborra (decisió operativa conservadora): sense canals, cap
+     * resolució futura no el pot tornar a seleccionar.
+     */
+    protected function mergePlaceholder(Customer $placeholder, Customer $target, CustomerChannel $channelRow): void
+    {
+        foreach (Conversation::where('customer_id', $placeholder->id)->get() as $conversation) {
+            // Mateix camí de codi que la UI del core: comptadors i esdeveniments coberts.
+            $conversation->changeCustomer('', $target);
+        }
+
+        // Cas límit conegut: si el client destí ja tingués un altre BSUID
+        // après al canal 101, aquest re-point hi deixaria dues files. És
+        // improbable (Meta regenera el BSUID) i deliberadament no es gestiona
+        // en aquest increment.
+        $channelRow->customer_id = $target->id;
+        $channelRow->save();
+
+        $placeholder->notes = trim(
+            ($placeholder->notes ? $placeholder->notes . "\n" : '')
+            . 'Merged into customer #' . $target->id . ' by MetaWhatsApp (BSUID).'
+        );
+        $placeholder->save();
+
+        Log::info('[MetaWhatsApp] BSUID placeholder merged into existing customer', [
+            'placeholder_id' => $placeholder->id,
+            'customer_id'    => $target->id,
+        ]);
     }
 
     protected function findOrCreateCustomer(string $phone): Customer
