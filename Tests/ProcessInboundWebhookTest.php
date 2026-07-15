@@ -277,6 +277,133 @@ class ProcessInboundWebhookTest extends TestCase
             ->where('channel_id', $bsuid)->count());
     }
 
+    public function test_conversa_tancada_es_reobre_per_defecte()
+    {
+        $account = $this->createTestAccount();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.qw1a', '34611222333', 'hola'));
+        $msg1 = WhatsAppMessage::where('wamid', 'wamid.qw1a')->first();
+        $conversation = Conversation::find($msg1->conversation_id);
+        $conversation->status = Conversation::STATUS_CLOSED;
+        $conversation->save();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.qw1b', '34611222333', 'una altra cosa'));
+
+        // Patró de xat del core: sense l'opció de bústia, la conversa tancada
+        // es reobre i el missatge nou s'hi encadena.
+        $msg2 = WhatsAppMessage::where('wamid', 'wamid.qw1b')->first();
+        $this->assertEquals($msg1->conversation_id, $msg2->conversation_id);
+        $this->assertEquals(Conversation::STATUS_ACTIVE, Conversation::find($msg1->conversation_id)->status);
+    }
+
+    public function test_conversa_tancada_amb_opcio_de_bustia_crea_conversa_nova()
+    {
+        $account = $this->createTestAccount();
+        $account->mailbox->setMetaParam('chat_start_new', true, true);
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.qw2a', '34611222333', 'hola'));
+        $msg1 = WhatsAppMessage::where('wamid', 'wamid.qw2a')->first();
+        $conversation = Conversation::find($msg1->conversation_id);
+        $conversation->status = Conversation::STATUS_CLOSED;
+        $conversation->save();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.qw2b', '34611222333', 'una altra cosa'));
+
+        // Amb 'chat_start_new' actiu, la tancada no es reutilitza.
+        $msg2 = WhatsAppMessage::where('wamid', 'wamid.qw2b')->first();
+        $this->assertNotEquals($msg1->conversation_id, $msg2->conversation_id);
+        $this->assertEquals(Conversation::STATUS_CLOSED, Conversation::find($msg1->conversation_id)->status);
+    }
+
+    /**
+     * Crea conversa via inbound i hi afegeix un thread de resposta d'agent
+     * amb la seva fila outbound, com deixaria SendWhatsAppMessage.
+     * Retorna [Thread, WhatsAppMessage].
+     */
+    private function createOutboundMessage(WhatsAppAccount $account, string $wamid): array
+    {
+        $this->runJob($account, $this->inboundPayload($account, $wamid . '-in', '34611222333', 'hola'));
+        $inbound      = WhatsAppMessage::where('wamid', $wamid . '-in')->first();
+        $conversation = Conversation::find($inbound->conversation_id);
+
+        $thread = new Thread();
+        $thread->conversation_id = $conversation->id;
+        $thread->user_id         = null;
+        $thread->type            = Thread::TYPE_MESSAGE;
+        $thread->status          = $conversation->status;
+        $thread->state           = Thread::STATE_PUBLISHED;
+        $thread->body            = 'resposta de prova';
+        $thread->source_via      = Thread::PERSON_USER;
+        $thread->source_type     = Thread::SOURCE_TYPE_WEB;
+        $thread->customer_id     = $conversation->customer_id;
+        $thread->save();
+
+        $message = WhatsAppMessage::create([
+            'wamid'           => $wamid,
+            'account_id'      => $account->id,
+            'conversation_id' => $conversation->id,
+            'thread_id'       => $thread->id,
+            'contact_phone'   => '+34611222333',
+            'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+            'status'          => WhatsAppMessage::STATUS_SENT,
+        ]);
+
+        return [$thread, $message];
+    }
+
+    /**
+     * Payload de Meta amb un status per a un wamid.
+     */
+    private function statusPayload(WhatsAppAccount $account, string $wamid, string $status): array
+    {
+        $payload = $this->inboundPayload($account, 'unused', 'unused', 'unused');
+        unset($payload['entry'][0]['changes'][0]['value']['messages']);
+        $payload['entry'][0]['changes'][0]['value']['statuses'] = [[
+            'id'     => $wamid,
+            'status' => $status,
+        ]];
+
+        return $payload;
+    }
+
+    public function test_status_read_marca_el_thread_com_a_obert()
+    {
+        $account = $this->createTestAccount();
+        [$thread, $message] = $this->createOutboundMessage($account, 'wamid.qw3');
+        $this->assertNull($thread->opened_at);
+
+        $this->runJob($account, $this->statusPayload($account, 'wamid.qw3', 'read'));
+
+        // El 'read' de Meta usa el mateix mecanisme natiu que el píxel dels emails.
+        $this->assertNotNull(Thread::find($thread->id)->opened_at);
+        $this->assertEquals(WhatsAppMessage::STATUS_READ, $message->fresh()->status);
+    }
+
+    public function test_status_read_posterior_no_sobreescriu_opened_at()
+    {
+        $account = $this->createTestAccount();
+        [$thread] = $this->createOutboundMessage($account, 'wamid.qw4');
+        $original = '2026-01-01 10:00:00';
+        $thread->opened_at = $original;
+        $thread->save();
+
+        $this->runJob($account, $this->statusPayload($account, 'wamid.qw4', 'read'));
+
+        // Es conserva la primera lectura. Cast a string: robust tant si el
+        // model retorna Carbon com si retorna l'string cru de la BD.
+        $this->assertEquals($original, (string) Thread::find($thread->id)->opened_at);
+    }
+
+    public function test_status_delivered_no_toca_opened_at()
+    {
+        $account = $this->createTestAccount();
+        [$thread] = $this->createOutboundMessage($account, 'wamid.qw5');
+
+        $this->runJob($account, $this->statusPayload($account, 'wamid.qw5', 'delivered'));
+
+        $this->assertNull(Thread::find($thread->id)->opened_at);
+    }
+
     public function test_compte_inactiu_no_processa_res()
     {
         $account = $this->createTestAccount(['is_active' => false]);

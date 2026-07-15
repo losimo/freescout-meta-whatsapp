@@ -160,11 +160,18 @@ class ProcessInboundWebhook implements ShouldQueue
             DB::transaction(function () use ($account, $wamid, $phone, $userId, $profileName, $text) {
                 $customer = $this->resolveCustomer($account, $phone, $userId, $profileName);
 
+                // Patró de xat del core (#4902): es reutilitza la darrera conversa
+                // encara que estigui tancada (es reobre), tret que l'opció de
+                // bústia 'chat_start_new' digui de començar-ne una de nova.
                 $conversation = Conversation::where('mailbox_id', $account->mailbox_id)
                     ->where('customer_id', $customer->id)
-                    ->whereNotIn('status', [Conversation::STATUS_CLOSED, Conversation::STATUS_SPAM])
+                    ->where('status', '!=', Conversation::STATUS_SPAM)
                     ->orderBy('created_at', 'desc')
                     ->first();
+
+                if ($conversation && $conversation->chatShouldStartNew($account->mailbox)) {
+                    $conversation = null;
+                }
 
                 $isNew = !$conversation;
                 $body  = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
@@ -502,6 +509,20 @@ class ProcessInboundWebhook implements ShouldQueue
             $record->error_code = (string) ($status['errors'][0]['code'] ?? '');
         }
         $record->save();
+
+        // Indicador de lectura natiu (issue #3): el 'read' de Meta marca el
+        // thread outbound com a obert, igual que el píxel de tracking dels
+        // emails (OpenController). Només la primera lectura.
+        if ($newStatus === 'read'
+            && $record->direction === WhatsAppMessage::DIRECTION_OUTBOUND
+            && $record->thread_id
+        ) {
+            $thread = Thread::find($record->thread_id);
+            if ($thread && !$thread->opened_at) {
+                $thread->opened_at = now();
+                $thread->save();
+            }
+        }
     }
 
     public function failed(\Throwable $e)
