@@ -10,6 +10,7 @@ return [
     'section_identification'       => 'Identificació del canal',
     'section_credentials'          => 'Credencials de l\'API',
     'section_webhook'              => 'Webhook',
+    'section_template_recovery'    => 'Recuperació de finestra caducada',
     'section_mailbox'              => 'Bústia associada',
 
     'channel_name'                 => 'Nom del canal',
@@ -33,6 +34,13 @@ return [
     'webhook_url'                  => 'URL del webhook',
     'webhook_url_help'             => 'Copia aquesta URL a la configuració del webhook de la teva aplicació Meta.',
     'copy'                         => 'Copia',
+
+    'template_name'                => 'Nom de la plantilla de recuperació',
+    'template_name_help'           => 'Nom exacte d\'una plantilla ja aprovada a WhatsApp Manager. No s\'admeten variables.',
+    'template_cost_warning'        => 'Meta factura els missatges de plantilla per conversa.',
+    'template_lang'                => 'Codi d\'idioma de la plantilla',
+    'template_threshold'           => 'Llindar de caducitat de la finestra (minuts)',
+    'template_threshold_help'      => 'La finestra oficial d\'atenció al client de Meta és de 24 hores des de l\'últim missatge del client. Aquesta opció només defineix quan el mòdul comença a tractar la finestra com a caducada, com a marge de seguretat operatiu intern — no canvia la regla de Meta. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Consulta la documentació de Meta</a>.',
 
     'mailbox'                      => 'Bústia',
     'mailbox_mode_new'             => 'Crea una bústia nova per a aquest canal',
@@ -62,4 +70,14 @@ return [
     'account_updated'              => 'Compte de WhatsApp actualitzat.',
     'account_deleted'              => 'Compte de WhatsApp eliminat.',
     'account_deleted_mailbox_kept' => 'Compte de WhatsApp eliminat. La bústia s\'ha conservat perquè conté converses.',
+
+    // Banner de finestra expirada (conversa).
+    'window_expired_notice'        => 'La finestra de 24 hores d\'atenció al client sembla haver caducat. És probable que Meta rebutgi les respostes de text lliure.',
+    'send_template_button'         => 'Envia la plantilla ":name"',
+    'template_sent'                => 'Missatge de plantilla encuat per enviar.',
+    'template_not_configured'      => 'Aquest compte de WhatsApp no té cap plantilla de recuperació configurada.',
+    'template_no_phone'            => 'No s\'ha pogut resoldre cap número de telèfon per a aquesta conversa.',
+    'template_no_phone_notice'     => 'Aquest contacte no té telèfon registrat (els contactes només amb ID de WhatsApp encara no admeten l\'enviament de plantilles — previst per a la fase 2b).',
+    'template_window_open'         => 'La finestra del client ha tornat a obrir-se: envia una resposta normal en comptes d\'una plantilla de pagament.',
+    'template_already_sent'        => 'Ja s\'ha enviat una plantilla fa uns moments per a aquesta conversa.',
 ];

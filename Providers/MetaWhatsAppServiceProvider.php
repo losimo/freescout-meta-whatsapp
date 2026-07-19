@@ -4,6 +4,7 @@ namespace Modules\MetaWhatsApp\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
+use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 
 class MetaWhatsAppServiceProvider extends ServiceProvider
 {
@@ -62,6 +63,30 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 echo '<style>#toggle-cc, .sidebar-title-email { display: none !important; }</style>';
             }
         });
+
+        // Banner de finestra expirada: només si la conversa és del mòdul
+        // (té fila meta_whatsapp_messages) i la finestra ha caducat.
+        // Signatura verificada al core (view.blade.php): 2 arguments.
+        \Eventy::addAction('conversation.after_subject_block', function ($conversation, $mailbox) {
+            $accountId = WhatsAppMessage::where('conversation_id', $conversation->id)
+                ->value('account_id');
+            if (!$accountId) {
+                return;
+            }
+            $account = WhatsAppAccount::find($accountId);
+            if (!$account || !WhatsAppMessage::windowExpired($conversation->id, $account)) {
+                return;
+            }
+            $phone = WhatsAppMessage::where('conversation_id', $conversation->id)
+                ->whereNotNull('contact_phone')
+                ->orderByDesc('id')
+                ->value('contact_phone');
+            echo view('metawhatsapp::partials/window_banner', [
+                'conversation' => $conversation,
+                'account'      => $account,
+                'phone'        => $phone,
+            ])->render();
+        }, 20, 2);
     }
 
     protected function currentPageIsWhatsAppMailbox(): bool
@@ -116,7 +141,7 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 ->where('channel', WhatsAppAccount::CHANNEL)
                 ->value('channel_id');
         if (!$phone) {
-            \Log::warning('[MetaWhatsApp] Reply sense telèfon de destinatari, no enviat', [
+            \Log::warning('[MetaWhatsApp] Reply without recipient phone, not sent', [
                 'conversation_id' => $conversation->id,
             ]);
             return;

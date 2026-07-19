@@ -121,7 +121,42 @@
                     </div>
                 </div>
 
-                {{-- Secció 4: Bústia associada (només en alta; immutable en edició) --}}
+                {{-- Secció 4: Recuperació de finestra expirada (MVP issue #2) --}}
+                <h4 style="margin-top:30px">{{ __('metawhatsapp::metawhatsapp.section_template_recovery') }}</h4>
+                <hr style="margin-top:5px">
+
+                <div class="form-group{{ $errors->has('template_name') ? ' has-error' : '' }}">
+                    <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.template_name') }}</label>
+                    <div class="col-sm-8">
+                        <input type="text" name="template_name" class="form-control" maxlength="512"
+                               value="{{ old('template_name', $account->template_name ?? '') }}">
+                        <p class="help-block">{{ __('metawhatsapp::metawhatsapp.template_name_help') }}</p>
+                        <p class="help-block">{{ __('metawhatsapp::metawhatsapp.template_cost_warning') }}</p>
+                        @if($errors->has('template_name'))<p class="help-block">{{ $errors->first('template_name') }}</p>@endif
+                    </div>
+                </div>
+
+                <div class="form-group{{ $errors->has('template_lang') ? ' has-error' : '' }}">
+                    <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.template_lang') }}</label>
+                    <div class="col-sm-8">
+                        <input type="text" name="template_lang" class="form-control" maxlength="15"
+                               value="{{ old('template_lang', $account->template_lang ?? '') }}"
+                               placeholder="es_ES">
+                        @if($errors->has('template_lang'))<p class="help-block">{{ $errors->first('template_lang') }}</p>@endif
+                    </div>
+                </div>
+
+                <div class="form-group{{ $errors->has('template_threshold_minutes') ? ' has-error' : '' }}">
+                    <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.template_threshold') }}</label>
+                    <div class="col-sm-8">
+                        <input type="number" name="template_threshold_minutes" class="form-control" min="1" max="1440"
+                               value="{{ old('template_threshold_minutes', $account->template_threshold_minutes ?? 1435) }}">
+                        <p class="help-block">{!! __('metawhatsapp::metawhatsapp.template_threshold_help') !!}</p>
+                        @if($errors->has('template_threshold_minutes'))<p class="help-block">{{ $errors->first('template_threshold_minutes') }}</p>@endif
+                    </div>
+                </div>
+
+                {{-- Secció 5: Bústia associada (només en alta; immutable en edició) --}}
                 @if(!$account)
                     <h4 style="margin-top:30px">{{ __('metawhatsapp::metawhatsapp.section_mailbox') }}</h4>
                     <hr style="margin-top:5px">

@@ -2,10 +2,14 @@
 
 namespace Modules\MetaWhatsApp\Http\Controllers;
 
+use App\Conversation;
 use App\Mailbox;
+use App\Thread;
 use Illuminate\Routing\Controller;
 use Modules\MetaWhatsApp\Http\Requests\WhatsAppAccountRequest;
+use Modules\MetaWhatsApp\Jobs\SendWhatsAppTemplate;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
+use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 
 class MetaWhatsAppController extends Controller
 {
@@ -53,6 +57,7 @@ class MetaWhatsAppController extends Controller
         $account = new WhatsAppAccount();
         $account->fill($request->only([
             'name', 'phone_number', 'phone_number_id', 'waba_id', 'verify_token',
+            'template_name', 'template_lang', 'template_threshold_minutes',
         ]));
         $account->mailbox_id           = $mailboxId;
         $account->auto_created_mailbox = $autoCreated;
@@ -80,6 +85,7 @@ class MetaWhatsAppController extends Controller
         // L'associació canal-bústia és immutable en edició (spec v0.3 §3.2).
         $account->fill($request->only([
             'name', 'phone_number', 'phone_number_id', 'waba_id', 'verify_token',
+            'template_name', 'template_lang', 'template_threshold_minutes',
         ]));
         if ($request->filled('access_token')) {
             $account->access_token = encrypt($request->access_token);
@@ -113,6 +119,86 @@ class MetaWhatsAppController extends Controller
 
         \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.account_deleted'));
         return redirect()->route('metawhatsapp.settings');
+    }
+
+    /**
+     * Banner de finestra expirada: enviament manual de la plantilla de
+     * recuperació des de la conversa. Mateix guard d'autorització que
+     * ConversationsController::view() del core (policy viewCached).
+     */
+    public function sendTemplate($id)
+    {
+        $conversation = Conversation::find($id);
+        if (!$conversation) {
+            abort(404);
+        }
+
+        if (!auth()->user() || !auth()->user()->can('viewCached', $conversation)) {
+            abort(403);
+        }
+
+        // Conversa "del mòdul": té almenys una fila meta_whatsapp_messages
+        // (mateix criteri que fa servir el banner al ServiceProvider).
+        $accountId = WhatsAppMessage::where('conversation_id', $conversation->id)->value('account_id');
+        $account   = $accountId ? WhatsAppAccount::find($accountId) : null;
+        if (!$account) {
+            abort(404);
+        }
+
+        $phone = WhatsAppMessage::where('conversation_id', $conversation->id)
+            ->whereNotNull('contact_phone')
+            ->orderByDesc('id')
+            ->value('contact_phone');
+        if (!$phone) {
+            return redirect()->back()
+                ->withErrors(['send_template' => __('metawhatsapp::metawhatsapp.template_no_phone')]);
+        }
+
+        if (empty($account->template_name) || empty($account->template_lang)) {
+            return redirect()->back()
+                ->withErrors(['send_template' => __('metawhatsapp::metawhatsapp.template_not_configured')]);
+        }
+
+        // Re-check de finestra al servidor: el banner es pot haver renderitzat
+        // fa temps (pestanya oberta) i el client pot haver escrit mentrestant.
+        // Sense aquest guard s'enviaria una plantilla de pagament innecessària
+        // quan una resposta normal ja funcionaria.
+        if (!WhatsAppMessage::windowExpired($conversation->id, $account)) {
+            return redirect()->back()
+                ->withErrors(['send_template' => __('metawhatsapp::metawhatsapp.template_window_open')]);
+        }
+
+        // Idempotència: evita el doble enviament (doble clic, doble POST del
+        // formulari, reintent de xarxa...) si ja s'ha creat un thread
+        // d'auditoria de plantilla per a aquesta conversa fa poc.
+        $recentTemplateSent = Thread::where('conversation_id', $conversation->id)
+            ->where('body', 'like', '[WhatsApp template]%')
+            ->where('created_at', '>=', now()->subSeconds(60))
+            ->exists();
+        if ($recentTemplateSent) {
+            return redirect()->back()
+                ->withErrors(['send_template' => __('metawhatsapp::metawhatsapp.template_already_sent')]);
+        }
+
+        // Thread d'auditoria: deixa constància visible a la conversa de qui
+        // i quan s'ha disparat l'enviament de la plantilla.
+        $thread = new Thread();
+        $thread->conversation_id    = $conversation->id;
+        $thread->user_id            = auth()->id();
+        $thread->type               = Thread::TYPE_MESSAGE;
+        $thread->status             = $conversation->status;
+        $thread->state              = Thread::STATE_PUBLISHED;
+        $thread->body               = '[WhatsApp template] ' . $account->template_name;
+        $thread->source_via         = Thread::PERSON_USER;
+        $thread->source_type        = Thread::SOURCE_TYPE_WEB;
+        $thread->customer_id        = $conversation->customer_id;
+        $thread->created_by_user_id = auth()->id();
+        $thread->save();
+
+        SendWhatsAppTemplate::dispatch($account->id, $thread->id, $phone);
+
+        \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.template_sent'));
+        return redirect()->back();
     }
 
     /**

@@ -33,12 +33,7 @@ class WhatsAppApiClient
      */
     public function sendText(string $to, string $text): array
     {
-        $url = rtrim(config('metawhatsapp.api_base', 'https://graph.facebook.com'), '/')
-            . '/' . self::API_VERSION
-            . '/' . $this->account->phone_number_id
-            . '/messages';
-
-        $body = json_encode([
+        return $this->postMessagePayload([
             'messaging_product' => 'whatsapp',
             'recipient_type'    => 'individual',
             'to'                => $to,
@@ -48,6 +43,40 @@ class WhatsAppApiClient
                 'body'        => $text,
             ],
         ]);
+    }
+
+    /**
+     * Envia una plantilla pre-aprovada (fora de la finestra de 24 h).
+     * Mateix retorn estructurat que sendText().
+     */
+    public function sendTemplate(string $to, string $name, string $lang): array
+    {
+        return $this->postMessagePayload([
+            'messaging_product' => 'whatsapp',
+            'recipient_type'    => 'individual',
+            'to'                => $to,
+            'type'              => 'template',
+            'template'          => [
+                'name'     => $name,
+                'language' => ['code' => $lang],
+            ],
+        ]);
+    }
+
+    /**
+     * Transport comú: construeix la URL, fa la crida cURL a Meta i normalitza
+     * la resposta al retorn estructurat descrit a sendText(). Extret de
+     * sendText() perquè sendTemplate() (i qualsevol futur tipus de missatge)
+     * el reutilitzin sense duplicar la part de xarxa.
+     */
+    protected function postMessagePayload(array $payload): array
+    {
+        $url = rtrim(config('metawhatsapp.api_base', 'https://graph.facebook.com'), '/')
+            . '/' . self::API_VERSION
+            . '/' . $this->account->phone_number_id
+            . '/messages';
+
+        $body = json_encode($payload);
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [

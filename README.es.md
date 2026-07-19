@@ -34,13 +34,13 @@ Esta v1 cubre:
 - Creación automática de conversaciones en FreeScout a partir de mensajes entrantes.
 - Respuesta desde FreeScout hacia WhatsApp respetando la ventana de deshacer del core.
 - Actualización best-effort de los estados `delivered` y `read` en la base de datos del módulo.
+- Desde la v1.2.0, el estado `read` de Meta también marca el thread outbound como abierto, con el indicador nativo "abierto" de FreeScout.
+- Desde la v1.3.0, recuperación manual de una ventana caducada con una única plantilla HSM preaprobada — ver [Recuperación de ventana caducada](#recuperación-de-ventana-caducada-v130) más abajo.
 
 Queda fuera de alcance en esta versión:
 
 - Multimedia entrante o saliente.
-- Plantillas HSM.
-- Mensajes fuera de la ventana de 24 horas.
-- Indicadores visuales de `delivered/read` en la conversación.
+- Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
 ## Instalación
@@ -134,7 +134,16 @@ Si se intenta responder fuera de ventana:
 - El mensaje queda registrado como fallido.
 - El cliente no recibe ninguna respuesta.
 
-En esta v1 no se implementan plantillas HSM para abrir o retomar conversaciones fuera de ventana.
+Desde la v1.3.0, una ventana caducada se puede recuperar manualmente con una plantilla HSM preaprobada — ver más abajo.
+
+### Recuperación de ventana caducada (v1.3.0)
+
+Cuando la ventana del cliente parece caducada, aparece un banner en la conversación que permite enviar **una única plantilla de WhatsApp preaprobada**, configurada por cuenta (nombre + idioma). El envío es siempre **manual**: un agente pulsa el botón del banner; no hay ningún reintento automático de plantilla.
+
+- Solo se admite **una** plantilla por cuenta; no hay selector de plantillas ni variables/parámetros.
+- Que aparezca el banner depende de un **umbral operativo interno configurable** (`template_threshold_minutes`, por defecto **1435 minutos**). Este umbral solo determina cuándo el módulo empieza a tratar la ventana como caducada para su propia UI — no cambia la regla real de las 24 horas de Meta. Consulta la [documentación de Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages).
+- Antes de enviar la plantilla de verdad, el servidor vuelve a comprobar la ventana y rechaza la petición si el cliente ha vuelto a escribir mientras tanto (ventana reabierta) o si ya se ha enviado una plantilla para la misma conversación en los últimos 60 segundos (protección contra doble clic / doble envío).
+- Meta **factura** los mensajes de plantilla igual que cualquier otra plantilla HSM, de forma independiente a este módulo.
 
 ### Token inválido o caducado
 
@@ -150,9 +159,9 @@ Estas limitaciones son conocidas y aceptadas en el alcance del MVP:
 
 - Solo se procesan mensajes de **texto plano**.
 - Los mensajes entrantes multimedia, documentos, audio o reacciones no se procesan como conversación útil.
-- No hay soporte para **plantillas HSM**.
-- No se pueden enviar mensajes fuera de la ventana de 24 horas.
-- Los estados `delivered` y `read` se actualizan en la base de datos del módulo, pero **no se muestran visualmente** dentro de la conversación.
+- Solo **una** plantilla HSM preaprobada por cuenta (configurada en la cuenta); sin selector de plantillas, sin variables/parámetros, sin sincronización automática con el catálogo de plantillas de Meta.
+- El envío de la plantilla de recuperación es siempre **manual**, iniciado por un agente desde el banner de la conversación; no hay reintento automático fuera de ventana.
+- Los estados `delivered` y `read` se actualizan en la base de datos del módulo; solo el `read` se muestra visualmente (vía el indicador nativo "abierto" del thread) — el `delivered` no se muestra en la conversación.
 - Si Meta agrupa en un solo envío de webhook eventos de **números diferentes**, solo se procesan los de la cuenta correspondiente al primero; el resto se descarta con un aviso en el log. En la práctica Meta suele enviar webhooks separados por número, pero conviene tenerlo presente con varios números bajo la misma App.
 - En modo chat, el core de FreeScout puede generar **borradores vacíos** en la conversación por el autoguardado del editor; son inocuos y se pueden descartar manualmente.
 - El **buzón técnico** del canal sigue siendo visible en **Gestionar → Buzones**.

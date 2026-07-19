@@ -12,7 +12,16 @@ use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 
-class SendWhatsAppMessage implements ShouldQueue
+/**
+ * Mirall de SendWhatsAppMessage per al mecanisme de recuperació: envia una
+ * plantilla pre-aprovada quan la finestra de servei de 24 h ha expirat.
+ * Diferències respecte al job de text pla: (a) llegeix template_name/
+ * template_lang del compte i avorta si no hi són; (b) crida sendTemplate()
+ * en lloc de sendText() — per tant no hi ha branch 131047 (fora de
+ * finestra), ja que la plantilla és precisament el mecanisme legal per
+ * a aquest cas.
+ */
+class SendWhatsAppTemplate implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;
 
@@ -39,7 +48,7 @@ class SendWhatsAppMessage implements ShouldQueue
     {
         $account = WhatsAppAccount::find($this->accountId);
         if (!$account || !$account->is_active) {
-            Log::warning('[MetaWhatsApp] SendWhatsAppMessage: account missing or inactive', [
+            Log::warning('[MetaWhatsApp] SendWhatsAppTemplate: account missing or inactive', [
                 'account_id' => $this->accountId,
                 'thread_id'  => $this->threadId,
             ]);
@@ -55,8 +64,7 @@ class SendWhatsAppMessage implements ShouldQueue
         }
 
         // Guard post-undo (H7/A6): estat SEMPRE fresc de BD, mai del model
-        // serialitzat. L'undo converteix el thread en draft i no cancel·la
-        // el TriggerAction que ens ha portat fins aquí.
+        // serialitzat.
         $thread = Thread::find($this->threadId);
         if (!$thread
             || $thread->type != Thread::TYPE_MESSAGE
@@ -65,12 +73,22 @@ class SendWhatsAppMessage implements ShouldQueue
             return;
         }
 
-        $text = trim(\Helper::htmlToText($thread->body));
-        if ($text === '') {
+        // Diferència (a): sense plantilla configurada no hi ha res legal
+        // a enviar fora de la finestra de 24 h.
+        if (empty($account->template_name) || empty($account->template_lang)) {
+            Log::warning('[MetaWhatsApp] Template not configured for the account', [
+                'account_id' => $account->id,
+                'thread_id'  => $thread->id,
+            ]);
+            $this->recordFailure($account->id, $thread, 'template-not-configured');
             return;
         }
 
-        $result = (new WhatsAppApiClient($account))->sendText($this->toPhone, $text);
+        $result = $this->makeClient($account)->sendTemplate(
+            $this->toPhone,
+            $account->template_name,
+            $account->template_lang
+        );
 
         if ($result['ok']) {
             WhatsAppMessage::create([
@@ -88,11 +106,12 @@ class SendWhatsAppMessage implements ShouldQueue
         // Errors transitoris (5xx, xarxa): reintent via $tries, sense fila.
         if ($result['transient']) {
             throw new \RuntimeException(
-                '[MetaWhatsApp] Error transitori enviant a Meta: ' . $result['error_message']
+                '[MetaWhatsApp] Error transitori enviant plantilla a Meta: ' . $result['error_message']
             );
         }
 
-        // Errors semàntics: reintentar no canvia el resultat.
+        // Errors semàntics: reintentar no canvia el resultat. Diferència (b):
+        // no hi ha branch 131047 aquí (vegeu docblock de la classe).
         if ($result['error_code'] === '190') {
             // Token invàlid o expirat: desactivar el compte perquè l'admin
             // ho vegi al llistat (○ Inactiu) i no cremar més crides.
@@ -101,13 +120,8 @@ class SendWhatsAppMessage implements ShouldQueue
             Log::error('[MetaWhatsApp] Access token rejected by Meta (190): account deactivated', [
                 'account_id' => $account->id,
             ]);
-        } elseif ($result['error_code'] === '131047') {
-            Log::warning('[MetaWhatsApp] Outside the 24h window (131047): message not delivered', [
-                'account_id' => $account->id,
-                'thread_id'  => $thread->id,
-            ]);
         } else {
-            Log::error('[MetaWhatsApp] Meta semantic error sending message', [
+            Log::error('[MetaWhatsApp] Meta semantic error sending template', [
                 'account_id' => $account->id,
                 'thread_id'  => $thread->id,
                 'error_code' => $result['error_code'],
@@ -116,6 +130,15 @@ class SendWhatsAppMessage implements ShouldQueue
         }
 
         $this->recordFailure($account->id, $thread, (string) $result['error_code']);
+    }
+
+    /**
+     * Seam d'instanciació: permet substituir el transport HTTP a tests
+     * (bind al contenidor) sense tocar la resta de la lògica del job.
+     */
+    protected function makeClient(WhatsAppAccount $account): WhatsAppApiClient
+    {
+        return app(WhatsAppApiClient::class, ['account' => $account]);
     }
 
     protected function recordFailure(int $accountId, Thread $thread, string $errorCode)
@@ -135,7 +158,7 @@ class SendWhatsAppMessage implements ShouldQueue
 
     public function failed(\Throwable $e)
     {
-        Log::error('[MetaWhatsApp] SendWhatsAppMessage failed permanently', [
+        Log::error('[MetaWhatsApp] SendWhatsAppTemplate failed permanently', [
             'account_id' => $this->accountId,
             'thread_id'  => $this->threadId,
             'error'      => $e->getMessage(),

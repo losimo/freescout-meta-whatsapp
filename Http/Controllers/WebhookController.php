@@ -46,7 +46,7 @@ class WebhookController extends Controller
 
         $payload = json_decode($rawBody, true);
         if (!is_array($payload)) {
-            \Log::warning('[MetaWhatsApp] Webhook rebutjat: JSON invàlid', ['ip' => $request->ip()]);
+            \Log::warning('[MetaWhatsApp] Webhook rejected: invalid JSON', ['ip' => $request->ip()]);
             return response('Forbidden', 403);
         }
 
@@ -54,7 +54,7 @@ class WebhookController extends Controller
         // el primer phone_number_id identifica el compte i, per tant, l'app_secret.
         $phoneNumberId = $payload['entry'][0]['changes'][0]['value']['metadata']['phone_number_id'] ?? null;
         if (!$phoneNumberId) {
-            \Log::warning('[MetaWhatsApp] Webhook rebutjat: sense phone_number_id', ['ip' => $request->ip()]);
+            \Log::warning('[MetaWhatsApp] Webhook rejected: missing phone_number_id', ['ip' => $request->ip()]);
             return response('Forbidden', 403);
         }
 
@@ -62,7 +62,7 @@ class WebhookController extends Controller
             ->where('is_active', true)
             ->first();
         if (!$account) {
-            \Log::warning('[MetaWhatsApp] Webhook rebutjat: compte desconegut o inactiu', [
+            \Log::warning('[MetaWhatsApp] Webhook rejected: unknown or inactive account', [
                 'phone_number_id' => $phoneNumberId,
                 'ip'              => $request->ip(),
             ]);
@@ -72,7 +72,7 @@ class WebhookController extends Controller
         $signature = $request->header('X-Hub-Signature-256', '');
         $expected  = 'sha256=' . hash_hmac('sha256', $rawBody, decrypt($account->app_secret));
         if (!$signature || !hash_equals($expected, $signature)) {
-            \Log::warning('[MetaWhatsApp] Webhook rebutjat: signatura absent o invàlida', [
+            \Log::warning('[MetaWhatsApp] Webhook rejected: missing or invalid signature', [
                 'account_id' => $account->id,
                 'ip'         => $request->ip(),
             ]);

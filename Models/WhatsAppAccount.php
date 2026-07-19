@@ -33,6 +33,9 @@ class WhatsAppAccount extends Model
         'verify_token',
         'auto_created_mailbox',
         'is_active',
+        'template_name',
+        'template_lang',
+        'template_threshold_minutes',
     ];
 
     // access_token i app_secret mai fillable: s'assignen explícitament amb encrypt().

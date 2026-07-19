@@ -34,13 +34,13 @@ Aquesta v1 cobreix:
 - Creació automàtica de converses a FreeScout a partir de missatges entrants.
 - Resposta des de FreeScout cap a WhatsApp respectant la finestra d'undo del core.
 - Actualització best-effort dels estats `delivered` i `read` a la base de dades del mòdul.
+- Des de la v1.2.0, l'estat `read` de Meta també marca el thread outbound com a obert, amb l'indicador natiu "obert" de FreeScout.
+- Des de la v1.3.0, recuperació manual d'una finestra caducada amb una única plantilla HSM pre-aprovada — vegeu [Recuperació de finestra caducada](#recuperació-de-finestra-caducada-v130) més avall.
 
 Queda fora d'abast en aquesta versió:
 
 - Multimèdia entrant o sortint.
-- Plantilles HSM.
-- Missatges fora de la finestra de 24 hores.
-- Indicadors visuals de `delivered/read` a la conversa.
+- Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
 ## Instal·lació
@@ -134,7 +134,16 @@ Si s'intenta respondre fora de finestra:
 - El missatge queda registrat com a fallit.
 - El client no rep cap resposta.
 
-En aquesta v1 no s'implementen plantilles HSM per obrir o reprendre converses fora de finestra.
+Des de la v1.3.0, una finestra caducada es pot recuperar manualment amb una plantilla HSM pre-aprovada — vegeu més avall.
+
+### Recuperació de finestra caducada (v1.3.0)
+
+Quan la finestra del client sembla caducada, apareix un banner a la conversa que permet enviar **una única plantilla de WhatsApp pre-aprovada**, configurada per compte (nom + idioma). L'enviament és sempre **manual**: un agent prem el botó del banner; no hi ha cap reintent automàtic de plantilla.
+
+- Només s'admet **una** plantilla per compte; no hi ha selector de plantilles ni variables/paràmetres.
+- Que aparegui el banner depèn d'un **llindar operatiu intern configurable** (`template_threshold_minutes`, per defecte **1435 minuts**). Aquest llindar només determina quan el mòdul comença a tractar la finestra com a caducada per a la seva pròpia UI — no canvia la regla real de les 24 hores de Meta. Consulta la [documentació de Meta](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages).
+- Abans d'enviar la plantilla de debò, el servidor torna a comprovar la finestra i rebutja la petició si el client ha tornat a escriure mentrestant (finestra reoberta) o si ja s'ha enviat una plantilla per a la mateixa conversa en els últims 60 segons (protecció contra doble clic / doble enviament).
+- Meta **factura** els missatges de plantilla igual que qualsevol altra plantilla HSM, de manera independent a aquest mòdul.
 
 ### Token invàlid o caducat
 
@@ -150,9 +159,9 @@ Aquestes limitacions són conegudes i acceptades en l'abast del MVP:
 
 - Només es processen missatges de **text pla**.
 - Missatges entrants de tipus multimèdia, documents, àudio o reaccions no es processen com a conversa útil.
-- No hi ha suport per a **plantilles HSM**.
-- No es poden enviar missatges fora de la finestra de 24 hores.
-- Els estats `delivered` i `read` s'actualitzen a la base de dades del mòdul, però **no es mostren visualment** dins de la conversa.
+- Només **una** plantilla HSM pre-aprovada per compte (configurada al compte); sense selector de plantilles, sense variables/paràmetres, sense sincronització automàtica amb el catàleg de plantilles de Meta.
+- L'enviament de la plantilla de recuperació és sempre **manual**, iniciat per un agent des del banner de la conversa; no hi ha reintent automàtic fora de finestra.
+- Els estats `delivered` i `read` s'actualitzen a la base de dades del mòdul; només el `read` es mostra visualment (via l'indicador natiu "obert" del thread) — el `delivered` no es mostra a la conversa.
 - Si Meta agrupa en un sol enviament de webhook esdeveniments de **números diferents**, només es processen els del compte corresponent al primer; la resta es descarta amb un avís al log. En la pràctica Meta sol enviar webhooks separats per número, però amb diversos números sota la mateixa App convé tenir-ho present.
 - En mode xat, el core de FreeScout pot generar **esborranys buits** a la conversa per l'autodesat de l'editor; són innocus i es poden descartar manualment.
 - La **bústia tècnica** del canal continua sent visible a **Gestionar → Bústies**.

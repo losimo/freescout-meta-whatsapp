@@ -40,7 +40,7 @@ class ProcessInboundWebhook implements ShouldQueue
     {
         $account = WhatsAppAccount::with('mailbox')->find($this->accountId);
         if (!$account || !$account->is_active || !$account->mailbox) {
-            Log::warning('[MetaWhatsApp] ProcessInboundWebhook: compte inexistent, inactiu o sense bústia', [
+            Log::warning('[MetaWhatsApp] ProcessInboundWebhook: account missing, inactive, or without mailbox', [
                 'account_id' => $this->accountId,
             ]);
             return;
@@ -58,7 +58,7 @@ class ProcessInboundWebhook implements ShouldQueue
                 // (evita misatribució entre canals i injecció creuada).
                 $changePhoneId = $value['metadata']['phone_number_id'] ?? null;
                 if ($changePhoneId !== $account->phone_number_id) {
-                    Log::warning('[MetaWhatsApp] Change amb phone_number_id que no coincideix amb el compte, descartat', [
+                    Log::warning('[MetaWhatsApp] Change with phone_number_id not matching the account, discarded', [
                         'account_id' => $account->id,
                     ]);
                     continue;
@@ -80,7 +80,7 @@ class ProcessInboundWebhook implements ShouldQueue
         $wamid = $message['id'] ?? null;
         $from  = $message['from'] ?? null;
         if (!$wamid || !$from) {
-            Log::warning('[MetaWhatsApp] Missatge sense wamid o remitent, descartat', [
+            Log::warning('[MetaWhatsApp] Message without wamid or sender, discarded', [
                 'account_id' => $account->id,
             ]);
             return;
@@ -88,9 +88,10 @@ class ProcessInboundWebhook implements ShouldQueue
 
         // MVP: només text pla. Meta no reenviarà el payload després del nostre 200.
         if (($message['type'] ?? '') !== 'text') {
-            Log::info('[MetaWhatsApp] Tipus de missatge no suportat, descartat', [
+            Log::error('[MetaWhatsApp] Unsupported message type, discarded', [
                 'account_id' => $account->id,
-                'type'       => $message['type'] ?? '(desconegut)',
+                'type'       => $message['type'] ?? '(unknown)',
+                'from'       => $from,
             ]);
             return;
         }
@@ -119,7 +120,7 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         if (!$phone && !$userId) {
-            Log::warning('[MetaWhatsApp] Remitent sense telèfon ni user_id vàlids, descartat', [
+            Log::warning('[MetaWhatsApp] Sender without valid phone or user_id, discarded', [
                 'account_id' => $account->id,
             ]);
             return;
@@ -279,7 +280,7 @@ class ProcessInboundWebhook implements ShouldQueue
 
         // Sanejament: cap a VARCHAR(100); només ASCII imprimible sense espais.
         if (!preg_match('/^[\x21-\x7E]{1,100}$/', $userId)) {
-            Log::warning('[MetaWhatsApp] contacts[].user_id amb format inesperat, ignorat', [
+            Log::warning('[MetaWhatsApp] contacts[].user_id has unexpected format, ignored', [
                 'account_id' => $account->id,
             ]);
             return null;
@@ -473,8 +474,27 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         if ($prev_status && $prev_status != $conversation->status) {
-            \Eventy::action('conversation.status_changed', $conversation, null, false, $prev_status);
+            $user = $this->resolveSystemUser($account, $conversation);
+
+            if ($user) {
+                \Eventy::action('conversation.status_changed', $conversation, $user, false, $prev_status);
+            }
         }
+    }
+
+    /**
+     * conversation.status_changed exigeix sempre un User no nul (el core i
+     * mòduls com Workflows hi accedeixen directament amb $user->id i
+     * exploten si és null, cf. issue #7). Fem servir l'agent assignat i,
+     * si no n'hi ha, el primer usuari amb accés a la bústia.
+     */
+    protected function resolveSystemUser(WhatsAppAccount $account, $conversation)
+    {
+        if ($conversation->user_id && $conversation->user) {
+            return $conversation->user;
+        }
+
+        return $account->mailbox->usersHavingAccess()->first();
     }
 
     protected function processStatus(WhatsAppAccount $account, array $status)
@@ -490,7 +510,7 @@ class ProcessInboundWebhook implements ShouldQueue
             ->first();
         if (!$record) {
             // Missatge anterior al mòdul o d'un altre sistema: best-effort.
-            Log::debug('[MetaWhatsApp] Status per a wamid desconegut', ['account_id' => $account->id]);
+            Log::debug('[MetaWhatsApp] Status for unknown wamid', ['account_id' => $account->id]);
             return;
         }
 

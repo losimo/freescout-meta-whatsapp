@@ -10,6 +10,7 @@ return [
     'section_identification'       => 'Channel identification',
     'section_credentials'          => 'API credentials',
     'section_webhook'              => 'Webhook',
+    'section_template_recovery'    => 'Expired window recovery',
     'section_mailbox'              => 'Associated mailbox',
 
     'channel_name'                 => 'Channel name',
@@ -33,6 +34,13 @@ return [
     'webhook_url'                  => 'Webhook URL',
     'webhook_url_help'             => 'Copy this URL to the webhook configuration of your Meta App.',
     'copy'                         => 'Copy',
+
+    'template_name'                => 'Recovery template name',
+    'template_name_help'           => 'Exact name of a template already approved in WhatsApp Manager. No variables are supported.',
+    'template_cost_warning'        => 'Template messages are billed by Meta per conversation.',
+    'template_lang'                => 'Template language code',
+    'template_threshold'           => 'Window expiry threshold (minutes)',
+    'template_threshold_help'      => 'Meta\'s official customer service window is 24 hours from the customer\'s last message. This setting only defines when the module starts treating the window as expired, as an internal operational safety margin — it does not change Meta\'s rule. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">See Meta docs</a>.',
 
     'mailbox'                      => 'Mailbox',
     'mailbox_mode_new'             => 'Create a new mailbox for this channel',
@@ -62,4 +70,14 @@ return [
     'account_updated'              => 'WhatsApp account updated.',
     'account_deleted'              => 'WhatsApp account deleted.',
     'account_deleted_mailbox_kept' => 'WhatsApp account deleted. The mailbox was kept because it contains conversations.',
+
+    // Banner de finestra expirada (conversa).
+    'window_expired_notice'        => 'The 24-hour customer service window appears to be expired. Free-form replies will likely be rejected by Meta.',
+    'send_template_button'         => 'Send template ":name"',
+    'template_sent'                => 'Template message queued for sending.',
+    'template_not_configured'      => 'No recovery template is configured for this WhatsApp account.',
+    'template_no_phone'            => 'No phone number could be resolved for this conversation.',
+    'template_no_phone_notice'     => 'This contact has no phone number on file (WhatsApp ID-only contacts are not yet supported for template sending — planned for phase 2b).',
+    'template_window_open'         => 'The customer window is open again — send a normal reply instead of a paid template.',
+    'template_already_sent'        => 'A template was already sent moments ago for this conversation.',
 ];

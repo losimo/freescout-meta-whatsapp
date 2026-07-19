@@ -28,10 +28,15 @@ abstract class TestCase extends BaseTestCase
         // sent" i HandleExceptions (error_reporting -1) ho converteix en
         // ErrorException -> 500. S'ignora només aquest warning; la resta es
         // delega al handler previ.
+        // Mockery (usat per Log::spy()/shouldReceive()) crida mètodes de
+        // ReflectionParameter deprecats en aquesta versió de PHP;
+        // HandleExceptions ho converteix igualment en ErrorException.
         $previousHandler = null;
         $previousHandler = set_error_handler(
             function ($severity, $message, $file = '', $line = 0) use (&$previousHandler) {
-                if (strpos($message, 'Cannot modify header information') !== false) {
+                if (strpos($message, 'Cannot modify header information') !== false
+                    || strpos($message, 'ReflectionParameter::') !== false
+                ) {
                     return true;
                 }
                 return $previousHandler

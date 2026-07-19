@@ -34,13 +34,13 @@ This v1 covers:
 - Automatic conversation creation in FreeScout from incoming messages.
 - Replies from FreeScout to WhatsApp honoring the core undo window.
 - Best-effort tracking of `delivered` and `read` states in the module database.
+- Since v1.2.0, a `read` receipt from Meta also marks the outbound thread as opened, using FreeScout's native "opened" indicator.
+- Since v1.3.0, manual recovery of an expired window with a single pre-approved HSM template — see [Expired window recovery](#expired-window-recovery-v130) below.
 
 Out of scope in this version:
 
 - Inbound or outbound media.
-- HSM templates.
-- Messages outside the 24-hour window.
-- Visual `delivered/read` indicators in the conversation.
+- Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
 ## Installation
@@ -134,7 +134,16 @@ If a reply is attempted outside the window:
 - The message is recorded as failed.
 - The customer receives nothing.
 
-This v1 does not implement HSM templates to open or resume conversations outside the window.
+Since v1.3.0, an expired window can be manually recovered with a pre-approved HSM template — see below.
+
+### Expired window recovery (v1.3.0)
+
+When the customer window looks expired, a banner appears in the conversation offering to send a **single pre-approved WhatsApp template**, configured per account (name + language). Sending is always **manual**: an agent clicks the button in the banner, there is no automatic template retry.
+
+- Only **one** template per account is supported; there is no template picker and no variables/parameters.
+- Whether the banner appears is governed by a configurable **internal operational threshold** (`template_threshold_minutes`, default **1435 minutes**). This threshold only controls when the module starts treating the window as expired for its own UI — it does **not** change Meta's real 24-hour rule. See the [Meta documentation](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages).
+- Before actually sending, the server re-checks the window and rejects the request if the customer has written again in the meantime (window re-opened) or if a template was already sent for the same conversation in the last 60 seconds (double-click / double-submit protection).
+- Template messages are **billed by Meta** like any other HSM template, independently of this module.
 
 ### Invalid or expired token
 
@@ -150,9 +159,9 @@ These limitations are known and accepted within the MVP scope:
 
 - Only **plain text** messages are processed.
 - Incoming media, documents, audio or reactions are not turned into useful conversations.
-- No **HSM template** support.
-- No messages outside the 24-hour window.
-- `delivered` and `read` states are stored in the module database but **not shown visually** in the conversation.
+- Only **one** pre-approved HSM template per account (set on the account); no template picker, no variables/parameters, no automatic sync with Meta's template catalog.
+- Sending the recovery template is always **manual**, triggered by an agent from the conversation banner; there is no automatic retry outside the window.
+- `delivered` and `read` states are stored in the module database; only `read` is shown visually (via the thread's native "opened" indicator) — `delivered` is not shown in the conversation.
 - If Meta batches webhook events of **different numbers** in a single delivery, only those matching the first resolved account are processed; the rest are discarded with a log warning. In practice Meta usually delivers separate webhooks per number, but keep this in mind with several numbers under the same App.
 - In chat mode, the FreeScout core may leave **empty drafts** in the conversation due to editor autosave; they are harmless and can be discarded manually.
 - The channel's **technical mailbox** remains visible under **Manage → Mailboxes**.

@@ -6,7 +6,9 @@ use App\Conversation;
 use App\Customer;
 use App\CustomerChannel;
 use App\Thread;
+use App\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Jobs\ProcessInboundWebhook;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
@@ -294,6 +296,55 @@ class ProcessInboundWebhookTest extends TestCase
         $msg2 = WhatsAppMessage::where('wamid', 'wamid.qw1b')->first();
         $this->assertEquals($msg1->conversation_id, $msg2->conversation_id);
         $this->assertEquals(Conversation::STATUS_ACTIVE, Conversation::find($msg1->conversation_id)->status);
+    }
+
+    /**
+     * Issue #7: firePostEvents() passava null com a $user a
+     * conversation.status_changed, cosa que fa petar mòduls com Workflows
+     * (accedeixen a $user->id sense comprovar null) i es perd el missatge.
+     */
+    public function test_status_changed_event_rep_sempre_un_user_no_null()
+    {
+        $account = $this->createTestAccount();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.st1a', '34611222333', 'hola'));
+        $msg1 = WhatsAppMessage::where('wamid', 'wamid.st1a')->first();
+        $conversation = Conversation::find($msg1->conversation_id);
+        $conversation->status = Conversation::STATUS_CLOSED;
+        $conversation->save();
+
+        $capturedUser = 'listener-not-called';
+        \Eventy::addAction('conversation.status_changed', function ($conv, $user, $changedOnReply, $prevStatus) use (&$capturedUser) {
+            $capturedUser = $user;
+        }, 20, 4);
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.st1b', '34611222333', 'una altra cosa'));
+
+        $this->assertInstanceOf(User::class, $capturedUser);
+        $this->assertNotNull($capturedUser->id);
+    }
+
+    /**
+     * Issue #8: el descart de tipus no suportats loguejava a nivell info i
+     * sense el remitent, fent-lo invisible amb APP_LOG_LEVEL=error (defecte).
+     */
+    public function test_tipus_no_suportat_es_registra_en_error_amb_remitent()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+
+        $payload = $this->inboundPayload($account, 'wamid.au1', '34611222333', 'irrelevant');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type'] = 'audio';
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['audio'] = ['id' => 'media-id-123'];
+        unset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']);
+
+        $this->runJob($account, $payload);
+
+        Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
+            return $message === '[MetaWhatsApp] Unsupported message type, discarded'
+                && ($context['from'] ?? null) === '34611222333'
+                && ($context['type'] ?? null) === 'audio';
+        })->once();
     }
 
     public function test_conversa_tancada_amb_opcio_de_bustia_crea_conversa_nova()

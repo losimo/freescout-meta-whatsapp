@@ -33,4 +33,24 @@ class WhatsAppMessage extends Model
     {
         return $this->belongsTo(WhatsAppAccount::class, 'account_id');
     }
+
+    /**
+     * La finestra de servei s'ha de tractar com a expirada per a aquesta
+     * conversa? Es basa en l'últim missatge inbound i el llindar operatiu
+     * del compte (marge intern; la regla real de Meta són 24 h).
+     */
+    public static function windowExpired(int $conversationId, WhatsAppAccount $account): bool
+    {
+        $last = static::where('conversation_id', $conversationId)
+            ->where('direction', static::DIRECTION_INBOUND)
+            ->max('created_at');
+
+        if (!$last) {
+            return true;
+        }
+
+        $threshold = (int) ($account->template_threshold_minutes ?: 1435);
+
+        return \Carbon\Carbon::parse($last)->lt(now()->subMinutes($threshold));
+    }
 }
