@@ -36,10 +36,12 @@ This v1 covers:
 - Best-effort tracking of `delivered` and `read` states in the module database.
 - Since v1.2.0, a `read` receipt from Meta also marks the outbound thread as opened, using FreeScout's native "opened" indicator.
 - Since v1.3.0, manual recovery of an expired window with a single pre-approved HSM template — see [Expired window recovery](#expired-window-recovery-v130) below.
+- Since v1.4.0, media messages (image, video, audio, document): inbound download & attachment, image thumbnail preview, outbound send gated to the open 24h window — see [Media support](#media-support-v140) below.
 
 Out of scope in this version:
 
-- Inbound or outbound media.
+- Image/video transformation or resizing, image gallery/carousel views.
+- A cloud storage adapter (S3, etc.) for media — attachments use FreeScout's existing local storage only.
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
@@ -153,12 +155,25 @@ If Meta returns error `190`:
 - the channel stops sending and receiving properly,
 - and the access token must be updated from the account edit screen.
 
+### Media support (v1.4.0)
+
+Inbound image, video, audio and document messages are downloaded from the Meta Cloud API and stored as regular FreeScout attachments on the conversation thread. Images additionally get an inline thumbnail preview; other types show as a standard downloadable attachment (FreeScout's default file row).
+
+Outbound media follows the same rule as text: it is **only sent within the open 24h customer window** (see above) — there is no template-based fallback for media. When an agent replies with attachments:
+
+- One WhatsApp message is sent **per attachment** (Meta does not support more than one media object per message).
+- The reply's text travels as the **caption** of the first attachment, except when that attachment is **audio** (Meta does not support captions on audio) — in that case the text is sent as a separate plain-text message.
+- Each attachment is size-checked against Meta's own limits before upload: **5 MB** for images, **16 MB** for video/audio, **100 MB** for documents. Oversized attachments are not sent and are recorded as failed.
+
+Media is stored using FreeScout's existing local attachment storage — no separate storage adapter is introduced.
+
 ## Known limitations
 
 These limitations are known and accepted within the MVP scope:
 
-- Only **plain text** messages are processed.
-- Incoming media, documents, audio or reactions are not turned into useful conversations.
+- WhatsApp **reactions** and other unsupported message types are still dropped (logged, not shown in the conversation).
+- Inbound media has no size validation on this module's side beyond what Meta itself enforces before delivering the webhook.
+- No image/video gallery or carousel view — each attachment appears as its own row/thumbnail, same as any other FreeScout attachment.
 - Only **one** pre-approved HSM template per account (set on the account); no template picker, no variables/parameters, no automatic sync with Meta's template catalog.
 - Sending the recovery template is always **manual**, triggered by an agent from the conversation banner; there is no automatic retry outside the window.
 - `delivered` and `read` states are stored in the module database; only `read` is shown visually (via the thread's native "opened" indicator) — `delivered` is not shown in the conversation.

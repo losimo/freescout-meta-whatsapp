@@ -80,4 +80,7 @@ return [
     'template_no_phone_notice'     => 'Aquest contacte no té telèfon registrat (els contactes només amb ID de WhatsApp encara no admeten l\'enviament de plantilles — previst per a la fase 2b).',
     'template_window_open'         => 'La finestra del client ha tornat a obrir-se: envia una resposta normal en comptes d\'una plantilla de pagament.',
     'template_already_sent'        => 'Ja s\'ha enviat una plantilla fa uns moments per a aquesta conversa.',
+
+    'media_attachment_unavailable' => 'No s\'ha pogut descarregar el fitxer adjunt de WhatsApp.',
+    'media_preview_no_caption'     => 'Fitxer adjunt (:type)',
 ];

@@ -105,4 +105,36 @@ class SendWhatsAppMessageTest extends TestCase
 
         $this->assertEquals(1, WhatsAppMessage::where('thread_id', $thread->id)->count());
     }
+
+    public function test_fila_outbound_amb_attachment_id_no_bloqueja_lenviament_de_text()
+    {
+        $account = $this->createTestAccount();
+        $thread  = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+
+        WhatsAppMessage::create([
+            'wamid'           => 'wamid.media-ja-enviada',
+            'account_id'      => $account->id,
+            'conversation_id' => $thread->conversation_id,
+            'thread_id'       => $thread->id,
+            'attachment_id'   => 999,
+            'contact_phone'   => '+34611222333',
+            'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+            'status'          => WhatsAppMessage::STATUS_SENT,
+        ]);
+
+        $fakeClient = \Mockery::mock(\Modules\MetaWhatsApp\Services\WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('sendText')
+            ->once()
+            ->andReturn(['ok' => true, 'wamid' => 'wamid.text-despres-de-media', 'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false]);
+
+        $job = \Mockery::mock(SendWhatsAppMessage::class, [$account->id, $thread->id, '+34611222333'])->makePartial();
+        $job->shouldAllowMockingProtectedMethods();
+        $job->shouldReceive('apiClient')->andReturn($fakeClient);
+        $job->handle();
+
+        $this->assertEquals(1, WhatsAppMessage::where('thread_id', $thread->id)
+            ->where('direction', WhatsAppMessage::DIRECTION_OUTBOUND)
+            ->whereNull('attachment_id')
+            ->count());
+    }
 }

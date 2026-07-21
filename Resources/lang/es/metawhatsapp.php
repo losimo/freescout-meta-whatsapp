@@ -80,4 +80,7 @@ return [
     'template_no_phone_notice'     => 'Este contacto no tiene teléfono registrado (los contactos solo con ID de WhatsApp aún no admiten el envío de plantillas — previsto para la fase 2b).',
     'template_window_open'         => 'La ventana del cliente ha vuelto a abrirse: envía una respuesta normal en vez de una plantilla de pago.',
     'template_already_sent'        => 'Ya se ha enviado una plantilla hace unos momentos para esta conversación.',
+
+    'media_attachment_unavailable' => 'No se pudo descargar el archivo adjunto de WhatsApp.',
+    'media_preview_no_caption'     => 'Archivo adjunto (:type)',
 ];

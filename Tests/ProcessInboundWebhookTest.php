@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Jobs\ProcessInboundWebhook;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
+use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 
 class ProcessInboundWebhookTest extends TestCase
 {
@@ -107,8 +108,8 @@ class ProcessInboundWebhookTest extends TestCase
             'from'      => '34611222333',
             'id'        => 'wamid.in6',
             'timestamp' => (string) time(),
-            'type'      => 'image',
-            'image'     => ['id' => 'img1', 'mime_type' => 'image/jpeg'],
+            'type'      => 'reaction',
+            'reaction'  => ['message_id' => 'wamid.other', 'emoji' => '👍'],
         ];
 
         $before = Conversation::where('mailbox_id', $account->mailbox_id)->count();
@@ -334,8 +335,8 @@ class ProcessInboundWebhookTest extends TestCase
         $account = $this->createTestAccount();
 
         $payload = $this->inboundPayload($account, 'wamid.au1', '34611222333', 'irrelevant');
-        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type'] = 'audio';
-        $payload['entry'][0]['changes'][0]['value']['messages'][0]['audio'] = ['id' => 'media-id-123'];
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type']     = 'reaction';
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['reaction'] = ['message_id' => 'wamid.other', 'emoji' => '👍'];
         unset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']);
 
         $this->runJob($account, $payload);
@@ -343,7 +344,7 @@ class ProcessInboundWebhookTest extends TestCase
         Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
             return $message === '[MetaWhatsApp] Unsupported message type, discarded'
                 && ($context['from'] ?? null) === '34611222333'
-                && ($context['type'] ?? null) === 'audio';
+                && ($context['type'] ?? null) === 'reaction';
         })->once();
     }
 
@@ -566,5 +567,135 @@ class ProcessInboundWebhookTest extends TestCase
         $this->assertEquals($bsuid, $msg->contact_user_id);
         $this->assertNull($msg->conversation_id);
         $this->assertEquals(0, CustomerChannel::where('channel_id', $bsuid)->count());
+    }
+
+    public function test_missatge_imatge_es_descarrega_i_es_penja_com_a_adjunt()
+    {
+        $account = $this->createTestAccount();
+
+        $payload = $this->inboundPayload($account, 'wamid.img1', '34611222333', 'irrelevant');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type']  = 'image';
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['image'] = [
+            'id'      => 'media-123',
+            'caption' => 'Look at this',
+        ];
+        unset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']);
+
+        $fakeClient = \Mockery::mock(WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('downloadMedia')
+            ->with('media-123')
+            ->andReturn([
+                'ok' => true, 'bytes' => 'fake-image-bytes', 'mime_type' => 'image/jpeg',
+                'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false,
+            ]);
+
+        $job = new class($account->id, $payload) extends ProcessInboundWebhook {
+            private $fakeApiClient;
+            public function setFakeApiClient($client) {
+                $this->fakeApiClient = $client;
+            }
+            protected function apiClient(WhatsAppAccount $account): WhatsAppApiClient {
+                return $this->fakeApiClient ?? parent::apiClient($account);
+            }
+        };
+        $job->setFakeApiClient($fakeClient);
+        $job->handle();
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.img1')->first();
+        $this->assertNotNull($msg);
+        $thread = Thread::find($msg->thread_id);
+        $this->assertStringContainsString('Look at this', $thread->body);
+        $this->assertTrue((bool) $thread->has_attachments);
+
+        $attachment = \App\Attachment::where('thread_id', $thread->id)->first();
+        $this->assertNotNull($attachment);
+        $this->assertEquals('image/jpeg', $attachment->mime_type);
+        $this->assertEquals(\App\Attachment::TYPE_IMAGE, $attachment->type);
+
+        $conversation = Conversation::find($msg->conversation_id);
+        $this->assertTrue((bool) $conversation->has_attachments);
+    }
+
+    public function test_missatge_document_sense_caption_usa_preview_generica_i_mapa_a_application()
+    {
+        $account = $this->createTestAccount();
+
+        $payload = $this->inboundPayload($account, 'wamid.doc1', '34611222333', 'irrelevant');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type']     = 'document';
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['document'] = [
+            'id'       => 'media-456',
+            'filename' => 'invoice.pdf',
+        ];
+        unset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']);
+
+        $fakeClient = \Mockery::mock(WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('downloadMedia')
+            ->with('media-456')
+            ->andReturn([
+                'ok' => true, 'bytes' => 'fake-pdf-bytes', 'mime_type' => 'application/pdf',
+                'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false,
+            ]);
+
+        $job = new class($account->id, $payload) extends ProcessInboundWebhook {
+            private $fakeApiClient;
+            public function setFakeApiClient($client) {
+                $this->fakeApiClient = $client;
+            }
+            protected function apiClient(WhatsAppAccount $account): WhatsAppApiClient {
+                return $this->fakeApiClient ?? parent::apiClient($account);
+            }
+        };
+        $job->setFakeApiClient($fakeClient);
+        $job->handle();
+
+        $msg    = WhatsAppMessage::where('wamid', 'wamid.doc1')->first();
+        $thread = Thread::find($msg->thread_id);
+        $this->assertStringContainsString('document', $thread->body);
+
+        $attachment = \App\Attachment::where('thread_id', $thread->id)->first();
+        $this->assertEquals('invoice.pdf', $attachment->file_name);
+        $this->assertEquals(\App\Attachment::TYPE_APPLICATION, $attachment->type);
+    }
+
+    public function test_descarrega_fallida_crea_thread_amb_avis_i_sense_adjunt()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+
+        $payload = $this->inboundPayload($account, 'wamid.fail1', '34611222333', 'irrelevant');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type']  = 'video';
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['video'] = ['id' => 'media-789'];
+        unset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']);
+
+        $fakeClient = \Mockery::mock(WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('downloadMedia')
+            ->with('media-789')
+            ->andReturn([
+                'ok' => false, 'bytes' => null, 'mime_type' => null,
+                'http_status' => 404, 'error_code' => '404', 'error_message' => 'Not found', 'transient' => false,
+            ]);
+
+        $job = new class($account->id, $payload) extends ProcessInboundWebhook {
+            private $fakeApiClient;
+            public function setFakeApiClient($client) {
+                $this->fakeApiClient = $client;
+            }
+            protected function apiClient(WhatsAppAccount $account): WhatsAppApiClient {
+                return $this->fakeApiClient ?? parent::apiClient($account);
+            }
+        };
+        $job->setFakeApiClient($fakeClient);
+        $job->handle();
+
+        $msg    = WhatsAppMessage::where('wamid', 'wamid.fail1')->first();
+        $this->assertNotNull($msg);
+        $thread = Thread::find($msg->thread_id);
+        $this->assertEquals(0, \App\Attachment::where('thread_id', $thread->id)->count());
+        $this->assertFalse((bool) $thread->has_attachments);
+
+        Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
+            return $message === '[MetaWhatsApp] Failed to download inbound media, attachment not stored'
+                && ($context['type'] ?? null) === 'video';
+        })->once();
     }
 }

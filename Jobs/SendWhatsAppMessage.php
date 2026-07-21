@@ -46,9 +46,12 @@ class SendWhatsAppMessage implements ShouldQueue
             return;
         }
 
-        // Idempotència autoritativa: un thread només s'envia una vegada.
+        // Idempotència autoritativa: un thread només envia UN missatge de
+        // text (a diferència de multimèdia, que en pot tenir un per adjunt);
+        // per això només compten les files sense attachment_id.
         if (WhatsAppMessage::where('thread_id', $this->threadId)
             ->where('direction', WhatsAppMessage::DIRECTION_OUTBOUND)
+            ->whereNull('attachment_id')
             ->exists()
         ) {
             return;
@@ -70,7 +73,7 @@ class SendWhatsAppMessage implements ShouldQueue
             return;
         }
 
-        $result = (new WhatsAppApiClient($account))->sendText($this->toPhone, $text);
+        $result = $this->apiClient($account)->sendText($this->toPhone, $text);
 
         if ($result['ok']) {
             WhatsAppMessage::create([
@@ -118,6 +121,11 @@ class SendWhatsAppMessage implements ShouldQueue
         $this->recordFailure($account->id, $thread, (string) $result['error_code']);
     }
 
+    protected function apiClient(WhatsAppAccount $account): WhatsAppApiClient
+    {
+        return new WhatsAppApiClient($account);
+    }
+
     protected function recordFailure(int $accountId, Thread $thread, string $errorCode)
     {
         WhatsAppMessage::create([
@@ -143,6 +151,7 @@ class SendWhatsAppMessage implements ShouldQueue
 
         $exists = WhatsAppMessage::where('thread_id', $this->threadId)
             ->where('direction', WhatsAppMessage::DIRECTION_OUTBOUND)
+            ->whereNull('attachment_id')
             ->exists();
         if (!$exists) {
             $thread = Thread::find($this->threadId);

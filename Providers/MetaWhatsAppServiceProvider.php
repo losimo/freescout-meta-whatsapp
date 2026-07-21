@@ -87,6 +87,22 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 'phone'        => $phone,
             ])->render();
         }, 20, 2);
+
+        // Miniatura d'imatge als adjunts multimèdia de WhatsApp: el core ja
+        // llista qualsevol Attachment (nom + enllaç de descàrrega); només
+        // s'hi afegeix una previsualització per a TYPE_IMAGE. La resta de
+        // tipus (video/audio/document) es queden amb la fila per defecte
+        // del core — és la degradació correcta, no cal construir-la.
+        \Eventy::addAction('thread.attachment_append', function ($attachment, $thread, $conversation, $mailbox) {
+            if ($attachment->type != \App\Attachment::TYPE_IMAGE) {
+                return;
+            }
+            echo '<div class="metawhatsapp-attachment-preview">'
+                . '<a href="' . e($attachment->url()) . '" target="_blank">'
+                . '<img src="' . e($attachment->url()) . '" alt="' . e($attachment->file_name) . '" '
+                . 'style="max-width:200px;max-height:200px;border-radius:4px;margin-top:6px;">'
+                . '</a></div>';
+        }, 20, 4);
     }
 
     protected function currentPageIsWhatsAppMailbox(): bool
@@ -155,13 +171,50 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
             ) {
                 continue; // Notes internes i threads retirats per undo.
             }
-            if (\Modules\MetaWhatsApp\Models\WhatsAppMessage::where('thread_id', $fresh->id)
-                ->where('direction', \Modules\MetaWhatsApp\Models\WhatsAppMessage::DIRECTION_OUTBOUND)
-                ->exists()
-            ) {
-                continue; // Ja enviat (o fallit definitivament).
+
+            $attachments = $fresh->attachments;
+
+            if ($attachments->isEmpty()) {
+                if (\Modules\MetaWhatsApp\Models\WhatsAppMessage::where('thread_id', $fresh->id)
+                    ->where('direction', \Modules\MetaWhatsApp\Models\WhatsAppMessage::DIRECTION_OUTBOUND)
+                    ->exists()
+                ) {
+                    continue; // Ja enviat (o fallit definitivament).
+                }
+                \Modules\MetaWhatsApp\Jobs\SendWhatsAppMessage::dispatch($account->id, $fresh->id, $phone);
+                continue;
             }
-            \Modules\MetaWhatsApp\Jobs\SendWhatsAppMessage::dispatch($account->id, $fresh->id, $phone);
+
+            // Multimèdia (A3): un missatge de WhatsApp per adjunt (Meta no
+            // permet més d'un objecte multimèdia per missatge). El text de
+            // la resposta viatja com a caption del primer adjunt, tret que
+            // sigui audio (Meta no admet caption en audio): en aquest cas
+            // el text es despatxa a part.
+            $text         = trim(\Helper::htmlToText($fresh->body));
+            $firstIsAudio = \Modules\MetaWhatsApp\Jobs\SendWhatsAppMedia::mediaCategory($attachments->first()->mime_type) === 'audio';
+
+            if ($text !== '' && $firstIsAudio
+                && !\Modules\MetaWhatsApp\Models\WhatsAppMessage::where('thread_id', $fresh->id)
+                    ->where('direction', \Modules\MetaWhatsApp\Models\WhatsAppMessage::DIRECTION_OUTBOUND)
+                    ->whereNull('attachment_id')
+                    ->exists()
+            ) {
+                \Modules\MetaWhatsApp\Jobs\SendWhatsAppMessage::dispatch($account->id, $fresh->id, $phone);
+            }
+
+            foreach ($attachments as $index => $attachment) {
+                if (\Modules\MetaWhatsApp\Models\WhatsAppMessage::where('thread_id', $fresh->id)
+                    ->where('attachment_id', $attachment->id)
+                    ->where('direction', \Modules\MetaWhatsApp\Models\WhatsAppMessage::DIRECTION_OUTBOUND)
+                    ->exists()
+                ) {
+                    continue; // Ja enviat (o fallit definitivament).
+                }
+
+                $caption = ($index === 0 && $text !== '' && !$firstIsAudio) ? $text : null;
+
+                \Modules\MetaWhatsApp\Jobs\SendWhatsAppMedia::dispatch($account->id, $fresh->id, $phone, $attachment->id, $caption);
+            }
         }
     }
 

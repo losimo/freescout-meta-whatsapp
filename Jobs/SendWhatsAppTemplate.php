@@ -58,6 +58,7 @@ class SendWhatsAppTemplate implements ShouldQueue
         // Idempotència autoritativa: un thread només s'envia una vegada.
         if (WhatsAppMessage::where('thread_id', $this->threadId)
             ->where('direction', WhatsAppMessage::DIRECTION_OUTBOUND)
+            ->whereNull('attachment_id')
             ->exists()
         ) {
             return;
@@ -166,6 +167,7 @@ class SendWhatsAppTemplate implements ShouldQueue
 
         $exists = WhatsAppMessage::where('thread_id', $this->threadId)
             ->where('direction', WhatsAppMessage::DIRECTION_OUTBOUND)
+            ->whereNull('attachment_id')
             ->exists();
         if (!$exists) {
             $thread = Thread::find($this->threadId);

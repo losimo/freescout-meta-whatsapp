@@ -80,4 +80,7 @@ return [
     'template_no_phone_notice'     => 'This contact has no phone number on file (WhatsApp ID-only contacts are not yet supported for template sending — planned for phase 2b).',
     'template_window_open'         => 'The customer window is open again — send a normal reply instead of a paid template.',
     'template_already_sent'        => 'A template was already sent moments ago for this conversation.',
+
+    'media_attachment_unavailable' => 'The attached file could not be downloaded from WhatsApp.',
+    'media_preview_no_caption'     => 'Attachment (:type)',
 ];

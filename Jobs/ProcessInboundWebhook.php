@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
+use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 
 class ProcessInboundWebhook implements ShouldQueue
 {
@@ -78,25 +79,44 @@ class ProcessInboundWebhook implements ShouldQueue
     protected function processMessage(WhatsAppAccount $account, array $message, array $contacts = [])
     {
         $wamid = $message['id'] ?? null;
-        $from  = $message['from'] ?? null;
-        if (!$wamid || !$from) {
-            Log::warning('[MetaWhatsApp] Message without wamid or sender, discarded', [
-                'account_id' => $account->id,
-            ]);
+        if (!$wamid) {
             return;
         }
 
-        // MVP: només text pla. Meta no reenviarà el payload després del nostre 200.
-        if (($message['type'] ?? '') !== 'text') {
+        $from  = $message['from'] ?? null;
+        $type  = $message['type'] ?? null;
+        $mediaTypes = ['image', 'video', 'audio', 'document'];
+
+        if (!in_array($type, [...$mediaTypes, 'text'], true)) {
             Log::error('[MetaWhatsApp] Unsupported message type, discarded', [
                 'account_id' => $account->id,
-                'type'       => $message['type'] ?? '(unknown)',
                 'from'       => $from,
+                'type'       => $type,
             ]);
             return;
         }
 
+        // Missatge multimèdia: extreu l'objecte del tipus corresponent.
+        $media = null;
+        if (in_array($type, $mediaTypes, true)) {
+            $media = $message[$type] ?? null;
+            if (!$media) {
+                return;
+            }
+            // Descarrega l'adjunt. Si falla, crea igualment el thread amb avís.
+            $media = $this->downloadInboundMedia($account, $type, $media, $wamid, $from);
+        }
+
+        // Missatge de text o multimèdia amb caption.
         $text = trim($message['text']['body'] ?? '');
+        if ($media && $media['ok'] && $media['caption']) {
+            $text = $media['caption'];
+        } elseif ($media && !$media['ok']) {
+            $text = __('metawhatsapp::metawhatsapp.media_attachment_unavailable');
+        } elseif ($media && $media['ok']) {
+            $text = __('metawhatsapp::metawhatsapp.media_preview_no_caption', ['type' => $type]);
+        }
+
         if ($text === '') {
             return;
         }
@@ -158,7 +178,7 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         try {
-            DB::transaction(function () use ($account, $wamid, $phone, $userId, $profileName, $text) {
+            DB::transaction(function () use ($account, $wamid, $phone, $userId, $profileName, $text, $media) {
                 $customer = $this->resolveCustomer($account, $phone, $userId, $profileName);
 
                 // Patró de xat del core (#4902): es reutilitza la darrera conversa
@@ -225,6 +245,25 @@ class ProcessInboundWebhook implements ShouldQueue
                 $thread->created_by_customer_id = $customer->id;
                 $thread->first                  = $isNew;
                 $thread->save();
+
+                // Crea l'adjunt si s'ha descarregat correctament.
+                if ($media && $media['ok']) {
+                    $category = $this->attachmentCategory($media['type'] ?? 'image');
+                    $typeInt = \App\Attachment::typeNameToInt($category);
+                    \App\Attachment::create(
+                        $media['filename'],
+                        $media['mime_type'],
+                        $typeInt,
+                        $media['bytes'],
+                        null,
+                        false,
+                        $thread->id
+                    );
+                    $thread->has_attachments = true;
+                    $thread->save();
+                    $conversation->has_attachments = true;
+                    $conversation->save();
+                }
 
                 WhatsAppMessage::create([
                     'wamid'           => $wamid,
@@ -551,5 +590,68 @@ class ProcessInboundWebhook implements ShouldQueue
             'account_id' => $this->accountId,
             'error'      => $e->getMessage(),
         ]);
+    }
+
+    /**
+     * Descarrega l'adjunt d'un missatge multimèdia inbound. Si falla, es
+     * retorna ok=false: processMessage() crea igualment el thread amb un
+     * avís, mai perd el missatge silenciosament (mateix principi que el fix
+     * de la issue #7).
+     */
+    protected function downloadInboundMedia(WhatsAppAccount $account, string $type, array $mediaObject, string $wamid, string $from): array
+    {
+        $mediaId = $mediaObject['id'] ?? null;
+        $caption = trim($mediaObject['caption'] ?? '');
+
+        if (!$mediaId) {
+            Log::error('[MetaWhatsApp] Media message without media id, attachment not downloaded', [
+                'account_id' => $account->id,
+                'wamid'      => $wamid,
+                'from'       => $from,
+                'type'       => $type,
+            ]);
+            return ['ok' => false, 'caption' => $caption, 'type' => $type];
+        }
+
+        $result = $this->apiClient($account)->downloadMedia($mediaId);
+        if (!$result['ok']) {
+            Log::error('[MetaWhatsApp] Failed to download inbound media, attachment not stored', [
+                'account_id' => $account->id,
+                'wamid'      => $wamid,
+                'from'       => $from,
+                'type'       => $type,
+                'error'      => $result['error_message'],
+            ]);
+            return ['ok' => false, 'caption' => $caption, 'type' => $type];
+        }
+
+        $filename = $mediaObject['filename'] ?? $this->syntheticFilename($type, $result['mime_type']);
+
+        return [
+            'ok'        => true,
+            'bytes'     => $result['bytes'],
+            'mime_type' => $result['mime_type'],
+            'filename'  => $filename,
+            'caption'   => $caption,
+            'type'      => $type,
+        ];
+    }
+
+    protected function syntheticFilename(string $type, string $mimeType): string
+    {
+        $ext = explode('/', $mimeType)[1] ?? 'bin';
+        $ext = preg_replace('/[^a-z0-9]/i', '', $ext) ?: 'bin';
+
+        return $type . '_' . uniqid() . '.' . $ext;
+    }
+
+    protected function attachmentCategory(string $waType): string
+    {
+        return $waType === 'document' ? 'application' : $waType;
+    }
+
+    protected function apiClient(WhatsAppAccount $account): WhatsAppApiClient
+    {
+        return new WhatsAppApiClient($account);
     }
 }

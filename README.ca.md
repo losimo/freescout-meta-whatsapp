@@ -36,10 +36,12 @@ Aquesta v1 cobreix:
 - Actualització best-effort dels estats `delivered` i `read` a la base de dades del mòdul.
 - Des de la v1.2.0, l'estat `read` de Meta també marca el thread outbound com a obert, amb l'indicador natiu "obert" de FreeScout.
 - Des de la v1.3.0, recuperació manual d'una finestra caducada amb una única plantilla HSM pre-aprovada — vegeu [Recuperació de finestra caducada](#recuperació-de-finestra-caducada-v130) més avall.
+- Des de la v1.4.0, missatges multimèdia (imatge, vídeo, àudio, document): descàrrega i adjunció entrant, previsualització en miniatura d'imatges, enviament sortint limitat a la finestra oberta de 24h — vegeu [Suport multimèdia](#suport-multimèdia-v140) més avall.
 
 Queda fora d'abast en aquesta versió:
 
-- Multimèdia entrant o sortint.
+- Transformació o redimensionament d'imatge/vídeo, vistes de galeria o carrusel.
+- Un adaptador d'emmagatzematge al núvol (S3, etc.) per a multimèdia — els adjunts usen l'emmagatzematge local ja existent de FreeScout.
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
@@ -153,12 +155,25 @@ Si Meta retorna l'error `190`:
 - el canal deixa d'enviar i rebre correctament,
 - i cal actualitzar el token d'accés des de l'edició del compte.
 
+### Suport multimèdia (v1.4.0)
+
+Els missatges entrants d'imatge, vídeo, àudio i document es descarreguen de la Meta Cloud API i es guarden com a adjunts normals de FreeScout al thread de la conversa. Les imatges, a més, tenen una previsualització en miniatura; la resta de tipus es mostren com un adjunt descarregable estàndard (la fila per defecte de FreeScout).
+
+L'enviament sortint de multimèdia segueix la mateixa regla que el text: només s'envia **dins la finestra oberta de 24h** (vegeu més amunt) — no hi ha alternativa amb plantilla per a multimèdia. Quan un agent respon amb adjunts:
+
+- S'envia un missatge de WhatsApp **per adjunt** (Meta no admet més d'un objecte multimèdia per missatge).
+- El text de la resposta viatja com a **caption** del primer adjunt, tret que aquest sigui **àudio** (Meta no admet caption en àudio) — en aquest cas el text s'envia com a missatge de text a part.
+- Cada adjunt es valida de mida contra els límits propis de Meta abans de pujar-lo: **5 MB** per a imatges, **16 MB** per a vídeo/àudio, **100 MB** per a documents. Els adjunts massa grans no s'envien i es registren com a fallats.
+
+El multimèdia s'emmagatzema amb l'emmagatzematge local ja existent de FreeScout — no s'introdueix cap adaptador d'emmagatzematge nou.
+
 ## Limitacions conegudes
 
 Aquestes limitacions són conegudes i acceptades en l'abast del MVP:
 
-- Només es processen missatges de **text pla**.
-- Missatges entrants de tipus multimèdia, documents, àudio o reaccions no es processen com a conversa útil.
+- Les **reaccions** de WhatsApp i altres tipus de missatge no suportats es continuen descartant (es registren al log, no es mostren a la conversa).
+- La descàrrega de multimèdia entrant no té validació de mida pròpia del mòdul més enllà de la que Meta ja aplica abans d'entregar el webhook.
+- No hi ha vista de galeria o carrusel per a imatges/vídeos — cada adjunt apareix com una fila/miniatura independent, igual que qualsevol altre adjunt de FreeScout.
 - Només **una** plantilla HSM pre-aprovada per compte (configurada al compte); sense selector de plantilles, sense variables/paràmetres, sense sincronització automàtica amb el catàleg de plantilles de Meta.
 - L'enviament de la plantilla de recuperació és sempre **manual**, iniciat per un agent des del banner de la conversa; no hi ha reintent automàtic fora de finestra.
 - Els estats `delivered` i `read` s'actualitzen a la base de dades del mòdul; només el `read` es mostra visualment (via l'indicador natiu "obert" del thread) — el `delivered` no es mostra a la conversa.

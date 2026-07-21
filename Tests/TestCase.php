@@ -36,6 +36,7 @@ abstract class TestCase extends BaseTestCase
             function ($severity, $message, $file = '', $line = 0) use (&$previousHandler) {
                 if (strpos($message, 'Cannot modify header information') !== false
                     || strpos($message, 'ReflectionParameter::') !== false
+                    || strpos($message, 'Use of "parent" in callables is deprecated') !== false
                 ) {
                     return true;
                 }

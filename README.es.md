@@ -36,10 +36,12 @@ Esta v1 cubre:
 - Actualización best-effort de los estados `delivered` y `read` en la base de datos del módulo.
 - Desde la v1.2.0, el estado `read` de Meta también marca el thread outbound como abierto, con el indicador nativo "abierto" de FreeScout.
 - Desde la v1.3.0, recuperación manual de una ventana caducada con una única plantilla HSM preaprobada — ver [Recuperación de ventana caducada](#recuperación-de-ventana-caducada-v130) más abajo.
+- Desde la v1.4.0, mensajes multimedia (imagen, vídeo, audio, documento): descarga y adjunción entrante, previsualización en miniatura de imágenes, envío saliente limitado a la ventana abierta de 24h — ver [Soporte multimedia](#soporte-multimedia-v140) más abajo.
 
 Queda fuera de alcance en esta versión:
 
-- Multimedia entrante o saliente.
+- Transformación o redimensionado de imagen/vídeo, vistas de galería o carrusel.
+- Un adaptador de almacenamiento en la nube (S3, etc.) para multimedia — los adjuntos usan el almacenamiento local ya existente de FreeScout.
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
@@ -153,12 +155,25 @@ Si Meta devuelve el error `190`:
 - el canal deja de enviar y recibir correctamente,
 - y hay que actualizar el token de acceso desde la edición de la cuenta.
 
+### Soporte multimedia (v1.4.0)
+
+Los mensajes entrantes de imagen, vídeo, audio y documento se descargan de la Meta Cloud API y se guardan como adjuntos normales de FreeScout en el thread de la conversación. Las imágenes, además, tienen una previsualización en miniatura; el resto de tipos se muestran como un adjunto descargable estándar (la fila por defecto de FreeScout).
+
+El envío saliente de multimedia sigue la misma regla que el texto: solo se envía **dentro de la ventana abierta de 24h** (ver arriba) — no hay alternativa con plantilla para multimedia. Cuando un agente responde con adjuntos:
+
+- Se envía un mensaje de WhatsApp **por adjunto** (Meta no admite más de un objeto multimedia por mensaje).
+- El texto de la respuesta viaja como **caption** del primer adjunto, salvo que este sea **audio** (Meta no admite caption en audio) — en ese caso el texto se envía como mensaje de texto aparte.
+- Cada adjunto se valida de tamaño contra los límites propios de Meta antes de subirlo: **5 MB** para imágenes, **16 MB** para vídeo/audio, **100 MB** para documentos. Los adjuntos demasiado grandes no se envían y se registran como fallidos.
+
+El multimedia se almacena con el almacenamiento local ya existente de FreeScout — no se introduce ningún adaptador de almacenamiento nuevo.
+
 ## Limitaciones conocidas
 
 Estas limitaciones son conocidas y aceptadas en el alcance del MVP:
 
-- Solo se procesan mensajes de **texto plano**.
-- Los mensajes entrantes multimedia, documentos, audio o reacciones no se procesan como conversación útil.
+- Las **reacciones** de WhatsApp y otros tipos de mensaje no soportados se siguen descartando (se registran en el log, no se muestran en la conversación).
+- La descarga de multimedia entrante no tiene validación de tamaño propia del módulo más allá de la que Meta ya aplica antes de entregar el webhook.
+- No hay vista de galería o carrusel para imágenes/vídeos — cada adjunto aparece como una fila/miniatura independiente, igual que cualquier otro adjunto de FreeScout.
 - Solo **una** plantilla HSM preaprobada por cuenta (configurada en la cuenta); sin selector de plantillas, sin variables/parámetros, sin sincronización automática con el catálogo de plantillas de Meta.
 - El envío de la plantilla de recuperación es siempre **manual**, iniciado por un agente desde el banner de la conversación; no hay reintento automático fuera de ventana.
 - Los estados `delivered` y `read` se actualizan en la base de datos del módulo; solo el `read` se muestra visualmente (vía el indicador nativo "abierto" del thread) — el `delivered` no se muestra en la conversación.
