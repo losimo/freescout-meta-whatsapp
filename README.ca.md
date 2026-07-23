@@ -47,16 +47,19 @@ Queda fora d'abast en aquesta versió:
 
 ## Instal·lació
 
-1. Copia o enllaça el mòdul dins de `Modules/MetaWhatsApp` a la instal·lació de FreeScout.
-2. Activa'l i executa les migracions:
+Segueix la [guia oficial d'instal·lació de mòduls personalitzats de FreeScout](https://github.com/freescout-help-desk/freescout/wiki/FreeScout-Modules#3-installing-custom-modules):
+
+1. Descarrega el zip del mòdul des de la [pàgina de Releases](https://github.com/losimo/freescout-meta-whatsapp/releases) (o copia/enllaça el codi font) dins de `Modules/MetaWhatsApp` a la instal·lació de FreeScout.
+2. Ves a **Gestionar → Mòduls** a FreeScout i activa **MetaWhatsApp**. FreeScout executa les migracions del mòdul i neteja la memòria cau automàticament.
+3. El mòdul apareixerà a **Gestionar → WhatsApp** per a usuaris administradors.
+
+Si prefereixes la línia d'ordres (per exemple, en un servidor sense accés a la interfície del gestor de mòduls), els passos equivalents són:
 
 ```bash
 php artisan module:enable MetaWhatsApp
 php artisan module:migrate MetaWhatsApp
 php artisan freescout:clear-cache
 ```
-
-3. El mòdul apareixerà a **Gestionar → WhatsApp** per a usuaris administradors.
 
 El mòdul crea dues taules pròpies:
 

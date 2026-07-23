@@ -47,16 +47,19 @@ Out of scope in this version:
 
 ## Installation
 
-1. Copy or symlink the module into `Modules/MetaWhatsApp` of your FreeScout installation.
-2. Enable it and run the migrations:
+Follow FreeScout's [official custom module installation guide](https://github.com/freescout-help-desk/freescout/wiki/FreeScout-Modules#3-installing-custom-modules):
+
+1. Download the module zip from the [Releases page](https://github.com/losimo/freescout-meta-whatsapp/releases) (or copy/symlink the module source) into `Modules/MetaWhatsApp` of your FreeScout installation.
+2. Go to **Manage → Modules** in FreeScout and activate **MetaWhatsApp**. FreeScout runs the module's migrations and clears the cache automatically.
+3. The module appears under **Manage → WhatsApp** for administrator users.
+
+If you prefer the command line (e.g. on a server without UI access to the module manager), the equivalent steps are:
 
 ```bash
 php artisan module:enable MetaWhatsApp
 php artisan module:migrate MetaWhatsApp
 php artisan freescout:clear-cache
 ```
-
-3. The module appears under **Manage → WhatsApp** for administrator users.
 
 The module creates two tables of its own:
 
