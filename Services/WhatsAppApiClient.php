@@ -2,6 +2,7 @@
 
 namespace Modules\MetaWhatsApp\Services;
 
+use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 
 class WhatsAppApiClient
@@ -249,6 +250,11 @@ class WhatsAppApiClient
 
         $body = json_encode($payload);
 
+        Log::debug('[MetaWhatsApp] Outbound message payload', [
+            'account_id' => $this->account->id,
+            'payload'    => $payload,
+        ]);
+
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
@@ -281,6 +287,12 @@ class WhatsAppApiClient
         }
 
         $data = json_decode($response, true) ?: [];
+
+        Log::debug('[MetaWhatsApp] Outbound message response', [
+            'account_id'  => $this->account->id,
+            'http_status' => $httpCode,
+            'response'    => $data,
+        ]);
 
         if ($httpCode >= 200 && $httpCode < 300) {
             $wamid = $data['messages'][0]['id'] ?? null;

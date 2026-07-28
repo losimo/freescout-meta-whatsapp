@@ -17,6 +17,7 @@ class WhatsAppAccountRequest extends FormRequest
 
         $rules = [
             'name'            => 'required|string|max:100',
+            'conversation_subject_template' => 'nullable|string|max:190',
             'phone_number'    => 'required|regex:/^\+[1-9]\d{6,14}$/',
             'phone_number_id' => 'required|string|max:50|unique:meta_whatsapp_accounts,phone_number_id' . ($id ? ',' . $id : ''),
             'waba_id'         => 'required|string|max:50',

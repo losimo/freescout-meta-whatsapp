@@ -64,6 +64,8 @@ return [
     'delete_confirm'               => 'Vols eliminar aquest compte de WhatsApp? El webhook deixarà de funcionar immediatament.',
 
     'conversation_subject'         => 'WhatsApp :phone',
+    'conversation_subject_template' => 'Nom de les converses noves',
+    'conversation_subject_template_help' => 'Opcional. Deixa-ho buit per fer servir "WhatsApp :phone". Variables disponibles: %YEAR% (any actual), :phone (telèfon del client).',
     'phone_number_id_change_warning' => 'Has canviat el Phone Number ID: el webhook deixarà de reconèixer aquest compte fins que actualitzis la configuració a Meta. Continuar?',
 
     'account_created'              => 'Compte de WhatsApp creat. Copia la URL del webhook i el token de verificació al Meta App Dashboard.',

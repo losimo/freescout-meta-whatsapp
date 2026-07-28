@@ -64,6 +64,8 @@ return [
     'delete_confirm'               => 'Delete this WhatsApp account? The webhook will stop working immediately.',
 
     'conversation_subject'         => 'WhatsApp :phone',
+    'conversation_subject_template' => 'New conversation name',
+    'conversation_subject_template_help' => 'Optional. Leave empty to use "WhatsApp :phone". Placeholders: %YEAR% (current year), :phone (customer phone number).',
     'phone_number_id_change_warning' => 'You changed the Phone Number ID: the webhook will stop recognizing this account until you update the Meta configuration. Continue?',
 
     'account_created'              => 'WhatsApp account created. Copy the webhook URL and verify token to Meta App Dashboard.',

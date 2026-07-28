@@ -28,6 +28,13 @@ class WhatsAppMessage extends Model
         'direction',
         'status',
         'error_code',
+        'delivered_at',
+        'read_at',
+    ];
+
+    protected $casts = [
+        'delivered_at' => 'datetime',
+        'read_at'      => 'datetime',
     ];
 
     public function account()

@@ -32,6 +32,17 @@
                     </div>
                 </div>
 
+                <div class="form-group{{ $errors->has('conversation_subject_template') ? ' has-error' : '' }}">
+                    <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.conversation_subject_template') }}</label>
+                    <div class="col-sm-8">
+                        <input type="text" name="conversation_subject_template" class="form-control" maxlength="190"
+                               value="{{ old('conversation_subject_template', $account->conversation_subject_template ?? '') }}"
+                               placeholder="{{ __('metawhatsapp::metawhatsapp.conversation_subject') }}">
+                        <p class="help-block">{{ __('metawhatsapp::metawhatsapp.conversation_subject_template_help') }}</p>
+                        @if($errors->has('conversation_subject_template'))<p class="help-block">{{ $errors->first('conversation_subject_template') }}</p>@endif
+                    </div>
+                </div>
+
                 <div class="form-group{{ $errors->has('phone_number') ? ' has-error' : '' }}">
                     <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.phone_number') }}</label>
                     <div class="col-sm-8">

@@ -27,6 +27,7 @@ class WhatsAppAccount extends Model
     protected $fillable = [
         'mailbox_id',
         'name',
+        'conversation_subject_template',
         'phone_number',
         'phone_number_id',
         'waba_id',

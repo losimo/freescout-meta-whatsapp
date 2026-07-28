@@ -100,6 +100,87 @@ class ProcessInboundWebhookTest extends TestCase
         );
     }
 
+    public function test_subject_amb_plantilla_personalitzada_substitueix_year_i_phone()
+    {
+        $account = $this->createTestAccount();
+        $account->conversation_subject_template = 'WhatsApp conversation %YEAR% - :phone';
+        $account->save();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.in10', '34611222333', 'hola'));
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.in10')->first();
+        $conversation = Conversation::find($msg->conversation_id);
+
+        $this->assertEquals('WhatsApp conversation ' . date('Y') . ' - +34611222333', $conversation->subject);
+    }
+
+    public function test_subject_sense_plantilla_usa_el_format_per_defecte()
+    {
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.in11', '34611222333', 'hola'));
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.in11')->first();
+        $conversation = Conversation::find($msg->conversation_id);
+
+        $this->assertEquals('WhatsApp +34611222333', $conversation->subject);
+    }
+
+    public function test_status_read_sense_delivered_previ_omple_els_dos_timestamps()
+    {
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.in8', '34611222333', 'hola'));
+
+        $statusPayload = $this->inboundPayload($account, 'x', 'x', 'x');
+        $statusPayload['entry'][0]['changes'][0]['value'] = [
+            'messaging_product' => 'whatsapp',
+            'metadata'          => ['phone_number_id' => $account->phone_number_id],
+            'statuses'          => [[
+                'id'        => 'wamid.in8',
+                'status'    => 'read',
+                'timestamp' => (string) 1700000000,
+            ]],
+        ];
+        $this->runJob($account, $statusPayload);
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.in8')->first();
+        $this->assertNotNull($msg->delivered_at);
+        $this->assertNotNull($msg->read_at);
+        $this->assertEquals($msg->delivered_at->timestamp, $msg->read_at->timestamp);
+    }
+
+    public function test_status_delivered_seguit_de_read_no_sobreescriu_delivered_at()
+    {
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.in9', '34611222333', 'hola'));
+
+        $deliveredPayload = $this->inboundPayload($account, 'x', 'x', 'x');
+        $deliveredPayload['entry'][0]['changes'][0]['value'] = [
+            'messaging_product' => 'whatsapp',
+            'metadata'          => ['phone_number_id' => $account->phone_number_id],
+            'statuses'          => [[
+                'id'        => 'wamid.in9',
+                'status'    => 'delivered',
+                'timestamp' => (string) 1700000000,
+            ]],
+        ];
+        $this->runJob($account, $deliveredPayload);
+
+        $readPayload = $this->inboundPayload($account, 'x', 'x', 'x');
+        $readPayload['entry'][0]['changes'][0]['value'] = [
+            'messaging_product' => 'whatsapp',
+            'metadata'          => ['phone_number_id' => $account->phone_number_id],
+            'statuses'          => [[
+                'id'        => 'wamid.in9',
+                'status'    => 'read',
+                'timestamp' => (string) 1700000100,
+            ]],
+        ];
+        $this->runJob($account, $readPayload);
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.in9')->first();
+        $this->assertEquals(1700000000, $msg->delivered_at->timestamp);
+        $this->assertEquals(1700000100, $msg->read_at->timestamp);
+    }
+
     public function test_tipus_no_suportat_es_descarta_sense_efectes()
     {
         $account = $this->createTestAccount();
@@ -117,6 +198,27 @@ class ProcessInboundWebhookTest extends TestCase
 
         $this->assertEquals(0, WhatsAppMessage::where('wamid', 'wamid.in6')->count());
         $this->assertEquals($before, Conversation::where('mailbox_id', $account->mailbox_id)->count());
+    }
+
+    public function test_missatge_button_es_processa_amb_el_text_del_boto()
+    {
+        $account = $this->createTestAccount();
+        $payload = $this->inboundPayload($account, 'wamid.in7', '34611222333', 'x');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
+            'from'      => '34611222333',
+            'id'        => 'wamid.in7',
+            'timestamp' => (string) time(),
+            'type'      => 'button',
+            'button'    => ['text' => 'Yes, continue the conversation', 'payload' => 'YES_CONTINUE'],
+        ];
+
+        $this->runJob($account, $payload);
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.in7')->first();
+        $this->assertNotNull($msg);
+
+        $thread = Thread::find($msg->thread_id);
+        $this->assertStringContainsString('Yes, continue the conversation', $thread->body);
     }
 
     public function test_change_amb_phone_number_id_dun_altre_numero_es_descarta()

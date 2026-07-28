@@ -48,6 +48,7 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         Log::info('[MetaWhatsApp] Processing inbound webhook', ['account_id' => $account->id]);
+        Log::debug('[MetaWhatsApp] Inbound webhook payload', ['account_id' => $account->id, 'payload' => $this->payload]);
 
         foreach ($this->payload['entry'] ?? [] as $entry) {
             foreach ($entry['changes'] ?? [] as $change) {
@@ -87,7 +88,7 @@ class ProcessInboundWebhook implements ShouldQueue
         $type  = $message['type'] ?? null;
         $mediaTypes = ['image', 'video', 'audio', 'document'];
 
-        if (!in_array($type, [...$mediaTypes, 'text'], true)) {
+        if (!in_array($type, [...$mediaTypes, 'text', 'button'], true)) {
             Log::error('[MetaWhatsApp] Unsupported message type, discarded', [
                 'account_id' => $account->id,
                 'from'       => $from,
@@ -108,7 +109,9 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         // Missatge de text o multimèdia amb caption.
-        $text = trim($message['text']['body'] ?? '');
+        $text = $type === 'button'
+            ? trim($message['button']['text'] ?? '')
+            : trim($message['text']['body'] ?? '');
         if ($media && $media['ok'] && $media['caption']) {
             $text = $media['caption'];
         } elseif ($media && !$media['ok']) {
@@ -201,7 +204,10 @@ class ProcessInboundWebhook implements ShouldQueue
                     $conversation = new Conversation();
                     $conversation->type                   = Conversation::TYPE_CHAT;
                     $conversation->state                  = Conversation::STATE_PUBLISHED;
-                    $conversation->subject                = __('metawhatsapp::metawhatsapp.conversation_subject', ['phone' => $phone ?: ($profileName ?: $userId)]);
+                    $displayPhone = $phone ?: ($profileName ?: $userId);
+                    $conversation->subject                = $account->conversation_subject_template
+                        ? str_replace(['%YEAR%', ':phone'], [date('Y'), $displayPhone], $account->conversation_subject_template)
+                        : __('metawhatsapp::metawhatsapp.conversation_subject', ['phone' => $displayPhone]);
                     $conversation->mailbox_id             = $account->mailbox_id;
                     $conversation->customer_id            = $customer->id;
                     $conversation->customer_email         = '';
@@ -567,6 +573,23 @@ class ProcessInboundWebhook implements ShouldQueue
         if ($newStatus === 'failed') {
             $record->error_code = (string) ($status['errors'][0]['code'] ?? '');
         }
+
+        if (in_array($newStatus, ['delivered', 'read'], true)) {
+            $statusAt = isset($status['timestamp'])
+                ? \Carbon\Carbon::createFromTimestamp((int) $status['timestamp'])
+                : now();
+
+            // Meta no sempre envia 'delivered' abans de 'read'; si arriba
+            // 'read' sense que ho haguem vist, deduïm delivered_at del
+            // mateix esdeveniment en lloc de deixar-lo buit.
+            if (!$record->delivered_at) {
+                $record->delivered_at = $statusAt;
+            }
+            if ($newStatus === 'read' && !$record->read_at) {
+                $record->read_at = $statusAt;
+            }
+        }
+
         $record->save();
 
         // Indicador de lectura natiu (issue #3): el 'read' de Meta marca el

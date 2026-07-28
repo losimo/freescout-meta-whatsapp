@@ -56,7 +56,7 @@ class MetaWhatsAppController extends Controller
 
         $account = new WhatsAppAccount();
         $account->fill($request->only([
-            'name', 'phone_number', 'phone_number_id', 'waba_id', 'verify_token',
+            'name', 'conversation_subject_template', 'phone_number', 'phone_number_id', 'waba_id', 'verify_token',
             'template_name', 'template_lang', 'template_threshold_minutes',
         ]));
         $account->mailbox_id           = $mailboxId;
@@ -84,7 +84,7 @@ class MetaWhatsAppController extends Controller
 
         // L'associació canal-bústia és immutable en edició (spec v0.3 §3.2).
         $account->fill($request->only([
-            'name', 'phone_number', 'phone_number_id', 'waba_id', 'verify_token',
+            'name', 'conversation_subject_template', 'phone_number', 'phone_number_id', 'waba_id', 'verify_token',
             'template_name', 'template_lang', 'template_threshold_minutes',
         ]));
         if ($request->filled('access_token')) {
