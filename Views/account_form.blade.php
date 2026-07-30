@@ -234,6 +234,60 @@
                     </div>
                 </div>
             </form>
+
+            @if($account)
+            <div class="panel panel-default" style="margin-top:20px">
+                <div class="panel-heading">{{ __('metawhatsapp::metawhatsapp.health_snapshot_title') }}</div>
+                <div class="panel-body">
+                    <form method="POST" action="{{ route('metawhatsapp.test_connection', $account->id) }}" style="margin-bottom:15px">
+                        {{ csrf_field() }}
+                        <button type="submit" class="btn btn-default">{{ __('metawhatsapp::metawhatsapp.test_connection_button') }}</button>
+                    </form>
+
+                    <div class="form-horizontal">
+                        <div class="form-group">
+                            <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.health_last_inbound') }}</label>
+                            <div class="col-sm-8">
+                                <p class="form-control-static">
+                                    @if($healthSnapshot['last_inbound'])
+                                        {{ $healthSnapshot['last_inbound']->created_at->format('Y-m-d H:i') }}
+                                    @else
+                                        {{ __('metawhatsapp::metawhatsapp.health_never') }}
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.health_last_outbound') }}</label>
+                            <div class="col-sm-8">
+                                <p class="form-control-static">
+                                    @if($healthSnapshot['last_outbound'])
+                                        {{ $healthSnapshot['last_outbound']->created_at->format('Y-m-d H:i') }}
+                                        &mdash; {{ __('metawhatsapp::metawhatsapp.health_last_status') }}: {{ $healthSnapshot['last_outbound']->status }}
+                                    @else
+                                        {{ __('metawhatsapp::metawhatsapp.health_never') }}
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.health_last_error') }}</label>
+                            <div class="col-sm-8">
+                                <p class="form-control-static">
+                                    @if($healthSnapshot['last_error'])
+                                        {{ $healthSnapshot['last_error']->error_code }} &mdash; {{ $healthSnapshot['last_error']->created_at->format('Y-m-d H:i') }}
+                                    @else
+                                        {{ __('metawhatsapp::metawhatsapp.health_never') }}
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
         </div>
     </div>
 </div>

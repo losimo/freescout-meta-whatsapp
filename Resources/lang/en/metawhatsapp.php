@@ -73,6 +73,18 @@ return [
     'account_deleted'              => 'WhatsApp account deleted.',
     'account_deleted_mailbox_kept' => 'WhatsApp account deleted. The mailbox was kept because it contains conversations.',
 
+    // Test connection button + account health snapshot.
+    'test_connection_button'       => 'Test connection',
+    'test_connection_success'      => 'Connection OK — verified as ":name".',
+    'test_connection_failed'       => 'Connection test failed: :error',
+    'test_connection_unknown_error' => 'Unknown error.',
+    'health_snapshot_title'        => 'Account health',
+    'health_last_inbound'          => 'Last inbound message',
+    'health_last_outbound'         => 'Last outbound attempt',
+    'health_last_status'           => 'Last delivery status',
+    'health_last_error'            => 'Last error',
+    'health_never'                 => 'Never',
+
     // Banner de finestra expirada (conversa).
     'window_expired_notice'        => 'The 24-hour customer service window appears to be expired. Free-form replies will likely be rejected by Meta.',
     'send_template_button'         => 'Send template ":name"',
@@ -85,4 +97,6 @@ return [
 
     'media_attachment_unavailable' => 'The attached file could not be downloaded from WhatsApp.',
     'media_preview_no_caption'     => 'Attachment (:type)',
+    'reaction_text'                => 'Reacted: :emoji',
+    'reaction_removed'             => 'Removed a reaction',
 ];

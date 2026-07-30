@@ -73,6 +73,18 @@ return [
     'account_deleted'              => 'Compte de WhatsApp eliminat.',
     'account_deleted_mailbox_kept' => 'Compte de WhatsApp eliminat. La bústia s\'ha conservat perquè conté converses.',
 
+    // Botó de prova de connexió + instantània de salut del compte.
+    'test_connection_button'       => 'Provar connexió',
+    'test_connection_success'      => 'Connexió correcta — verificada com a ":name".',
+    'test_connection_failed'       => 'La prova de connexió ha fallat: :error',
+    'test_connection_unknown_error' => 'Error desconegut.',
+    'health_snapshot_title'        => 'Salut del compte',
+    'health_last_inbound'          => 'Últim missatge entrant',
+    'health_last_outbound'         => 'Últim intent de sortida',
+    'health_last_status'           => 'Últim estat de lliurament',
+    'health_last_error'            => 'Últim error',
+    'health_never'                 => 'Mai',
+
     // Banner de finestra expirada (conversa).
     'window_expired_notice'        => 'La finestra de 24 hores d\'atenció al client sembla haver caducat. És probable que Meta rebutgi les respostes de text lliure.',
     'send_template_button'         => 'Envia la plantilla ":name"',
@@ -85,4 +97,6 @@ return [
 
     'media_attachment_unavailable' => 'No s\'ha pogut descarregar el fitxer adjunt de WhatsApp.',
     'media_preview_no_caption'     => 'Fitxer adjunt (:type)',
+    'reaction_text'                => 'Ha reaccionat: :emoji',
+    'reaction_removed'             => 'Ha eliminat una reacció',
 ];

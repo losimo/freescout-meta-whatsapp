@@ -45,11 +45,24 @@ Out of scope in this version:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.5
+
+- **Location and reaction messages**: inbound location messages are now shown as a Google Maps link, and reactions (including removing one) are shown as text.
+- **Connection test & health snapshot**: per-account panel with a live connection test and last-activity info.
+- Media messages without a caption are no longer discarded outright when the placeholder text is empty — only messages with neither text nor media are dropped.
+- Added a [capability matrix](docs/capability-matrix.md) documenting exactly what's supported, planned or out of scope.
+- Added a lightweight [incident notes](docs/incidents.md) log for operational gotchas worth remembering.
+
 ## Installation
 
 Follow FreeScout's [official custom module installation guide](https://github.com/freescout-help-desk/freescout/wiki/FreeScout-Modules#3-installing-custom-modules):
 
 1. Download the module zip from the [Releases page](https://github.com/losimo/freescout-meta-whatsapp/releases) (or copy/symlink the module source) into `Modules/MetaWhatsApp` of your FreeScout installation.
+
+> **Note for manual installs**
+>
+> If you copy or symlink the module source directly instead of using the zip from the Releases page, run `composer dump-autoload` from the FreeScout root before activating the module. This is required when your installation uses optimized/cached autoloading (e.g. `composer install --optimize-autoloader`) — otherwise FreeScout won't find the module's classes.
+
 2. Go to **Manage → Modules** in FreeScout and activate **MetaWhatsApp**. FreeScout runs the module's migrations and clears the cache automatically.
 3. The module appears under **Manage → WhatsApp** for administrator users.
 
@@ -174,7 +187,7 @@ Media is stored using FreeScout's existing local attachment storage — no separ
 
 These limitations are known and accepted within the MVP scope:
 
-- WhatsApp **reactions** and other unsupported message types are still dropped (logged, not shown in the conversation).
+- Message types other than text, media, button, location and reaction (e.g. contacts, stickers) are still dropped (logged, not shown in the conversation).
 - Inbound media has no size validation on this module's side beyond what Meta itself enforces before delivering the webhook.
 - No image/video gallery or carousel view — each attachment appears as its own row/thumbnail, same as any other FreeScout attachment.
 - Only **one** pre-approved HSM template per account (set on the account); no template picker, no variables/parameters, no automatic sync with Meta's template catalog.

@@ -199,6 +199,30 @@ class WhatsAppApiClient
     }
 
     /**
+     * Crida lleugera a Graph API (GET del phone number, sense enviar cap
+     * missatge) per validar que el phone_number_id i el token encara són
+     * vàlids. Mateix format ok/http_status/error_code/error_message/transient
+     * que downloadMedia(), amb 'verified_name' afegit si la crida té èxit.
+     */
+    public function testConnection(): array
+    {
+        $url = rtrim(config('metawhatsapp.api_base', 'https://graph.facebook.com'), '/')
+            . '/' . self::API_VERSION . '/' . $this->account->phone_number_id
+            . '?fields=verified_name,display_phone_number';
+
+        $result = $this->curlGet($url, [
+            'Authorization: Bearer ' . $this->accessToken,
+        ]);
+
+        if ($result['ok']) {
+            $data = json_decode($result['body'], true) ?: [];
+            $result['verified_name'] = $data['verified_name'] ?? null;
+        }
+
+        return $result;
+    }
+
+    /**
      * GET genèric amb Bearer, reutilitzat per downloadMedia(). Mateix patró
      * de retorn estructurat que postMessagePayload(), amb 'body' en lloc
      * dels camps específics de missatge.

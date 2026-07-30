@@ -73,6 +73,18 @@ return [
     'account_deleted'              => 'Cuenta de WhatsApp eliminada.',
     'account_deleted_mailbox_kept' => 'Cuenta de WhatsApp eliminada. El buzón se ha conservado porque contiene conversaciones.',
 
+    // Botón de prueba de conexión + instantánea de salud de la cuenta.
+    'test_connection_button'       => 'Probar conexión',
+    'test_connection_success'      => 'Conexión correcta — verificada como ":name".',
+    'test_connection_failed'       => 'La prueba de conexión ha fallado: :error',
+    'test_connection_unknown_error' => 'Error desconocido.',
+    'health_snapshot_title'        => 'Salud de la cuenta',
+    'health_last_inbound'          => 'Último mensaje entrante',
+    'health_last_outbound'         => 'Último intento de salida',
+    'health_last_status'           => 'Último estado de entrega',
+    'health_last_error'            => 'Último error',
+    'health_never'                 => 'Nunca',
+
     // Banner de finestra expirada (conversa).
     'window_expired_notice'        => 'La ventana de 24 horas de atención al cliente parece haber caducado. Es probable que Meta rechace las respuestas de texto libre.',
     'send_template_button'         => 'Enviar la plantilla ":name"',
@@ -85,4 +97,6 @@ return [
 
     'media_attachment_unavailable' => 'No se pudo descargar el archivo adjunto de WhatsApp.',
     'media_preview_no_caption'     => 'Archivo adjunto (:type)',
+    'reaction_text'                => 'Reaccionó: :emoji',
+    'reaction_removed'             => 'Eliminó una reacción',
 ];

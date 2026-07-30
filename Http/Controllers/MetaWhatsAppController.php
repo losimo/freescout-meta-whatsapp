@@ -10,6 +10,7 @@ use Modules\MetaWhatsApp\Http\Requests\WhatsAppAccountRequest;
 use Modules\MetaWhatsApp\Jobs\SendWhatsAppTemplate;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
+use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 
 class MetaWhatsAppController extends Controller
 {
@@ -75,7 +76,22 @@ class MetaWhatsAppController extends Controller
         $this->requireAdmin();
         $account    = WhatsAppAccount::with('mailbox')->findOrFail($id);
         $webhookUrl = $this->webhookUrl();
-        return view('metawhatsapp::account_form', compact('account', 'webhookUrl'));
+
+        // Instantània de salut: es llegeix de meta_whatsapp_messages, cap
+        // dada nova a persistir (delivered_at/read_at/error_code ja existeixen).
+        $healthSnapshot = [
+            'last_inbound'  => WhatsAppMessage::where('account_id', $account->id)
+                ->where('direction', WhatsAppMessage::DIRECTION_INBOUND)
+                ->latest('id')->first(),
+            'last_outbound' => WhatsAppMessage::where('account_id', $account->id)
+                ->where('direction', WhatsAppMessage::DIRECTION_OUTBOUND)
+                ->latest('id')->first(),
+            'last_error'    => WhatsAppMessage::where('account_id', $account->id)
+                ->where('status', WhatsAppMessage::STATUS_FAILED)
+                ->latest('id')->first(),
+        ];
+
+        return view('metawhatsapp::account_form', compact('account', 'webhookUrl', 'healthSnapshot'));
     }
 
     public function update(WhatsAppAccountRequest $request, $id)
@@ -119,6 +135,32 @@ class MetaWhatsAppController extends Controller
 
         \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.account_deleted'));
         return redirect()->route('metawhatsapp.settings');
+    }
+
+    /**
+     * Botó "Test connection" del formulari de compte: crida lleugera a
+     * Graph API per confirmar que el phone_number_id i el token encara són
+     * vàlids, sense enviar cap missatge. Resultat via flash, redirigint a
+     * edit(), mateix patró que la resta d'accions d'aquest controlador.
+     */
+    public function testConnection($id)
+    {
+        $this->requireAdmin();
+        $account = WhatsAppAccount::findOrFail($id);
+
+        $result = app(WhatsAppApiClient::class, ['account' => $account])->testConnection();
+
+        if ($result['ok']) {
+            \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.test_connection_success', [
+                'name' => $result['verified_name'] ?: $account->phone_number,
+            ]));
+        } else {
+            \Session::flash('flash_error_floating', __('metawhatsapp::metawhatsapp.test_connection_failed', [
+                'error' => $result['error_message'] ?: __('metawhatsapp::metawhatsapp.test_connection_unknown_error'),
+            ]));
+        }
+
+        return redirect()->route('metawhatsapp.edit', $id);
     }
 
     /**

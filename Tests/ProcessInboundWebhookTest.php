@@ -8,6 +8,7 @@ use App\CustomerChannel;
 use App\Thread;
 use App\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Jobs\ProcessInboundWebhook;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
@@ -189,8 +190,8 @@ class ProcessInboundWebhookTest extends TestCase
             'from'      => '34611222333',
             'id'        => 'wamid.in6',
             'timestamp' => (string) time(),
-            'type'      => 'reaction',
-            'reaction'  => ['message_id' => 'wamid.other', 'emoji' => '👍'],
+            'type'      => 'sticker',
+            'sticker'   => ['id' => 'media-sticker-1'],
         ];
 
         $before = Conversation::where('mailbox_id', $account->mailbox_id)->count();
@@ -219,6 +220,54 @@ class ProcessInboundWebhookTest extends TestCase
 
         $thread = Thread::find($msg->thread_id);
         $this->assertStringContainsString('Yes, continue the conversation', $thread->body);
+    }
+
+    public function test_missatge_location_es_formata_amb_enllac_de_google_maps()
+    {
+        $account = $this->createTestAccount();
+        $payload = $this->inboundPayload($account, 'wamid.in7b', '34611222333', 'x');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
+            'from'      => '34611222333',
+            'id'        => 'wamid.in7b',
+            'timestamp' => (string) time(),
+            'type'      => 'location',
+            'location'  => [
+                'latitude'  => 41.3874,
+                'longitude' => 2.1686,
+                'name'      => 'Plaça Catalunya',
+                'address'   => 'Barcelona, Spain',
+            ],
+        ];
+
+        $this->runJob($account, $payload);
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.in7b')->first();
+        $this->assertNotNull($msg);
+
+        $thread = Thread::find($msg->thread_id);
+        $this->assertStringContainsString('Plaça Catalunya — Barcelona, Spain', $thread->body);
+        $this->assertStringContainsString('https://www.google.com/maps?q=41.3874,2.1686', $thread->body);
+    }
+
+    public function test_missatge_reaction_es_processa_amb_emoji()
+    {
+        $account = $this->createTestAccount();
+        $payload = $this->inboundPayload($account, 'wamid.in7c', '34611222333', 'x');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
+            'from'      => '34611222333',
+            'id'        => 'wamid.in7c',
+            'timestamp' => (string) time(),
+            'type'      => 'reaction',
+            'reaction'  => ['message_id' => 'wamid.previous', 'emoji' => '👍'],
+        ];
+
+        $this->runJob($account, $payload);
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.in7c')->first();
+        $this->assertNotNull($msg);
+
+        $thread = Thread::find($msg->thread_id);
+        $this->assertStringContainsString('👍', $thread->body);
     }
 
     public function test_change_amb_phone_number_id_dun_altre_numero_es_descarta()
@@ -437,8 +486,8 @@ class ProcessInboundWebhookTest extends TestCase
         $account = $this->createTestAccount();
 
         $payload = $this->inboundPayload($account, 'wamid.au1', '34611222333', 'irrelevant');
-        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type']     = 'reaction';
-        $payload['entry'][0]['changes'][0]['value']['messages'][0]['reaction'] = ['message_id' => 'wamid.other', 'emoji' => '👍'];
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type']    = 'sticker';
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['sticker'] = ['id' => 'media-sticker-1'];
         unset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']);
 
         $this->runJob($account, $payload);
@@ -446,7 +495,7 @@ class ProcessInboundWebhookTest extends TestCase
         Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
             return $message === '[MetaWhatsApp] Unsupported message type, discarded'
                 && ($context['from'] ?? null) === '34611222333'
-                && ($context['type'] ?? null) === 'reaction';
+                && ($context['type'] ?? null) === 'sticker';
         })->once();
     }
 
@@ -757,6 +806,52 @@ class ProcessInboundWebhookTest extends TestCase
         $attachment = \App\Attachment::where('thread_id', $thread->id)->first();
         $this->assertEquals('invoice.pdf', $attachment->file_name);
         $this->assertEquals(\App\Attachment::TYPE_APPLICATION, $attachment->type);
+    }
+
+    public function test_placeholder_buit_no_descarta_el_missatge_amb_adjunt()
+    {
+        // #11: traduir media_preview_no_caption a una cadena buida (via el
+        // mecanisme de traduccio del propi FreeScout) ha de seguir desant
+        // el missatge i l'adjunt, no descartar-los silenciosament.
+        Lang::addLines(['metawhatsapp::metawhatsapp.media_preview_no_caption' => ''], app()->getLocale());
+
+        $account = $this->createTestAccount();
+
+        $payload = $this->inboundPayload($account, 'wamid.img-empty1', '34611222333', 'irrelevant');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type']  = 'image';
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['image'] = ['id' => 'media-empty-1'];
+        unset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']);
+
+        $fakeClient = \Mockery::mock(WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('downloadMedia')
+            ->with('media-empty-1')
+            ->andReturn([
+                'ok' => true, 'bytes' => 'fake-image-bytes', 'mime_type' => 'image/jpeg',
+                'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false,
+            ]);
+
+        $job = new class($account->id, $payload) extends ProcessInboundWebhook {
+            private $fakeApiClient;
+            public function setFakeApiClient($client) {
+                $this->fakeApiClient = $client;
+            }
+            protected function apiClient(WhatsAppAccount $account): WhatsAppApiClient {
+                return $this->fakeApiClient ?? parent::apiClient($account);
+            }
+        };
+        $job->setFakeApiClient($fakeClient);
+        $job->handle();
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.img-empty1')->first();
+        $this->assertNotNull($msg, 'The message must not be discarded when the placeholder translates to an empty string.');
+
+        $thread = Thread::find($msg->thread_id);
+        $this->assertNotNull($thread);
+        $this->assertTrue((bool) $thread->has_attachments);
+
+        $attachment = \App\Attachment::where('thread_id', $thread->id)->first();
+        $this->assertNotNull($attachment);
+        $this->assertEquals('image/jpeg', $attachment->mime_type);
     }
 
     public function test_descarrega_fallida_crea_thread_amb_avis_i_sense_adjunt()

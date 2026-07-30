@@ -88,7 +88,7 @@ class ProcessInboundWebhook implements ShouldQueue
         $type  = $message['type'] ?? null;
         $mediaTypes = ['image', 'video', 'audio', 'document'];
 
-        if (!in_array($type, [...$mediaTypes, 'text', 'button'], true)) {
+        if (!in_array($type, [...$mediaTypes, 'text', 'button', 'location', 'reaction'], true)) {
             Log::error('[MetaWhatsApp] Unsupported message type, discarded', [
                 'account_id' => $account->id,
                 'from'       => $from,
@@ -109,9 +109,15 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         // Missatge de text o multimèdia amb caption.
-        $text = $type === 'button'
-            ? trim($message['button']['text'] ?? '')
-            : trim($message['text']['body'] ?? '');
+        if ($type === 'button') {
+            $text = trim($message['button']['text'] ?? '');
+        } elseif ($type === 'location') {
+            $text = $this->formatLocationText($message['location'] ?? []);
+        } elseif ($type === 'reaction') {
+            $text = $this->formatReactionText($message['reaction'] ?? []);
+        } else {
+            $text = trim($message['text']['body'] ?? '');
+        }
         if ($media && $media['ok'] && $media['caption']) {
             $text = $media['caption'];
         } elseif ($media && !$media['ok']) {
@@ -120,7 +126,7 @@ class ProcessInboundWebhook implements ShouldQueue
             $text = __('metawhatsapp::metawhatsapp.media_preview_no_caption', ['type' => $type]);
         }
 
-        if ($text === '') {
+        if ($text === '' && !$media) {
             return;
         }
 
@@ -311,6 +317,37 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         return $selected;
+    }
+
+    /**
+     * Formata una ubicació compartida com a text amb enllaç a Google Maps.
+     */
+    protected function formatLocationText(array $location): string
+    {
+        $lat = $location['latitude'] ?? null;
+        $lng = $location['longitude'] ?? null;
+        if ($lat === null || $lng === null) {
+            return '';
+        }
+
+        $name    = trim($location['name'] ?? '');
+        $address = trim($location['address'] ?? '');
+        $label   = trim($name . ($name !== '' && $address !== '' ? ' — ' : '') . $address);
+        $link    = "https://www.google.com/maps?q={$lat},{$lng}";
+
+        return $label !== '' ? "{$label}\n{$link}" : $link;
+    }
+
+    /**
+     * Formata una reacció (emoji) a un missatge previ com a text.
+     */
+    protected function formatReactionText(array $reaction): string
+    {
+        $emoji = trim($reaction['emoji'] ?? '');
+
+        return $emoji !== ''
+            ? __('metawhatsapp::metawhatsapp.reaction_text', ['emoji' => $emoji])
+            : __('metawhatsapp::metawhatsapp.reaction_removed');
     }
 
     /**

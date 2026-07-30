@@ -12,6 +12,7 @@ Route::group([
     Route::get('/settings/{id}/edit', 'MetaWhatsAppController@edit')->name('metawhatsapp.edit');
     Route::put('/settings/{id}', 'MetaWhatsAppController@update')->name('metawhatsapp.update');
     Route::delete('/settings/{id}', 'MetaWhatsAppController@destroy')->name('metawhatsapp.destroy');
+    Route::post('/settings/{id}/test-connection', 'MetaWhatsAppController@testConnection')->name('metawhatsapp.test_connection');
 
     // Banner de finestra expirada: enviament manual de la plantilla de recuperació.
     Route::post('/conversation/{id}/send-template', 'MetaWhatsAppController@sendTemplate')->name('metawhatsapp.send_template');
