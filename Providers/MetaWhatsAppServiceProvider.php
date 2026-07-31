@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../vendor/autoload.php';
+
 namespace Modules\MetaWhatsApp\Providers;
 
 use Illuminate\Support\ServiceProvider;
