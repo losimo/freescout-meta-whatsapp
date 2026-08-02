@@ -45,6 +45,11 @@ Out of scope in this version:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.5.1
+
+- **Official channel IDs**: the module now uses the channel IDs officially assigned by the FreeScout team (`103`/`104`) instead of the provisional `100`/`101`. Existing installations are migrated automatically and transparently — no action needed.
+- **Critical fix**: v1.5.0 shipped a `require_once` placed before the file's `namespace` declaration, which is invalid PHP and made the module fail to load entirely. Fixed; if you installed v1.5.0, update to v1.5.1 immediately.
+
 ## What's new in v1.5
 
 - **Location and reaction messages**: inbound location messages are now shown as a Google Maps link, and reactions (including removing one) are shown as text.

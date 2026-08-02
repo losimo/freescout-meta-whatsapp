@@ -8,12 +8,15 @@ use App\CustomerChannel;
 use App\Thread;
 use App\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Jobs\ProcessInboundWebhook;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+
+require_once __DIR__ . '/../Database/Migrations/2026_08_02_000001_migrate_meta_whatsapp_channel_ids.php';
 
 class ProcessInboundWebhookTest extends TestCase
 {
@@ -894,5 +897,42 @@ class ProcessInboundWebhookTest extends TestCase
             return $message === '[MetaWhatsApp] Failed to download inbound media, attachment not stored'
                 && ($context['type'] ?? null) === 'video';
         })->once();
+    }
+
+    public function test_migracio_reassigna_nomes_els_channel_ids_del_modul()
+    {
+        $account = $this->createTestAccount();
+        // Identitat nostra amb fila de missatge (com deixaria una instal·lació antiga).
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.qw6', '34611222333', 'hola', [[
+            'wa_id' => '34611222333', 'user_id' => '9876543210987654321',
+        ]]));
+        // Simula l'esquema antic: les files del mòdul als canals 100/101.
+        DB::table('customer_channel')->where('channel', WhatsAppAccount::CHANNEL)
+            ->where('channel_id', '+34611222333')->update(['channel' => 100]);
+        DB::table('customer_channel')->where('channel', WhatsAppAccount::CHANNEL_BSUID)
+            ->update(['channel' => 101]);
+        // Fila d'un ALTRE mòdul al canal 100: no s'ha de tocar mai.
+        DB::table('customer_channel')->insert([
+            'customer_id' => Conversation::first()->customer_id,
+            'channel'     => 100,
+            'channel_id'  => 'telegram-777',
+        ]);
+
+        (new \MigrateMetaWhatsappChannelIds())->up();
+
+        $this->assertEquals(1, DB::table('customer_channel')
+            ->where('channel', WhatsAppAccount::CHANNEL)->where('channel_id', '+34611222333')->count());
+        $this->assertEquals(1, DB::table('customer_channel')
+            ->where('channel', WhatsAppAccount::CHANNEL_BSUID)->where('channel_id', '9876543210987654321')->count());
+        // La fila aliena continua intacta al canal 100.
+        $this->assertEquals(1, DB::table('customer_channel')
+            ->where('channel', 100)->where('channel_id', 'telegram-777')->count());
+
+        (new \MigrateMetaWhatsappChannelIds())->down();
+        $this->assertEquals(1, DB::table('customer_channel')
+            ->where('channel', 100)->where('channel_id', '+34611222333')->count());
+        // La fila aliena tampoc no s'ha tocat en el rollback.
+        $this->assertEquals(1, DB::table('customer_channel')
+            ->where('channel', 100)->where('channel_id', 'telegram-777')->count());
     }
 }

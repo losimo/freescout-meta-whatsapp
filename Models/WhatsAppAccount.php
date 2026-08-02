@@ -9,17 +9,18 @@ class WhatsAppAccount extends Model
     /**
      * Canal enter propi del mòdul a customer_channel (el core no en defineix cap;
      * la columna és unsignedTinyInteger). El nom visible es registra via el
-     * filter Eventy 'channel.name'.
+     * filter Eventy 'channel.name'. IDs oficials assignats per l'equip de
+     * FreeScout (issue #4); abans de v1.5.1 el mòdul usava 100/101 provisionals.
      */
-    const CHANNEL = 100;
+    const CHANNEL = 103;
     const CHANNEL_NAME = 'WhatsApp';
 
     /**
      * Canal dedicat per als BSUID (user_id de Meta): el core només permet una
      * fila de customer_channel per client i canal, així que el telèfon viu al
-     * canal 100 i el BSUID en aquest.
+     * canal 103 i el BSUID en aquest.
      */
-    const CHANNEL_BSUID      = 101;
+    const CHANNEL_BSUID      = 104;
     const CHANNEL_BSUID_NAME = 'WhatsApp ID';
 
     protected $table = 'meta_whatsapp_accounts';

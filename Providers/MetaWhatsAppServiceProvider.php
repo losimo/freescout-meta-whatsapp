@@ -1,12 +1,12 @@
 <?php
 
-require_once __DIR__ . '/../vendor/autoload.php';
-
 namespace Modules\MetaWhatsApp\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
+
+require_once __DIR__ . '/../vendor/autoload.php';
 
 class MetaWhatsAppServiceProvider extends ServiceProvider
 {
