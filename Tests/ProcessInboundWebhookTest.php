@@ -104,6 +104,131 @@ class ProcessInboundWebhookTest extends TestCase
         );
     }
 
+    public function test_status_failed_asincron_crea_nota_visible_amb_el_codi_derror()
+    {
+        // Reconciliació d'esdeveniments outbound: un enviament que Meta va
+        // acceptar (wamid real) però rebutja després amb un status 'failed'
+        // async no tenia cap senyal visible per a l'agent.
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.fail-in1', '34611222333', 'hola'));
+        $inbound      = WhatsAppMessage::where('wamid', 'wamid.fail-in1')->first();
+        $conversation = Conversation::find($inbound->conversation_id);
+
+        $outboundThread = new Thread();
+        $outboundThread->conversation_id = $conversation->id;
+        $outboundThread->type            = Thread::TYPE_MESSAGE;
+        $outboundThread->status          = $conversation->status;
+        $outboundThread->state           = Thread::STATE_PUBLISHED;
+        $outboundThread->body            = 'Hola, tens un missatge pendent';
+        $outboundThread->source_via      = Thread::PERSON_USER;
+        $outboundThread->source_type     = Thread::SOURCE_TYPE_WEB;
+        $outboundThread->customer_id     = $conversation->customer_id;
+        $outboundThread->save();
+
+        WhatsAppMessage::create([
+            'wamid'           => 'wamid.out-fail1',
+            'account_id'      => $account->id,
+            'conversation_id' => $conversation->id,
+            'thread_id'       => $outboundThread->id,
+            'contact_phone'   => '+34611222333',
+            'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+            'status'          => WhatsAppMessage::STATUS_SENT,
+        ]);
+
+        $statusPayload = $this->inboundPayload($account, 'x', 'x', 'x');
+        $statusPayload['entry'][0]['changes'][0]['value'] = [
+            'messaging_product' => 'whatsapp',
+            'metadata'          => ['phone_number_id' => $account->phone_number_id],
+            'statuses'          => [[
+                'id'     => 'wamid.out-fail1',
+                'status' => 'failed',
+                'errors' => [['code' => 131047, 'title' => 'Re-engagement message']],
+            ]],
+        ];
+        $this->runJob($account, $statusPayload);
+
+        $this->assertEquals(WhatsAppMessage::STATUS_FAILED, WhatsAppMessage::where('wamid', 'wamid.out-fail1')->value('status'));
+
+        $note = Thread::where('conversation_id', $conversation->id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->where('body', 'like', '[WhatsApp delivery failed] wamid.out-fail1%')
+            ->first();
+        $this->assertNotNull($note, 'Ha de crear una nota interna visible amb la fallida.');
+        $this->assertStringContainsString('131047', $note->body);
+        $this->assertStringContainsString('Re-engagement message', $note->body);
+    }
+
+    public function test_status_failed_asincron_no_duplica_la_nota_en_rebre_el_webhook_dues_vegades()
+    {
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.fail-in2', '34611222333', 'hola'));
+        $inbound      = WhatsAppMessage::where('wamid', 'wamid.fail-in2')->first();
+        $conversation = Conversation::find($inbound->conversation_id);
+
+        $outboundThread = new Thread();
+        $outboundThread->conversation_id = $conversation->id;
+        $outboundThread->type            = Thread::TYPE_MESSAGE;
+        $outboundThread->status          = $conversation->status;
+        $outboundThread->state           = Thread::STATE_PUBLISHED;
+        $outboundThread->body            = 'x';
+        $outboundThread->source_via      = Thread::PERSON_USER;
+        $outboundThread->source_type     = Thread::SOURCE_TYPE_WEB;
+        $outboundThread->customer_id     = $conversation->customer_id;
+        $outboundThread->save();
+
+        WhatsAppMessage::create([
+            'wamid'           => 'wamid.out-fail2',
+            'account_id'      => $account->id,
+            'conversation_id' => $conversation->id,
+            'thread_id'       => $outboundThread->id,
+            'contact_phone'   => '+34611222333',
+            'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+            'status'          => WhatsAppMessage::STATUS_SENT,
+        ]);
+
+        $statusPayload = $this->inboundPayload($account, 'x', 'x', 'x');
+        $statusPayload['entry'][0]['changes'][0]['value'] = [
+            'messaging_product' => 'whatsapp',
+            'metadata'          => ['phone_number_id' => $account->phone_number_id],
+            'statuses'          => [[
+                'id' => 'wamid.out-fail2', 'status' => 'failed', 'errors' => [['code' => 470]],
+            ]],
+        ];
+        $this->runJob($account, $statusPayload);
+        $this->runJob($account, $statusPayload);
+
+        $this->assertEquals(
+            1,
+            Thread::where('conversation_id', $conversation->id)
+                ->where('body', 'like', '[WhatsApp delivery failed] wamid.out-fail2%')
+                ->count()
+        );
+    }
+
+    public function test_status_failed_dun_missatge_inbound_no_crea_nota()
+    {
+        // El 'failed' de Meta reporta l'entrega d'un enviament nostre: no té
+        // sentit aplicar-ho a un missatge inbound (client -> nosaltres).
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.fail-in3', '34611222333', 'hola'));
+
+        $statusPayload = $this->inboundPayload($account, 'x', 'x', 'x');
+        $statusPayload['entry'][0]['changes'][0]['value'] = [
+            'messaging_product' => 'whatsapp',
+            'metadata'          => ['phone_number_id' => $account->phone_number_id],
+            'statuses'          => [[
+                'id' => 'wamid.fail-in3', 'status' => 'failed', 'errors' => [['code' => 470]],
+            ]],
+        ];
+        $this->runJob($account, $statusPayload);
+
+        $this->assertFalse(
+            Thread::where('type', Thread::TYPE_NOTE)
+                ->where('body', 'like', '[WhatsApp delivery failed]%')
+                ->exists()
+        );
+    }
+
     public function test_subject_amb_plantilla_personalitzada_substitueix_year_i_phone()
     {
         $account = $this->createTestAccount();
@@ -193,8 +318,8 @@ class ProcessInboundWebhookTest extends TestCase
             'from'      => '34611222333',
             'id'        => 'wamid.in6',
             'timestamp' => (string) time(),
-            'type'      => 'sticker',
-            'sticker'   => ['id' => 'media-sticker-1'],
+            'type'      => 'order',
+            'order'     => ['catalog_id' => 'cat-1', 'product_items' => []],
         ];
 
         $before = Conversation::where('mailbox_id', $account->mailbox_id)->count();
@@ -252,6 +377,53 @@ class ProcessInboundWebhookTest extends TestCase
         $this->assertStringContainsString('https://www.google.com/maps?q=41.3874,2.1686', $thread->body);
     }
 
+    public function test_missatge_contacts_es_processa_amb_nom_i_telefon()
+    {
+        $account = $this->createTestAccount();
+        $payload = $this->inboundPayload($account, 'wamid.contacts1', '34611222333', 'x');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
+            'from'      => '34611222333',
+            'id'        => 'wamid.contacts1',
+            'timestamp' => (string) time(),
+            'type'      => 'contacts',
+            'contacts'  => [
+                ['name' => ['formatted_name' => 'John Smith'], 'phones' => [['phone' => '+1234567890']]],
+                ['name' => ['formatted_name' => 'Jane Doe'], 'phones' => [['phone' => '+1234567891']]],
+            ],
+        ];
+
+        $this->runJob($account, $payload);
+
+        $msg    = WhatsAppMessage::where('wamid', 'wamid.contacts1')->first();
+        $this->assertNotNull($msg);
+        $thread = Thread::find($msg->thread_id);
+        $this->assertStringContainsString('John Smith (+1234567890)', $thread->body);
+        $this->assertStringContainsString('Jane Doe (+1234567891)', $thread->body);
+    }
+
+    public function test_missatge_contacts_sense_nom_ni_telefon_usa_text_generic()
+    {
+        $account = $this->createTestAccount();
+        $payload = $this->inboundPayload($account, 'wamid.contacts2', '34611222333', 'x');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
+            'from'      => '34611222333',
+            'id'        => 'wamid.contacts2',
+            'timestamp' => (string) time(),
+            'type'      => 'contacts',
+            'contacts'  => [['name' => [], 'phones' => []]],
+        ];
+
+        $this->runJob($account, $payload);
+
+        $msg    = WhatsAppMessage::where('wamid', 'wamid.contacts2')->first();
+        $this->assertNotNull($msg);
+        $thread = Thread::find($msg->thread_id);
+        $this->assertStringContainsString(
+            __('metawhatsapp::metawhatsapp.contacts_shared_empty'),
+            $thread->body
+        );
+    }
+
     public function test_missatge_reaction_es_processa_amb_emoji()
     {
         $account = $this->createTestAccount();
@@ -271,6 +443,69 @@ class ProcessInboundWebhookTest extends TestCase
 
         $thread = Thread::find($msg->thread_id);
         $this->assertStringContainsString('👍', $thread->body);
+    }
+
+    public function test_reaction_cita_extracte_del_missatge_al_qual_reacciona()
+    {
+        $account = $this->createTestAccount();
+
+        // Missatge original al qual es reaccionarà.
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.target1', '34611222333', 'Quin és el preu del producte X?'));
+
+        $payload = $this->inboundPayload($account, 'wamid.react1', '34611222333', 'x');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
+            'from'      => '34611222333',
+            'id'        => 'wamid.react1',
+            'timestamp' => (string) time(),
+            'type'      => 'reaction',
+            'reaction'  => ['message_id' => 'wamid.target1', 'emoji' => '👍'],
+        ];
+        $this->runJob($account, $payload);
+
+        $msg    = WhatsAppMessage::where('wamid', 'wamid.react1')->first();
+        $thread = Thread::find($msg->thread_id);
+        $this->assertStringContainsString('👍', $thread->body);
+        $this->assertStringContainsString('Quin és el preu del producte X?', $thread->body);
+    }
+
+    public function test_reaction_eliminada_tambe_cita_extracte()
+    {
+        $account = $this->createTestAccount();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.target2', '34611222333', 'Un altre missatge'));
+
+        $payload = $this->inboundPayload($account, 'wamid.react2', '34611222333', 'x');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
+            'from'      => '34611222333',
+            'id'        => 'wamid.react2',
+            'timestamp' => (string) time(),
+            'type'      => 'reaction',
+            'reaction'  => ['message_id' => 'wamid.target2', 'emoji' => ''],
+        ];
+        $this->runJob($account, $payload);
+
+        $msg    = WhatsAppMessage::where('wamid', 'wamid.react2')->first();
+        $thread = Thread::find($msg->thread_id);
+        $this->assertStringContainsString('Un altre missatge', $thread->body);
+    }
+
+    public function test_reaction_sense_target_localitzable_cau_al_text_generic()
+    {
+        $account = $this->createTestAccount();
+        $payload = $this->inboundPayload($account, 'wamid.react3', '34611222333', 'x');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
+            'from'      => '34611222333',
+            'id'        => 'wamid.react3',
+            'timestamp' => (string) time(),
+            'type'      => 'reaction',
+            'reaction'  => ['message_id' => 'wamid.no-existeix', 'emoji' => '❤️'],
+        ];
+        $this->runJob($account, $payload);
+
+        $msg    = WhatsAppMessage::where('wamid', 'wamid.react3')->first();
+        $thread = Thread::find($msg->thread_id);
+        $this->assertStringContainsString('❤️', $thread->body);
+        $this->assertStringNotContainsString(':excerpt', $thread->body);
     }
 
     public function test_change_amb_phone_number_id_dun_altre_numero_es_descarta()
@@ -489,8 +724,8 @@ class ProcessInboundWebhookTest extends TestCase
         $account = $this->createTestAccount();
 
         $payload = $this->inboundPayload($account, 'wamid.au1', '34611222333', 'irrelevant');
-        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type']    = 'sticker';
-        $payload['entry'][0]['changes'][0]['value']['messages'][0]['sticker'] = ['id' => 'media-sticker-1'];
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type']  = 'order';
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['order'] = ['catalog_id' => 'cat-1', 'product_items' => []];
         unset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']);
 
         $this->runJob($account, $payload);
@@ -498,7 +733,7 @@ class ProcessInboundWebhookTest extends TestCase
         Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
             return $message === '[MetaWhatsApp] Unsupported message type, discarded'
                 && ($context['from'] ?? null) === '34611222333'
-                && ($context['type'] ?? null) === 'sticker';
+                && ($context['type'] ?? null) === 'order';
         })->once();
     }
 
@@ -768,6 +1003,46 @@ class ProcessInboundWebhookTest extends TestCase
 
         $conversation = Conversation::find($msg->conversation_id);
         $this->assertTrue((bool) $conversation->has_attachments);
+    }
+
+    public function test_missatge_sticker_es_processa_com_a_imatge()
+    {
+        $account = $this->createTestAccount();
+
+        $payload = $this->inboundPayload($account, 'wamid.sti1', '34611222333', 'irrelevant');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['type']    = 'sticker';
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['sticker'] = ['id' => 'media-sticker-1'];
+        unset($payload['entry'][0]['changes'][0]['value']['messages'][0]['text']);
+
+        $fakeClient = \Mockery::mock(WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('downloadMedia')
+            ->with('media-sticker-1')
+            ->andReturn([
+                'ok' => true, 'bytes' => 'fake-webp-bytes', 'mime_type' => 'image/webp',
+                'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false,
+            ]);
+
+        $job = new class($account->id, $payload) extends ProcessInboundWebhook {
+            private $fakeApiClient;
+            public function setFakeApiClient($client) {
+                $this->fakeApiClient = $client;
+            }
+            protected function apiClient(WhatsAppAccount $account): WhatsAppApiClient {
+                return $this->fakeApiClient ?? parent::apiClient($account);
+            }
+        };
+        $job->setFakeApiClient($fakeClient);
+        $job->handle();
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.sti1')->first();
+        $this->assertNotNull($msg);
+        $thread = Thread::find($msg->thread_id);
+        $this->assertTrue((bool) $thread->has_attachments);
+
+        $attachment = \App\Attachment::where('thread_id', $thread->id)->first();
+        $this->assertNotNull($attachment);
+        $this->assertEquals('image/webp', $attachment->mime_type);
+        $this->assertEquals(\App\Attachment::TYPE_IMAGE, $attachment->type);
     }
 
     public function test_missatge_document_sense_caption_usa_preview_generica_i_mapa_a_application()

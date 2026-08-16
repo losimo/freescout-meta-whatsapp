@@ -33,3 +33,11 @@ Add an entry whenever something takes more than a few minutes to figure out and 
 **Resolution:** Shipped in v1.5.1: constants bumped from the provisional `100`/`101` to the official `103`/`104`, with a reversible data migration (`2026_08_02_000001_migrate_meta_whatsapp_channel_ids.php`) that remaps only this module's own rows in `customer_channel`/`customers` — identified via `meta_whatsapp_messages.contact_phone` for the phone channel, and unconditionally for the BSUID channel since no other module ever used it. Existing installations upgrade transparently.
 
 **Follow-up:** None — issue #4 closed.
+
+## 2026-08-15 — Account-creation page returned 500 on PHP 8.1+ (pre-existing, no open issue)
+
+**What happened:** Discovered while adding the first-ever test coverage for `GET /meta-whatsapp/settings/create` (as part of the multi-template work for issue #2): `old('mailbox_name')` with no default returns `null` on first visit, and Blade's `{{ }}` auto-escaping calls `htmlspecialchars(null)`, which PHP 8.1+ deprecates and FreeScout's error handler promotes to a fatal `ErrorException`. Nobody had reported it — the route simply had zero test coverage before.
+
+**Resolution:** `old('mailbox_name', '')` with an explicit empty-string default. One-line fix.
+
+**Follow-up:** None needed, but a reminder that untested routes in this module can hide real breakage indefinitely — worth periodically checking for other unguarded `old()`/`$account->field` calls without a `??` fallback in Blade views.

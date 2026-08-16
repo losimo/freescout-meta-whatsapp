@@ -42,6 +42,11 @@ return [
     'template_threshold'           => 'Llindar de caducitat de la finestra (minuts)',
     'template_threshold_help'      => 'La finestra oficial d\'atenció al client de Meta és de 24 hores des de l\'últim missatge del client. Aquesta opció només defineix quan el mòdul comença a tractar la finestra com a caducada, com a marge de seguretat operatiu intern — no canvia la regla de Meta. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Consulta la documentació de Meta</a>.',
 
+    'templates_multi_help'         => 'Opcional: configura fins a 5 plantilles (p. ex. una per idioma) en lloc de la única de dalt. Deixa el nom/idioma d\'una fila en blanc per ometre-la. Amb almenys una fila plena, els agents veuran un botó per plantilla.',
+    'template_row_id'              => 'Nom de la plantilla',
+    'template_row_display_name'    => 'Text del botó',
+    'template_row_recovery_text'   => 'Text de recuperació mostrat a la conversa',
+
     'mailbox'                      => 'Bústia',
     'mailbox_mode_new'             => 'Crea una bústia nova per a aquest canal',
     'mailbox_mode_existing'        => 'Utilitza una bústia existent',
@@ -95,8 +100,26 @@ return [
     'template_window_open'         => 'La finestra del client ha tornat a obrir-se: envia una resposta normal en comptes d\'una plantilla de pagament.',
     'template_already_sent'        => 'Ja s\'ha enviat una plantilla fa uns moments per a aquesta conversa.',
 
+    'browse_templates_link'        => 'Veure totes les plantilles aprovades…',
+    'templates_picker_title'       => 'Enviar una plantilla de WhatsApp',
+    'templates_picker_back'        => '← Tornar a la conversa',
+    'templates_picker_fetch_error' => 'No s\'han pogut obtenir les plantilles de Meta: :error',
+    'templates_picker_empty'       => 'No s\'ha trobat cap plantilla aprovada per a aquest WhatsApp Business Account.',
+    'template_variable_label'      => 'Variable :n',
+    'template_send_button'         => 'Enviar',
+
+    'async_delivery_failed'        => 'WhatsApp ha informat que aquest missatge ha fallat després d\'haver-lo acceptat inicialment per enviar. Error: :error',
+
+    'webhook_subscribe_button'     => 'Subscriure webhook',
+    'webhook_subscribed_success'   => 'Subscripció de webhook confirmada amb Meta.',
+    'webhook_subscribe_failed'     => 'No s\'ha pogut subscriure als webhooks de Meta: :error',
+
     'media_attachment_unavailable' => 'No s\'ha pogut descarregar el fitxer adjunt de WhatsApp.',
     'media_preview_no_caption'     => 'Fitxer adjunt (:type)',
     'reaction_text'                => 'Ha reaccionat: :emoji',
     'reaction_removed'             => 'Ha eliminat una reacció',
+    'reaction_text_quoted'         => 'Ha reaccionat :emoji a: ":excerpt"',
+    'reaction_removed_quoted'      => 'Ha eliminat una reacció a: ":excerpt"',
+    'contacts_shared'              => 'Contacte(s) compartit(s):',
+    'contacts_shared_empty'        => 'Ha compartit una targeta de contacte (sense nom ni telèfon).',
 ];

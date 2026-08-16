@@ -25,6 +25,14 @@ class WhatsAppAccountRequest extends FormRequest
             'template_name'              => 'nullable|string|max:512',
             'template_lang'              => 'nullable|string|max:15|regex:/^[a-z]{2}(_[A-Z]{2})?$/',
             'template_threshold_minutes' => 'nullable|integer|min:1|max:1440',
+            // Fins a 5 plantilles (issue #2, punts 2-4): id+language obligatoris
+            // junts per fila plena, la resta opcional. Files buides es
+            // descarten al controlador, no cal 'required' aquí.
+            'templates'                  => 'nullable|array|max:5',
+            'templates.*.id'             => 'nullable|string|max:512',
+            'templates.*.language'       => 'nullable|string|max:15|regex:/^[a-z]{2}(_[A-Z]{2})?$/',
+            'templates.*.display_name'   => 'nullable|string|max:190',
+            'templates.*.recovery_text'  => 'nullable|string|max:1000',
         ];
 
         if ($id) {

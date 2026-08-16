@@ -127,6 +127,159 @@ class ConnectionPanelTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // WhatsAppApiClient::subscribeWebhook() + registre automàtic/manual
+    // ------------------------------------------------------------------
+
+    public function test_subscribe_webhook_ok()
+    {
+        $account = $this->createTestAccount();
+        $client  = new class($account) extends WhatsAppApiClient {
+            protected function curlPostSimple(string $url, array $headers): array
+            {
+                return ['ok' => true, 'body' => '{"success":true}', 'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false];
+            }
+        };
+
+        $result = $client->subscribeWebhook();
+
+        $this->assertTrue($result['ok']);
+    }
+
+    public function test_subscribe_webhook_fallit()
+    {
+        $account = $this->createTestAccount();
+        $client  = new class($account) extends WhatsAppApiClient {
+            protected function curlPostSimple(string $url, array $headers): array
+            {
+                return ['ok' => false, 'body' => null, 'http_status' => 401, 'error_code' => '190', 'error_message' => 'Token caducat', 'transient' => false];
+            }
+        };
+
+        $result = $client->subscribeWebhook();
+
+        $this->assertFalse($result['ok']);
+        $this->assertEquals('Token caducat', $result['error_message']);
+    }
+
+    public function test_post_subscribe_webhook_ok_marca_flash_success_floating()
+    {
+        $account = $this->createTestAccount();
+
+        $this->app->bind(WhatsAppApiClient::class, function ($app, $params) {
+            return new class($params['account']) extends WhatsAppApiClient {
+                protected function curlPostSimple(string $url, array $headers): array
+                {
+                    return ['ok' => true, 'body' => '{"success":true}', 'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false];
+                }
+            };
+        });
+
+        $admin = $this->makeAdminUser();
+
+        $response = $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/settings/' . $account->id . '/subscribe-webhook'));
+
+        $response->assertStatus(302);
+        $response->assertSessionHas('flash_success_floating');
+    }
+
+    public function test_post_subscribe_webhook_fallit_marca_flash_error_floating()
+    {
+        $account = $this->createTestAccount();
+
+        $this->app->bind(WhatsAppApiClient::class, function ($app, $params) {
+            return new class($params['account']) extends WhatsAppApiClient {
+                protected function curlPostSimple(string $url, array $headers): array
+                {
+                    return ['ok' => false, 'body' => null, 'http_status' => 401, 'error_code' => '190', 'error_message' => 'Token caducat', 'transient' => false];
+                }
+            };
+        });
+
+        $admin = $this->makeAdminUser();
+
+        $response = $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/settings/' . $account->id . '/subscribe-webhook'));
+
+        $response->assertStatus(302);
+        $response->assertSessionHas('flash_error_floating');
+    }
+
+    public function test_post_store_subscriu_automaticament_el_webhook_en_crear_el_compte()
+    {
+        $subscribed = new \stdClass();
+        $subscribed->called = false;
+
+        $this->app->bind(WhatsAppApiClient::class, function ($app, $params) use ($subscribed) {
+            return new class($params['account'], $subscribed) extends WhatsAppApiClient {
+                private $subscribed;
+                public function __construct($account, $subscribed) { parent::__construct($account); $this->subscribed = $subscribed; }
+                protected function curlPostSimple(string $url, array $headers): array
+                {
+                    $this->subscribed->called = true;
+                    return ['ok' => true, 'body' => '{"success":true}', 'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false];
+                }
+            };
+        });
+
+        $admin = $this->makeAdminUser();
+
+        $response = $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/settings'), [
+                'name'             => 'PHPUnit store',
+                'phone_number'     => '+34600111222',
+                'phone_number_id'  => 'store-test-' . uniqid(),
+                'waba_id'          => 'waba-store-test',
+                'verify_token'     => bin2hex(random_bytes(32)),
+                'access_token'     => str_repeat('a', 25),
+                'app_secret'       => str_repeat('b', 20),
+                'mailbox_mode'     => 'new',
+                'mailbox_name'     => 'PHPUnit store mailbox',
+            ]);
+
+        $response->assertStatus(302);
+        $this->assertTrue($subscribed->called, 'store() ha de cridar subscribeWebhook() automàticament.');
+        $response->assertSessionHas('flash_success_floating');
+        $response->assertSessionMissing('flash_warning_floating');
+    }
+
+    public function test_post_store_amb_subscripcio_fallida_no_bloqueja_la_creacio()
+    {
+        $this->app->bind(WhatsAppApiClient::class, function ($app, $params) {
+            return new class($params['account']) extends WhatsAppApiClient {
+                protected function curlPostSimple(string $url, array $headers): array
+                {
+                    return ['ok' => false, 'body' => null, 'http_status' => 401, 'error_code' => '190', 'error_message' => 'Token caducat', 'transient' => false];
+                }
+            };
+        });
+
+        $admin = $this->makeAdminUser();
+
+        $response = $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/settings'), [
+                'name'             => 'PHPUnit store fail',
+                'phone_number'     => '+34600111333',
+                'phone_number_id'  => 'store-test-fail-' . uniqid(),
+                'waba_id'          => 'waba-store-test-fail',
+                'verify_token'     => bin2hex(random_bytes(32)),
+                'access_token'     => str_repeat('a', 25),
+                'app_secret'       => str_repeat('b', 20),
+                'mailbox_mode'     => 'new',
+                'mailbox_name'     => 'PHPUnit store fail mailbox',
+            ]);
+
+        $response->assertStatus(302);
+        $this->assertNotNull(\Modules\MetaWhatsApp\Models\WhatsAppAccount::where('phone_number_id', 'like', 'store-test-fail-%')->first(), 'El compte s\'ha de crear igualment.');
+        $response->assertSessionHas('flash_success_floating');
+        $response->assertSessionHas('flash_warning_floating');
+    }
+
+    // ------------------------------------------------------------------
     // Controlador: GET meta-whatsapp/settings/{id}/edit (health snapshot)
     // ------------------------------------------------------------------
 

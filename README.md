@@ -45,6 +45,18 @@ Out of scope in this version:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.6.0
+
+- **Message templates, multi-template**: the expired-window banner now supports up to 5 configured templates (name, language, button label, recovery text) instead of a single one — useful for multi-language accounts. Existing single-template setups keep working unchanged.
+- **Message templates, dynamic picker**: a new "Browse all approved templates…" option fetches your WhatsApp Business Account's actual APPROVED templates live from Meta, shows the body text, and lets you fill in `{{n}}` variables — no static configuration needed. Complements the static list above, doesn't replace it.
+- **Stickers**: `type:sticker` messages are now supported, shown like any other media attachment.
+- **Contact cards**: `type:contacts` messages now show the shared contact's name and phone number(s).
+- **Reactions now quote what they reacted to**: instead of a bare "Reacted: 👍", the module looks up and quotes a short excerpt of the original message.
+- **Delivery failure visibility**: if Meta accepts a message and then reports it as failed asynchronously, that now shows up as a visible note in the conversation instead of a silent status change.
+- **Automatic webhook subscription**: adding a WhatsApp account now automatically subscribes it to Meta's webhooks (with a manual "Subscribe webhook" retry button on the account page).
+- **Debug logging fix**: inbound/outbound payloads no longer get truncated to "Over 9 levels deep..." in debug logs (a Monolog depth-limit issue). Debug logging can now also be scoped to this module only (`METAWHATSAPP_DEBUG=true` in FreeScout's `.env`), writing to its own daily-rotated log file independent of the app-wide log level.
+- **Fix**: the "Add new WhatsApp account" page could 500 on PHP 8.1+ due to a `null` passed into `htmlspecialchars()`.
+
 ## What's new in v1.5.1
 
 - **Official channel IDs**: the module now uses the channel IDs officially assigned by the FreeScout team (`103`/`104`) instead of the provisional `100`/`101`. Existing installations are migrated automatically and transparently — no action needed.
@@ -192,10 +204,10 @@ Media is stored using FreeScout's existing local attachment storage — no separ
 
 These limitations are known and accepted within the MVP scope:
 
-- Message types other than text, media, button, location and reaction (e.g. contacts, stickers) are still dropped (logged, not shown in the conversation).
+- Message types other than text, media (incl. stickers), button, location, reaction and contacts (e.g. `order`, `interactive` list replies) are still dropped (logged, not shown in the conversation).
 - Inbound media has no size validation on this module's side beyond what Meta itself enforces before delivering the webhook.
 - No image/video gallery or carousel view — each attachment appears as its own row/thumbnail, same as any other FreeScout attachment.
-- Only **one** pre-approved HSM template per account (set on the account); no template picker, no variables/parameters, no automatic sync with Meta's template catalog.
+- Up to 5 statically-configured templates per account, or any APPROVED template fetched live via the dynamic picker (with `{{n}}` variables); no automatic sync/caching of the static list from Meta's catalog.
 - Sending the recovery template is always **manual**, triggered by an agent from the conversation banner; there is no automatic retry outside the window.
 - `delivered` and `read` states are stored in the module database; only `read` is shown visually (via the thread's native "opened" indicator) — `delivered` is not shown in the conversation.
 - If Meta batches webhook events of **different numbers** in a single delivery, only those matching the first resolved account are processed; the rest are discarded with a log warning. In practice Meta usually delivers separate webhooks per number, but keep this in mind with several numbers under the same App.

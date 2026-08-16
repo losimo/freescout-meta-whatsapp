@@ -167,6 +167,58 @@
                     </div>
                 </div>
 
+                {{-- Multi-plantilla (issue #2, punts 2-4): fins a 5 files
+                     estàtiques. Buida (sense id o sense idioma) es descarta
+                     en desar; amb 0 files plenes, el compte cau al parell
+                     template_name/template_lang de dalt. --}}
+                <div class="form-group">
+                    <div class="col-sm-8 col-sm-offset-4">
+                        <p class="help-block">{{ __('metawhatsapp::metawhatsapp.templates_multi_help') }}</p>
+                    </div>
+                </div>
+                @php $existingTemplates = old('templates', $account->templates ?? []); @endphp
+                @for ($i = 0; $i < 5; $i++)
+                    <div class="panel panel-default">
+                        <div class="panel-body">
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.template_row_id') }}</label>
+                                <div class="col-sm-8">
+                                    <input type="text" name="templates[{{ $i }}][id]" class="form-control" maxlength="512"
+                                           value="{{ $existingTemplates[$i]['id'] ?? '' }}">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.template_lang') }}</label>
+                                <div class="col-sm-8">
+                                    <input type="text" name="templates[{{ $i }}][language]" class="form-control" maxlength="15"
+                                           placeholder="es_ES" value="{{ $existingTemplates[$i]['language'] ?? '' }}">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.template_row_display_name') }}</label>
+                                <div class="col-sm-8">
+                                    <input type="text" name="templates[{{ $i }}][display_name]" class="form-control" maxlength="190"
+                                           value="{{ $existingTemplates[$i]['display_name'] ?? '' }}">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.template_row_recovery_text') }}</label>
+                                <div class="col-sm-8">
+                                    <input type="text" name="templates[{{ $i }}][recovery_text]" class="form-control" maxlength="1000"
+                                           value="{{ $existingTemplates[$i]['recovery_text'] ?? '' }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endfor
+                @if($errors->has('templates') || $errors->has('templates.*'))
+                    <div class="form-group">
+                        <div class="col-sm-8 col-sm-offset-4">
+                            <p class="help-block">{{ $errors->first('templates') ?: $errors->first('templates.*') }}</p>
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Secció 5: Bústia associada (només en alta; immutable en edició) --}}
                 @if(!$account)
                     <h4 style="margin-top:30px">{{ __('metawhatsapp::metawhatsapp.section_mailbox') }}</h4>
@@ -195,7 +247,7 @@
                         <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.mailbox_name') }}</label>
                         <div class="col-sm-8">
                             <input type="text" name="mailbox_name" id="mailbox_name" class="form-control" maxlength="100"
-                                   value="{{ old('mailbox_name') }}">
+                                   value="{{ old('mailbox_name', '') }}">
                             <p class="help-block">{{ __('metawhatsapp::metawhatsapp.mailbox_name_help') }}</p>
                             @if($errors->has('mailbox_name'))<p class="help-block">{{ $errors->first('mailbox_name') }}</p>@endif
                         </div>
@@ -239,9 +291,13 @@
             <div class="panel panel-default" style="margin-top:20px">
                 <div class="panel-heading">{{ __('metawhatsapp::metawhatsapp.health_snapshot_title') }}</div>
                 <div class="panel-body">
-                    <form method="POST" action="{{ route('metawhatsapp.test_connection', $account->id) }}" style="margin-bottom:15px">
+                    <form method="POST" action="{{ route('metawhatsapp.test_connection', $account->id) }}" style="margin-bottom:15px; display:inline-block">
                         {{ csrf_field() }}
                         <button type="submit" class="btn btn-default">{{ __('metawhatsapp::metawhatsapp.test_connection_button') }}</button>
+                    </form>
+                    <form method="POST" action="{{ route('metawhatsapp.subscribe_webhook', $account->id) }}" style="margin-bottom:15px; display:inline-block">
+                        {{ csrf_field() }}
+                        <button type="submit" class="btn btn-default">{{ __('metawhatsapp::metawhatsapp.webhook_subscribe_button') }}</button>
                     </form>
 
                     <div class="form-horizontal">

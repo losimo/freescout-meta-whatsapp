@@ -42,6 +42,11 @@ return [
     'template_threshold'           => 'Window expiry threshold (minutes)',
     'template_threshold_help'      => 'Meta\'s official customer service window is 24 hours from the customer\'s last message. This setting only defines when the module starts treating the window as expired, as an internal operational safety margin — it does not change Meta\'s rule. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">See Meta docs</a>.',
 
+    'templates_multi_help'         => 'Optional: configure up to 5 templates (e.g. one per language) instead of the single one above. Leave a row\'s name/language blank to skip it. When at least one row is filled in, agents see one button per template.',
+    'template_row_id'              => 'Template name',
+    'template_row_display_name'    => 'Button label',
+    'template_row_recovery_text'   => 'Recovery text shown in the conversation',
+
     'mailbox'                      => 'Mailbox',
     'mailbox_mode_new'             => 'Create a new mailbox for this channel',
     'mailbox_mode_existing'        => 'Use an existing mailbox',
@@ -95,8 +100,29 @@ return [
     'template_window_open'         => 'The customer window is open again — send a normal reply instead of a paid template.',
     'template_already_sent'        => 'A template was already sent moments ago for this conversation.',
 
+    // Picker dinàmic de plantilles (issue #2, punt 2 complet).
+    'browse_templates_link'        => 'Browse all approved templates…',
+    'templates_picker_title'       => 'Send a WhatsApp template',
+    'templates_picker_back'        => '← Back to conversation',
+    'templates_picker_fetch_error' => 'Could not fetch templates from Meta: :error',
+    'templates_picker_empty'       => 'No approved templates found for this WhatsApp Business Account.',
+    'template_variable_label'      => 'Variable :n',
+    'template_send_button'         => 'Send',
+
+    // Reconciliació d'esdeveniments outbound.
+    'async_delivery_failed'        => 'WhatsApp reported this message as failed after it was initially accepted for sending. Error: :error',
+
+    // Registre automàtic de webhook.
+    'webhook_subscribe_button'     => 'Subscribe webhook',
+    'webhook_subscribed_success'   => 'Webhook subscription confirmed with Meta.',
+    'webhook_subscribe_failed'     => 'Could not subscribe to Meta webhooks: :error',
+
     'media_attachment_unavailable' => 'The attached file could not be downloaded from WhatsApp.',
     'media_preview_no_caption'     => 'Attachment (:type)',
     'reaction_text'                => 'Reacted: :emoji',
     'reaction_removed'             => 'Removed a reaction',
+    'reaction_text_quoted'         => 'Reacted :emoji to: ":excerpt"',
+    'reaction_removed_quoted'      => 'Removed a reaction from: ":excerpt"',
+    'contacts_shared'              => 'Shared contact(s):',
+    'contacts_shared_empty'        => 'Shared a contact card (no name or phone number in it).',
 ];

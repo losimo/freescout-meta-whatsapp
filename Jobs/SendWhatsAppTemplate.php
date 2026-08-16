@@ -37,11 +37,38 @@ class SendWhatsAppTemplate implements ShouldQueue
     /** @var string */
     protected $toPhone;
 
-    public function __construct(int $accountId, int $threadId, string $toPhone)
+    /** @var string|null */
+    protected $templateId;
+
+    /** @var string|null */
+    protected $templateLanguage;
+
+    /** @var array|null */
+    protected $variables;
+
+    /**
+     * $templateId/$templateLanguage identifiquen quina plantilla cal enviar.
+     * Si es deixen null, cau al parell legacy template_name/template_lang
+     * del compte (comptes d'una sola plantilla, compatibilitat amb crides
+     * existents).
+     *
+     * $variables distingeix el picker dinàmic (issue #2, punt 2 complet) de
+     * les plantilles estàtiques del compte: null (per defecte) = plantilla
+     * estàtica, es valida $templateId/$templateLanguage contra
+     * $account->findTemplate() abans d'enviar (defensa en profunditat).
+     * Array (fins i tot buit) = plantilla dinàmica del catàleg APPROVED en
+     * viu de Meta, ja validada pel controlador — no es torna a validar
+     * contra la llista estàtica, i els valors s'envien com a paràmetres
+     * {{1}}, {{2}}... del cos.
+     */
+    public function __construct(int $accountId, int $threadId, string $toPhone, ?string $templateId = null, ?string $templateLanguage = null, ?array $variables = null)
     {
-        $this->accountId = $accountId;
-        $this->threadId  = $threadId;
-        $this->toPhone   = $toPhone;
+        $this->accountId        = $accountId;
+        $this->threadId         = $threadId;
+        $this->toPhone          = $toPhone;
+        $this->templateId       = $templateId;
+        $this->templateLanguage = $templateLanguage;
+        $this->variables        = $variables;
     }
 
     public function handle()
@@ -74,9 +101,25 @@ class SendWhatsAppTemplate implements ShouldQueue
             return;
         }
 
-        // Diferència (a): sense plantilla configurada no hi ha res legal
+        // Diferència (a): sense plantilla identificable no hi ha res legal
         // a enviar fora de la finestra de 24 h.
-        if (empty($account->template_name) || empty($account->template_lang)) {
+        $bodyParams = [];
+        if ($this->variables !== null) {
+            // Dinàmica: nom/idioma ja validats pel controlador contra el
+            // catàleg APPROVED en viu de Meta (vegeu docblock constructor).
+            $templateName = $this->templateId;
+            $templateLang = $this->templateLanguage;
+            $bodyParams   = $this->variables;
+        } elseif ($this->templateId && $this->templateLanguage) {
+            $template = $account->findTemplate($this->templateId, $this->templateLanguage);
+            $templateName = $template['id'] ?? null;
+            $templateLang = $template['language'] ?? null;
+        } else {
+            $templateName = $account->template_name;
+            $templateLang = $account->template_lang;
+        }
+
+        if (empty($templateName) || empty($templateLang)) {
             Log::warning('[MetaWhatsApp] Template not configured for the account', [
                 'account_id' => $account->id,
                 'thread_id'  => $thread->id,
@@ -87,8 +130,9 @@ class SendWhatsAppTemplate implements ShouldQueue
 
         $result = $this->makeClient($account)->sendTemplate(
             $this->toPhone,
-            $account->template_name,
-            $account->template_lang
+            $templateName,
+            $templateLang,
+            $bodyParams
         );
 
         if ($result['ok']) {

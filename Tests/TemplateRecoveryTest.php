@@ -426,6 +426,209 @@ class TemplateRecoveryTest extends TestCase
         Queue::assertPushed(SendWhatsAppTemplate::class, 1);
     }
 
+    // ------------------------------------------------------------------
+    // Multi-plantilla (issue #2, punts 2-4)
+    // ------------------------------------------------------------------
+
+    public function test_get_template_list_retorna_les_plantilles_json_quan_nhi_ha()
+    {
+        $account = $this->createTestAccount();
+        $account->templates = [
+            ['id' => 'recover_en', 'language' => 'en', 'display_name' => 'Continue (English)', 'recovery_text' => 'There is a new message'],
+            ['id' => 'recover_ca', 'language' => 'ca', 'display_name' => 'Continua (Català)', 'recovery_text' => 'Tens un missatge nou'],
+        ];
+        $account->save();
+
+        $list = WhatsAppAccount::find($account->id)->getTemplateList();
+        $this->assertCount(2, $list);
+        $this->assertEquals('recover_en', $list[0]['id']);
+        $this->assertEquals('Continua (Català)', $list[1]['display_name']);
+    }
+
+    public function test_get_template_list_cau_al_parell_legacy_quan_templates_es_buit()
+    {
+        $account = $this->createTestAccount();
+        $account->template_name = 'recover_conversation';
+        $account->template_lang = 'es_ES';
+        $account->save();
+
+        $list = WhatsAppAccount::find($account->id)->getTemplateList();
+        $this->assertCount(1, $list);
+        $this->assertEquals('recover_conversation', $list[0]['id']);
+        $this->assertEquals('es_ES', $list[0]['language']);
+        $this->assertEquals('recover_conversation', $list[0]['display_name']);
+        $this->assertNull($list[0]['recovery_text']);
+    }
+
+    public function test_find_template_ignora_files_sense_id_o_sense_idioma()
+    {
+        $account = $this->createTestAccount();
+        $account->templates = [
+            ['id' => '', 'language' => 'en', 'display_name' => 'Buit'],
+            ['id' => 'recover_en', 'language' => 'en', 'display_name' => 'Continue (English)'],
+        ];
+        $account->save();
+
+        $fresh = WhatsAppAccount::find($account->id);
+        $this->assertCount(1, $fresh->getTemplateList());
+        $this->assertNotNull($fresh->findTemplate('recover_en', 'en'));
+        $this->assertNull($fresh->findTemplate('recover_ca', 'ca'));
+    }
+
+    public function test_el_job_de_plantilla_amb_id_explicit_envia_la_plantilla_correcta()
+    {
+        $account = $this->createTestAccount();
+        $account->templates = [
+            ['id' => 'recover_en', 'language' => 'en', 'display_name' => 'Continue (English)'],
+            ['id' => 'recover_ca', 'language' => 'ca', 'display_name' => 'Continua (Català)'],
+        ];
+        $account->save();
+        $thread = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+
+        $capture = $this->bindTemplateClientStub([
+            'ok' => true, 'wamid' => 'wamid.tpl2', 'http_status' => 200,
+            'error_code' => null, 'error_message' => null, 'transient' => false,
+        ]);
+
+        (new SendWhatsAppTemplate($account->id, $thread->id, '+34611222333', 'recover_ca', 'ca'))->handle();
+
+        $this->assertEquals('recover_ca', $capture->payload['template']['name']);
+        $this->assertEquals('ca', $capture->payload['template']['language']['code']);
+    }
+
+    public function test_el_job_de_plantilla_amb_id_no_configurat_falla_sense_cridar_meta()
+    {
+        $account = $this->createTestAccount();
+        $account->templates = [
+            ['id' => 'recover_en', 'language' => 'en', 'display_name' => 'Continue (English)'],
+        ];
+        $account->save();
+        $thread = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+
+        $this->app->bind(WhatsAppApiClient::class, function ($app, $params) {
+            return new class($params['account']) extends WhatsAppApiClient {
+                protected function postMessagePayload(array $payload): array
+                {
+                    throw new \RuntimeException('El client no s\'hauria d\'haver cridat amb un id de plantilla desconegut.');
+                }
+            };
+        });
+
+        (new SendWhatsAppTemplate($account->id, $thread->id, '+34611222333', 'recover_fr', 'fr'))->handle();
+
+        $msg = WhatsAppMessage::where('thread_id', $thread->id)->first();
+        $this->assertEquals(WhatsAppMessage::STATUS_FAILED, $msg->status);
+    }
+
+    public function test_post_amb_multiples_plantilles_envia_la_triada_i_cita_el_recovery_text()
+    {
+        $account = $this->createTestAccount();
+        $account->templates = [
+            ['id' => 'recover_en', 'language' => 'en', 'display_name' => 'Continue (English)', 'recovery_text' => 'There is a new message waiting for you'],
+            ['id' => 'recover_ca', 'language' => 'ca', 'display_name' => 'Continua (Català)', 'recovery_text' => 'Tens un missatge nou'],
+        ];
+        $account->save();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.multi1', '34611222333', 'hola'));
+        $msg          = WhatsAppMessage::where('wamid', 'wamid.multi1')->first();
+        $conversation = Conversation::find($msg->conversation_id);
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay()]);
+
+        Queue::fake();
+        $admin = $this->makeAdminUser();
+
+        $response = $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/conversation/' . $conversation->id . '/send-template'), [
+                'template_id'       => 'recover_ca',
+                'template_language' => 'ca',
+            ]);
+
+        $response->assertStatus(302);
+
+        $thread = Thread::where('conversation_id', $conversation->id)
+            ->where('body', '[WhatsApp template] Tens un missatge nou')
+            ->first();
+        $this->assertNotNull($thread, 'El thread d\'auditoria ha de citar el recovery_text de la plantilla triada.');
+
+        Queue::assertPushed(SendWhatsAppTemplate::class, function ($job) use ($account, $thread) {
+            return $this->jobProperty($job, 'accountId') === $account->id
+                && $this->jobProperty($job, 'threadId') === $thread->id
+                && $this->jobProperty($job, 'templateId') === 'recover_ca'
+                && $this->jobProperty($job, 'templateLanguage') === 'ca';
+        });
+    }
+
+    public function test_post_amb_multiples_plantilles_sense_triar_cap_retorna_error()
+    {
+        $account = $this->createTestAccount();
+        $account->templates = [
+            ['id' => 'recover_en', 'language' => 'en', 'display_name' => 'Continue (English)'],
+            ['id' => 'recover_ca', 'language' => 'ca', 'display_name' => 'Continua (Català)'],
+        ];
+        $account->save();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.multi2', '34611222333', 'hola'));
+        $msg          = WhatsAppMessage::where('wamid', 'wamid.multi2')->first();
+        $conversation = Conversation::find($msg->conversation_id);
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay()]);
+
+        Queue::fake();
+        $admin = $this->makeAdminUser();
+
+        // Sense template_id/template_language: amb >1 plantilla configurada
+        // no hi ha manera segura de triar-ne una implícitament.
+        $response = $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/conversation/' . $conversation->id . '/send-template'));
+
+        $response->assertStatus(302);
+        $response->assertSessionHasErrors();
+        Queue::assertNotPushed(SendWhatsAppTemplate::class);
+    }
+
+    public function test_banner_amb_multiples_plantilles_mostra_un_boto_per_cada_una()
+    {
+        $account = $this->createTestAccount();
+        $account->templates = [
+            ['id' => 'recover_en', 'language' => 'en', 'display_name' => 'Continue (English)'],
+            ['id' => 'recover_ca', 'language' => 'ca', 'display_name' => 'Continua (Català)'],
+        ];
+        $account->save();
+
+        $conversation = new Conversation();
+        $conversation->id = 999998;
+
+        $html = \View::make('metawhatsapp::partials/window_banner', [
+            'conversation' => $conversation,
+            'account'      => $account,
+            'phone'        => '+34611222333',
+        ])->render();
+
+        $this->assertStringContainsString('Continue (English)', $html);
+        $this->assertStringContainsString('Continua (Català)', $html);
+        $this->assertEquals(2, substr_count($html, '/send-template'));
+    }
+
+    public function test_formulari_de_creacio_renderitza_les_5_files_de_plantilla_sense_error()
+    {
+        // Cobertura no existent fins ara per a la ruta de creació (GET
+        // /settings/create): l'edició ja es cobreix a ConnectionPanelTest,
+        // però la secció multi-plantilla nova s'ha de validar amb $account
+        // null (old()/$account->templates ?? [] al mateix bloc Blade).
+        $admin = $this->makeAdminUser();
+
+        $response = $this->actingAs($admin)
+            ->get($this->url('/meta-whatsapp/settings/create'));
+
+        $response->assertStatus(200);
+        // assertSee() no és utilitzable en aquesta combinació de versions
+        // FreeScout/PHPUnit (TypeError intern a assertContains); es
+        // comprova directament el contingut, com fan els tests del banner.
+        $this->assertStringContainsString('templates[0][id]', $response->getContent());
+        $this->assertStringContainsString('templates[4][id]', $response->getContent());
+    }
+
     public function test_banner_sense_template_lang_no_mostra_boto_i_mostra_no_configurat()
     {
         // Acord banner-controlador: el guard del controlador exigeix nom I

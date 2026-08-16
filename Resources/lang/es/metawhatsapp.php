@@ -42,6 +42,11 @@ return [
     'template_threshold'           => 'Umbral de caducidad de la ventana (minutos)',
     'template_threshold_help'      => 'La ventana oficial de atención al cliente de Meta es de 24 horas desde el último mensaje del cliente. Esta opción solo define cuándo el módulo empieza a tratar la ventana como caducada, como margen de seguridad operativo interno — no cambia la regla de Meta. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Consulta la documentación de Meta</a>.',
 
+    'templates_multi_help'         => 'Opcional: configura hasta 5 plantillas (p. ej. una por idioma) en vez de la única de arriba. Deja el nombre/idioma de una fila en blanco para omitirla. Con al menos una fila rellenada, los agentes verán un botón por plantilla.',
+    'template_row_id'              => 'Nombre de la plantilla',
+    'template_row_display_name'    => 'Texto del botón',
+    'template_row_recovery_text'   => 'Texto de recuperación mostrado en la conversación',
+
     'mailbox'                      => 'Buzón',
     'mailbox_mode_new'             => 'Crear un buzón nuevo para este canal',
     'mailbox_mode_existing'        => 'Usar un buzón existente',
@@ -95,8 +100,26 @@ return [
     'template_window_open'         => 'La ventana del cliente ha vuelto a abrirse: envía una respuesta normal en vez de una plantilla de pago.',
     'template_already_sent'        => 'Ya se ha enviado una plantilla hace unos momentos para esta conversación.',
 
+    'browse_templates_link'        => 'Ver todas las plantillas aprobadas…',
+    'templates_picker_title'       => 'Enviar una plantilla de WhatsApp',
+    'templates_picker_back'        => '← Volver a la conversación',
+    'templates_picker_fetch_error' => 'No se pudieron obtener las plantillas de Meta: :error',
+    'templates_picker_empty'       => 'No se ha encontrado ninguna plantilla aprobada para este WhatsApp Business Account.',
+    'template_variable_label'      => 'Variable :n',
+    'template_send_button'         => 'Enviar',
+
+    'async_delivery_failed'        => 'WhatsApp ha informado que este mensaje ha fallado después de haberlo aceptado inicialmente para enviar. Error: :error',
+
+    'webhook_subscribe_button'     => 'Suscribir webhook',
+    'webhook_subscribed_success'   => 'Suscripción de webhook confirmada con Meta.',
+    'webhook_subscribe_failed'     => 'No se pudo suscribir a los webhooks de Meta: :error',
+
     'media_attachment_unavailable' => 'No se pudo descargar el archivo adjunto de WhatsApp.',
     'media_preview_no_caption'     => 'Archivo adjunto (:type)',
     'reaction_text'                => 'Reaccionó: :emoji',
     'reaction_removed'             => 'Eliminó una reacción',
+    'reaction_text_quoted'         => 'Reaccionó :emoji a: ":excerpt"',
+    'reaction_removed_quoted'      => 'Eliminó una reacción a: ":excerpt"',
+    'contacts_shared'              => 'Contacto(s) compartido(s):',
+    'contacts_shared_empty'        => 'Compartió una tarjeta de contacto (sin nombre ni teléfono).',
 ];

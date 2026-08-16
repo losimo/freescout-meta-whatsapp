@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+use Modules\MetaWhatsApp\Support\Logger as MetaWhatsAppLogger;
 
 class ProcessInboundWebhook implements ShouldQueue
 {
@@ -48,7 +49,7 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         Log::info('[MetaWhatsApp] Processing inbound webhook', ['account_id' => $account->id]);
-        Log::debug('[MetaWhatsApp] Inbound webhook payload', ['account_id' => $account->id, 'payload' => $this->payload]);
+        MetaWhatsAppLogger::debugData('[MetaWhatsApp] Inbound webhook payload', ['account_id' => $account->id, 'payload' => $this->payload]);
 
         foreach ($this->payload['entry'] ?? [] as $entry) {
             foreach ($entry['changes'] ?? [] as $change) {
@@ -86,9 +87,9 @@ class ProcessInboundWebhook implements ShouldQueue
 
         $from  = $message['from'] ?? null;
         $type  = $message['type'] ?? null;
-        $mediaTypes = ['image', 'video', 'audio', 'document'];
+        $mediaTypes = ['image', 'video', 'audio', 'document', 'sticker'];
 
-        if (!in_array($type, [...$mediaTypes, 'text', 'button', 'location', 'reaction'], true)) {
+        if (!in_array($type, [...$mediaTypes, 'text', 'button', 'location', 'reaction', 'contacts'], true)) {
             Log::error('[MetaWhatsApp] Unsupported message type, discarded', [
                 'account_id' => $account->id,
                 'from'       => $from,
@@ -114,7 +115,9 @@ class ProcessInboundWebhook implements ShouldQueue
         } elseif ($type === 'location') {
             $text = $this->formatLocationText($message['location'] ?? []);
         } elseif ($type === 'reaction') {
-            $text = $this->formatReactionText($message['reaction'] ?? []);
+            $text = $this->formatReactionText($account, $message['reaction'] ?? []);
+        } elseif ($type === 'contacts') {
+            $text = $this->formatContactsText($message['contacts'] ?? []);
         } else {
             $text = trim($message['text']['body'] ?? '');
         }
@@ -339,15 +342,92 @@ class ProcessInboundWebhook implements ShouldQueue
     }
 
     /**
+     * Formata un missatge type:contacts (targeta/es de contacte compartides
+     * — issue #14, item 4). Sense adjunt ni descàrrega: només nom + primer
+     * telèfon de cada contacte compartit, un per línia.
+     */
+    protected function formatContactsText(array $contacts): string
+    {
+        $lines = [];
+        foreach ($contacts as $contact) {
+            if (!is_array($contact)) {
+                continue;
+            }
+            $name  = trim($contact['name']['formatted_name'] ?? '');
+            $phone = trim($contact['phones'][0]['phone'] ?? '');
+            if ($name === '' && $phone === '') {
+                continue;
+            }
+            $lines[] = $phone !== ''
+                ? ($name !== '' ? "{$name} ({$phone})" : $phone)
+                : $name;
+        }
+
+        if (empty($lines)) {
+            return __('metawhatsapp::metawhatsapp.contacts_shared_empty');
+        }
+
+        return __('metawhatsapp::metawhatsapp.contacts_shared') . "\n" . implode("\n", $lines);
+    }
+
+    /**
      * Formata una reacció (emoji) a un missatge previ com a text.
      */
-    protected function formatReactionText(array $reaction): string
+    /**
+     * Formata una reacció, citant un extracte del missatge al qual reacciona
+     * (issue #14) quan el podem localitzar per message_id. Sense això, al fil
+     * de la conversa no queda clar a quin missatge es refereix la reacció.
+     */
+    protected function formatReactionText(WhatsAppAccount $account, array $reaction): string
     {
-        $emoji = trim($reaction['emoji'] ?? '');
+        $emoji  = trim($reaction['emoji'] ?? '');
+        $excerpt = $this->excerptForReactionTarget($account, $reaction['message_id'] ?? null);
+
+        if ($excerpt !== null) {
+            return $emoji !== ''
+                ? __('metawhatsapp::metawhatsapp.reaction_text_quoted', ['emoji' => $emoji, 'excerpt' => $excerpt])
+                : __('metawhatsapp::metawhatsapp.reaction_removed_quoted', ['excerpt' => $excerpt]);
+        }
 
         return $emoji !== ''
             ? __('metawhatsapp::metawhatsapp.reaction_text', ['emoji' => $emoji])
             : __('metawhatsapp::metawhatsapp.reaction_removed');
+    }
+
+    /**
+     * Extracte de text pla (sense HTML) del thread del missatge al qual es
+     * reacciona, o null si no el trobem (missatge fora de rang, esborrat,
+     * o d'abans que el mòdul enregistrés thread_id).
+     */
+    protected function excerptForReactionTarget(WhatsAppAccount $account, ?string $targetWamid): ?string
+    {
+        if (!$targetWamid) {
+            return null;
+        }
+
+        $target = WhatsAppMessage::where('wamid', $targetWamid)
+            ->where('account_id', $account->id)
+            ->first();
+        if (!$target || !$target->thread_id) {
+            return null;
+        }
+
+        $thread = Thread::find($target->thread_id);
+        if (!$thread || !$thread->body) {
+            return null;
+        }
+
+        $plain = trim(html_entity_decode(strip_tags(str_replace(
+            ['<br>', '<br/>', '<br />'],
+            ' ',
+            $thread->body
+        )), ENT_QUOTES, 'UTF-8'));
+
+        if ($plain === '') {
+            return null;
+        }
+
+        return mb_strlen($plain) > 60 ? mb_substr($plain, 0, 60) . '…' : $plain;
     }
 
     /**
@@ -642,6 +722,51 @@ class ProcessInboundWebhook implements ShouldQueue
                 $thread->save();
             }
         }
+
+        // Reconciliació d'esdeveniments outbound (inspirat en kapsowhatsapp):
+        // una fallida ASÍNCRONA (el 'sent' inicial va anar bé, Meta rebutja
+        // el missatge després) no tenia cap senyal visible per a l'agent —
+        // només un canvi de status silenciós a la BD. Nota interna amb el
+        // codi d'error, un cop per wamid.
+        if ($newStatus === 'failed') {
+            $this->recordAsyncDeliveryFailureNote($account, $record, $status);
+        }
+    }
+
+    protected function recordAsyncDeliveryFailureNote(WhatsAppAccount $account, WhatsAppMessage $record, array $status): void
+    {
+        // Només té sentit per als missatges que nosaltres hem enviat: el
+        // 'failed' de Meta reporta l'entrega d'un enviament outbound, mai
+        // res relacionat amb el missatge inbound del client.
+        if ($record->direction !== WhatsAppMessage::DIRECTION_OUTBOUND || !$record->conversation_id) {
+            return;
+        }
+
+        $marker = '[WhatsApp delivery failed] ' . $record->wamid;
+        if (Thread::where('conversation_id', $record->conversation_id)->where('body', 'like', $marker . '%')->exists()) {
+            return;
+        }
+
+        $conversation = Conversation::find($record->conversation_id);
+        if (!$conversation) {
+            return;
+        }
+
+        $errorCode  = (string) ($status['errors'][0]['code'] ?? '');
+        $errorTitle = trim((string) ($status['errors'][0]['title'] ?? ''));
+        $label      = $errorTitle !== '' ? ($errorCode . ' — ' . $errorTitle) : $errorCode;
+
+        $thread = new Thread();
+        $thread->conversation_id = $conversation->id;
+        $thread->user_id         = optional($this->resolveSystemUser($account, $conversation))->id;
+        $thread->type            = Thread::TYPE_NOTE;
+        $thread->status          = $conversation->status;
+        $thread->state           = Thread::STATE_PUBLISHED;
+        $thread->body            = $marker . ' ' . __('metawhatsapp::metawhatsapp.async_delivery_failed', ['error' => $label ?: '—']);
+        $thread->source_via      = Thread::PERSON_USER;
+        $thread->source_type     = Thread::SOURCE_TYPE_WEB;
+        $thread->customer_id     = $conversation->customer_id;
+        $thread->save();
     }
 
     public function failed(\Throwable $e)
@@ -707,7 +832,16 @@ class ProcessInboundWebhook implements ShouldQueue
 
     protected function attachmentCategory(string $waType): string
     {
-        return $waType === 'document' ? 'application' : $waType;
+        if ($waType === 'document') {
+            return 'application';
+        }
+        // Els stickers de WhatsApp són WEBP (estàtics o animats): es
+        // reutilitza la mateixa categoria/pipeline que les imatges.
+        if ($waType === 'sticker') {
+            return 'image';
+        }
+
+        return $waType;
     }
 
     protected function apiClient(WhatsAppAccount $account): WhatsAppApiClient

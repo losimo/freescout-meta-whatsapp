@@ -38,6 +38,7 @@ class WhatsAppAccount extends Model
         'template_name',
         'template_lang',
         'template_threshold_minutes',
+        'templates',
     ];
 
     // access_token i app_secret mai fillable: s'assignen explícitament amb encrypt().
@@ -45,7 +46,53 @@ class WhatsAppAccount extends Model
     protected $casts = [
         'auto_created_mailbox' => 'boolean',
         'is_active'            => 'boolean',
+        'templates'            => 'array',
     ];
+
+    /**
+     * Plantilles configurades (issue #2, punts 2-4): id, language,
+     * display_name, recovery_text. Si 'templates' és buit, cau al parell
+     * template_name/template_lang (comportament pre-existent, sense
+     * recovery_text ni display_name propis) perquè les instal·lacions amb
+     * una sola plantilla configurada no perdin res en actualitzar.
+     */
+    public function getTemplateList(): array
+    {
+        $list = array_values(array_filter($this->templates ?: [], function ($t) {
+            return is_array($t) && !empty($t['id']) && !empty($t['language']);
+        }));
+
+        if (!empty($list)) {
+            return $list;
+        }
+
+        if ($this->template_name && $this->template_lang) {
+            return [[
+                'id'            => $this->template_name,
+                'language'      => $this->template_lang,
+                'display_name'  => $this->template_name,
+                'recovery_text' => null,
+            ]];
+        }
+
+        return [];
+    }
+
+    /**
+     * Troba una plantilla configurada pel seu id+language exactes. Null si
+     * no coincideix amb cap de les configurades (ni de la llista JSON ni del
+     * fallback legacy) — evita enviar-ne una d'arbitrària des del request.
+     */
+    public function findTemplate(string $id, string $language): ?array
+    {
+        foreach ($this->getTemplateList() as $template) {
+            if ($template['id'] === $id && $template['language'] === $language) {
+                return $template;
+            }
+        }
+
+        return null;
+    }
 
     public function mailbox()
     {
