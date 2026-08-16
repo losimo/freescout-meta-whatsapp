@@ -45,6 +45,10 @@ Out of scope in this version:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.6.1
+
+- **Guided account reactivation**: if an account was auto-deactivated (e.g. after an invalid-token error), a successful "Test connection" now reactivates it automatically, with an audit trail (who and when) shown on the account health snapshot — no more manual database edits to recover.
+
 ## What's new in v1.6.0
 
 - **Message templates, multi-template**: the expired-window banner now supports up to 5 configured templates (name, language, button label, recovery text) instead of a single one — useful for multi-language accounts. Existing single-template setups keep working unchanged.

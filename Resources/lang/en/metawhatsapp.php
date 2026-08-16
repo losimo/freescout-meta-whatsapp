@@ -88,7 +88,9 @@ return [
     'health_last_outbound'         => 'Last outbound attempt',
     'health_last_status'           => 'Last delivery status',
     'health_last_error'            => 'Last error',
+    'health_last_reactivation'     => 'Last reactivation',
     'health_never'                 => 'Never',
+    'account_reactivated'          => 'Connection restored — account reactivated automatically (verified as ":name").',
 
     // Banner de finestra expirada (conversa).
     'window_expired_notice'        => 'The 24-hour customer service window appears to be expired. Free-form replies will likely be rejected by Meta.',

@@ -166,9 +166,23 @@ class MetaWhatsAppController extends Controller
         $result = app(WhatsAppApiClient::class, ['account' => $account])->testConnection();
 
         if ($result['ok']) {
-            \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.test_connection_success', [
-                'name' => $result['verified_name'] ?: $account->phone_number,
-            ]));
+            // Reactivació guiada (issue #9): un test de connexió amb èxit
+            // sobre un compte desactivat (p. ex. per un error 190 anterior)
+            // el reactiva automàticament, amb audit trail (qui/quan).
+            if (!$account->is_active) {
+                $account->is_active      = true;
+                $account->reactivated_at = now();
+                $account->reactivated_by = auth()->id();
+                $account->save();
+
+                \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.account_reactivated', [
+                    'name' => $result['verified_name'] ?: $account->phone_number,
+                ]));
+            } else {
+                \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.test_connection_success', [
+                    'name' => $result['verified_name'] ?: $account->phone_number,
+                ]));
+            }
         } else {
             \Session::flash('flash_error_floating', __('metawhatsapp::metawhatsapp.test_connection_failed', [
                 'error' => $result['error_message'] ?: __('metawhatsapp::metawhatsapp.test_connection_unknown_error'),

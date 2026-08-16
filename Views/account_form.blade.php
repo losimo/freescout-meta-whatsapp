@@ -340,6 +340,22 @@
                                 </p>
                             </div>
                         </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.health_last_reactivation') }}</label>
+                            <div class="col-sm-8">
+                                <p class="form-control-static">
+                                    @if($account->reactivated_at)
+                                        {{ $account->reactivated_at->format('Y-m-d H:i') }}
+                                        @if($account->reactivatedBy)
+                                            &mdash; {{ $account->reactivatedBy->getFullName() }}
+                                        @endif
+                                    @else
+                                        {{ __('metawhatsapp::metawhatsapp.health_never') }}
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -42,12 +42,20 @@ class WhatsAppAccount extends Model
     ];
 
     // access_token i app_secret mai fillable: s'assignen explícitament amb encrypt().
+    // reactivated_at/reactivated_by tampoc: només els escriu el controlador
+    // en reactivar (issue #9), mai des d'un request de l'usuari.
 
     protected $casts = [
         'auto_created_mailbox' => 'boolean',
         'is_active'            => 'boolean',
         'templates'            => 'array',
+        'reactivated_at'       => 'datetime',
     ];
+
+    public function reactivatedBy()
+    {
+        return $this->belongsTo(\App\User::class, 'reactivated_by');
+    }
 
     /**
      * Plantilles configurades (issue #2, punts 2-4): id, language,

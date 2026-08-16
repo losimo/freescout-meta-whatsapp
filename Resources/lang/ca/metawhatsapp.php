@@ -88,7 +88,9 @@ return [
     'health_last_outbound'         => 'Últim intent de sortida',
     'health_last_status'           => 'Últim estat de lliurament',
     'health_last_error'            => 'Últim error',
+    'health_last_reactivation'     => 'Última reactivació',
     'health_never'                 => 'Mai',
+    'account_reactivated'          => 'Connexió restaurada — compte reactivat automàticament (verificat com a ":name").',
 
     // Banner de finestra expirada (conversa).
     'window_expired_notice'        => 'La finestra de 24 hores d\'atenció al client sembla haver caducat. És probable que Meta rebutgi les respostes de text lliure.',

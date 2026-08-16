@@ -49,7 +49,7 @@ Effort legend (planned items only): S / M / L
 | "Chat mode" quick-reply button on conversations | ❌ | Reporter hasn't confirmed it's still needed post-Media-MVP; not yet re-scoped. | #5 | – |
 | Official/registered channel ID | ✅ | `103`/`104`, officially assigned by the FreeScout team. Shipped v1.5.1. | #4 | – |
 | Auto-deactivation on invalid token (error 190) | ✅ | Account is marked inactive so no further calls are burned. | | – |
-| Guided reactivation flow (UI, revalidation, audit trail) | ❌ | Today, recovery means editing the account manually. Needs its own spec. | #9 | L |
+| Guided reactivation flow (UI, revalidation, audit trail) | ✅ | Test connection success on an inactive account reactivates it automatically; `reactivated_at`/`reactivated_by` shown on the health snapshot. Shipped v1.6.1. | #9 | – |
 | Automatic webhook subscription | ✅ | `POST /{waba_id}/subscribed_apps` called automatically on account creation (best-effort), with a manual "Subscribe webhook" retry button. Shipped v1.6.0. | | – |
 
 ## Admin / diagnostics

@@ -127,6 +127,92 @@ class ConnectionPanelTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Reactivació guiada (issue #9)
+    // ------------------------------------------------------------------
+
+    public function test_test_connection_exit_sobre_compte_inactiu_el_reactiva_amb_audit_trail()
+    {
+        $account = $this->createTestAccount(['is_active' => false]);
+        $admin   = $this->makeAdminUser();
+
+        $this->app->bind(WhatsAppApiClient::class, function ($app, $params) {
+            return new class($params['account']) extends WhatsAppApiClient {
+                protected function curlGet(string $url, array $headers): array
+                {
+                    return [
+                        'ok' => true, 'body' => json_encode(['verified_name' => 'Suport Test']),
+                        'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false,
+                    ];
+                }
+            };
+        });
+
+        $response = $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/settings/' . $account->id . '/test-connection'));
+
+        $response->assertStatus(302);
+        $response->assertSessionHas('flash_success_floating');
+
+        $fresh = \Modules\MetaWhatsApp\Models\WhatsAppAccount::find($account->id);
+        $this->assertTrue((bool) $fresh->is_active);
+        $this->assertNotNull($fresh->reactivated_at);
+        $this->assertEquals($admin->id, $fresh->reactivated_by);
+    }
+
+    public function test_test_connection_exit_sobre_compte_ja_actiu_no_toca_laudit_trail()
+    {
+        $account = $this->createTestAccount(['is_active' => true]);
+        $admin   = $this->makeAdminUser();
+
+        $this->app->bind(WhatsAppApiClient::class, function ($app, $params) {
+            return new class($params['account']) extends WhatsAppApiClient {
+                protected function curlGet(string $url, array $headers): array
+                {
+                    return [
+                        'ok' => true, 'body' => json_encode(['verified_name' => 'Suport Test']),
+                        'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false,
+                    ];
+                }
+            };
+        });
+
+        $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/settings/' . $account->id . '/test-connection'));
+
+        $fresh = \Modules\MetaWhatsApp\Models\WhatsAppAccount::find($account->id);
+        $this->assertNull($fresh->reactivated_at);
+        $this->assertNull($fresh->reactivated_by);
+    }
+
+    public function test_test_connection_fallit_sobre_compte_inactiu_no_el_reactiva()
+    {
+        $account = $this->createTestAccount(['is_active' => false]);
+        $admin   = $this->makeAdminUser();
+
+        $this->app->bind(WhatsAppApiClient::class, function ($app, $params) {
+            return new class($params['account']) extends WhatsAppApiClient {
+                protected function curlGet(string $url, array $headers): array
+                {
+                    return [
+                        'ok' => false, 'body' => null,
+                        'http_status' => 401, 'error_code' => '190', 'error_message' => 'Token caducat', 'transient' => false,
+                    ];
+                }
+            };
+        });
+
+        $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/settings/' . $account->id . '/test-connection'));
+
+        $fresh = \Modules\MetaWhatsApp\Models\WhatsAppAccount::find($account->id);
+        $this->assertFalse((bool) $fresh->is_active);
+        $this->assertNull($fresh->reactivated_at);
+    }
+
+    // ------------------------------------------------------------------
     // WhatsAppApiClient::subscribeWebhook() + registre automàtic/manual
     // ------------------------------------------------------------------
 
