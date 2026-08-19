@@ -4,7 +4,7 @@
 
 Mòdul per a FreeScout que integra **WhatsApp Business directament amb la Meta Cloud API**, sense intermediaris de pagament com 1msg.io o Twilio. Els missatges van de Meta a la teva instal·lació de FreeScout, amb control complet de credencials, dades i flux operatiu.
 
-El projecte està publicat i les proves internes són completes, però encara és especialment útil trobar una empresa o persona que pugui integrar-lo i fer-lo servir durant uns dies en un entorn real per validar el comportament en producció, detectar casos límit i confirmar que el flux operatiu encaixa amb l’ús diari.
+El projecte és públic i porta en ús real de producció des de la v1.0, iterant a partir d'incidències reportades per usuaris en lloc d'un roadmap fixat: plantilles, multimèdia, stickers, contactes, missatges de ubicació i reacció, monitoratge de l'estat de connexió i reactivació guiada de comptes s'han afegit tots en resposta a l'ús real del dia a dia, no planificats per endavant. És estable, però encara evoluciona activament — vegeu [Limitacions conegudes](#limitacions-conegudes) més avall per als buits detectats així que encara no estan resolts.
 
 ## Característiques principals
 
@@ -25,25 +25,62 @@ El projecte està publicat i les proves internes són completes, però encara é
 
 ![Formulari d'alta del canal](docs/add-channel.png)
 
-## Abast del MVP
+## Abast de funcionalitats
 
-Aquesta v1 cobreix:
+Actualment cobreix:
 
 - Missatges de **text pla** inbound i outbound.
 - Un o més números WhatsApp, cadascun com a compte independent del mòdul.
 - Creació automàtica de converses a FreeScout a partir de missatges entrants.
 - Resposta des de FreeScout cap a WhatsApp respectant la finestra d'undo del core.
-- Actualització best-effort dels estats `delivered` i `read` a la base de dades del mòdul.
-- Des de la v1.2.0, l'estat `read` de Meta també marca el thread outbound com a obert, amb l'indicador natiu "obert" de FreeScout.
-- Des de la v1.3.0, recuperació manual d'una finestra caducada amb una única plantilla HSM pre-aprovada — vegeu [Recuperació de finestra caducada](#recuperació-de-finestra-caducada-v130) més avall.
+- Actualització best-effort dels estats `delivered` i `read` a la base de dades del mòdul; des de la v1.2.0, l'estat `read` de Meta també marca el thread outbound com a obert, amb l'indicador natiu "obert" de FreeScout.
+- Des de la v1.3.0, recuperació manual d'una finestra caducada amb una plantilla HSM pre-aprovada — vegeu [Recuperació de finestra caducada](#recuperació-de-finestra-caducada-v130) més avall.
 - Des de la v1.4.0, missatges multimèdia (imatge, vídeo, àudio, document): descàrrega i adjunció entrant, previsualització en miniatura d'imatges, enviament sortint limitat a la finestra oberta de 24h — vegeu [Suport multimèdia](#suport-multimèdia-v140) més avall.
+- Des de la v1.5.0, missatges entrants d'ubicació i reacció (amb context del missatge citat), i un panell d'estat de connexió per compte (últim inbound/outbound, últim error, botó "Test connection").
+- Des de la v1.5.1, els IDs de canal oficials de Meta (`103`/`104`).
+- Des de la v1.6.0: fins a 5 plantilles de recuperació configurades estàticament per compte (a més del flux d'una sola plantilla de la v1.3.0), o qualsevol plantilla aprovada per Meta obtinguda en viu via un selector dinàmic; stickers i targetes de contacte entrants; visibilitat de fallades de lliurament asíncrones (s'afegeix una nota si Meta informa que un missatge ha fallat després d'haver estat acceptat inicialment); registre automàtic del webhook des del formulari del compte (sense pas manual al Meta Business Manager).
+- Des de la v1.6.1, reactivació guiada d'un compte inactiu directament des de "Test connection", amb traçabilitat (qui/quan) al panell d'estat.
 
-Queda fora d'abast en aquesta versió:
+Queda fora d'abast:
 
 - Transformació o redimensionament d'imatge/vídeo, vistes de galeria o carrusel.
 - Un adaptador d'emmagatzematge al núvol (S3, etc.) per a multimèdia — els adjunts usen l'emmagatzematge local ja existent de FreeScout.
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
+- El botó de **mode xat** de FreeScout i una **etiqueta/label de canal** pròpia a les converses (presents al mòdul oficial de WhatsApp de Meta) — encara no implementats aquí, vegeu [Limitacions conegudes](#limitacions-conegudes).
+
+## Novetats a la v1.6.2
+
+- **Fix**: la nota de "missatge no lliurat" per a l'error `131047` (finestra de 24h) es registrava al log amb nivell `warning` en lloc de `error`, per la qual cosa podia desaparèixer silenciosament de `laravel-*.log` en instal·lacions amb `log_level` per sobre de warning, encara que la nota a la conversa sí que apareixia. Ara es registra com a `error`, igual que la resta de fallades de lliurament (text i multimèdia).
+- **Cosmètic**: eliminats guions llargs erronis de cadenes visibles per l'usuari (traduccions i vistes de compte/plantilla); substituïts per guions normals.
+
+## Novetats a la v1.6.1
+
+- **Reactivació guiada de compte**: si un compte s'havia desactivat automàticament (p. ex. després d'un error de token invàlid), un "Test connection" amb èxit ara el reactiva automàticament, amb traçabilitat (qui i quan) mostrada al panell d'estat del compte — ja no cal editar la base de dades manualment per recuperar-lo.
+
+## Novetats a la v1.6.0
+
+- **Plantilles de missatge, multi-plantilla**: el banner de finestra caducada ara admet fins a 5 plantilles configurades (nom, idioma, text del botó, text de recuperació) en lloc d'una de sola — útil per a comptes multiidioma. Les configuracions d'una sola plantilla existents continuen funcionant sense canvis.
+- **Plantilles de missatge, selector dinàmic**: una nova opció "Veure totes les plantilles aprovades…" obté en viu les plantilles APPROVED reals del vostre WhatsApp Business Account des de Meta, mostra el text del cos i permet omplir variables `{{n}}` — sense configuració estàtica necessària. Complementa la llista estàtica anterior, no la substitueix.
+- **Stickers**: els missatges `type:sticker` ara són compatibles, es mostren com qualsevol altre adjunt multimèdia.
+- **Targetes de contacte**: els missatges `type:contacts` ara mostren el nom i el(s) número(s) de telèfon del contacte compartit.
+- **Les reaccions ara citen a què han reaccionat**: en lloc d'un simple "Reacted: 👍", el mòdul busca i cita un extracte curt del missatge original.
+- **Visibilitat de fallades de lliurament**: si Meta accepta un missatge i després l'informa com a fallat de forma asíncrona, ara es mostra com una nota visible a la conversa en lloc d'un canvi d'estat silenciós.
+- **Registre automàtic de webhook**: afegir un compte de WhatsApp ara el subscriu automàticament als webhooks de Meta (amb un botó manual "Subscribe webhook" de reintent a la pàgina del compte).
+- **Fix de log de depuració**: els payloads inbound/outbound ja no es truncaven a "Over 9 levels deep..." als logs de debug (un problema de límit de profunditat de Monolog). El log de depuració també es pot limitar només a aquest mòdul (`METAWHATSAPP_DEBUG=true` a l'`.env` de FreeScout), escrivint al seu propi fitxer de log amb rotació diària, independent del nivell de log global de l'aplicació.
+- **Fix**: la pàgina "Add new WhatsApp account" podia donar un 500 a PHP 8.1+ per un `null` passat a `htmlspecialchars()`.
+
+## Novetats a la v1.5.1
+
+- **IDs de canal oficials**: el mòdul ara usa els IDs de canal assignats oficialment per l'equip de FreeScout (`103`/`104`) en lloc dels provisionals `100`/`101`. Les instal·lacions existents es migren automàticament i de forma transparent — no cal fer res.
+- **Fix crític**: la v1.5.0 va publicar un `require_once` col·locat abans de la declaració `namespace` del fitxer, cosa que és PHP invàlid i feia que el mòdul no carregués. Corregit; si vau instal·lar la v1.5.0, actualitzeu a la v1.5.1 immediatament.
+
+## Novetats a la v1.5
+
+- **Missatges d'ubicació i reacció**: els missatges d'ubicació entrants ara es mostren com un enllaç de Google Maps, i les reaccions (incloent-hi eliminar-ne una) es mostren com a text.
+- **Test de connexió i panell d'estat**: panell per compte amb un test de connexió en viu i informació de l'última activitat.
+- Els missatges multimèdia sense peu de foto ja no es descarten directament quan el text de marcador de posició és buit — només es descarten els missatges sense text ni multimèdia.
+- Afegida una [matriu de capacitats](docs/capability-matrix.md) que documenta exactament què és compatible, planificat o fora d'abast.
 
 ## Instal·lació
 
@@ -172,12 +209,12 @@ El multimèdia s'emmagatzema amb l'emmagatzematge local ja existent de FreeScout
 
 ## Limitacions conegudes
 
-Aquestes limitacions són conegudes i acceptades en l'abast del MVP:
+Aquestes limitacions són conegudes i acceptades dins l'abast actual de funcionalitats:
 
-- Les **reaccions** de WhatsApp i altres tipus de missatge no suportats es continuen descartant (es registren al log, no es mostren a la conversa).
+- Els tipus de missatge diferents de text, multimèdia (incl. stickers), botó, ubicació, reacció i contactes (p. ex. `order`, respostes de llista `interactive`) es continuen descartant (es registren al log, no es mostren a la conversa).
 - La descàrrega de multimèdia entrant no té validació de mida pròpia del mòdul més enllà de la que Meta ja aplica abans d'entregar el webhook.
 - No hi ha vista de galeria o carrusel per a imatges/vídeos — cada adjunt apareix com una fila/miniatura independent, igual que qualsevol altre adjunt de FreeScout.
-- Només **una** plantilla HSM pre-aprovada per compte (configurada al compte); sense selector de plantilles, sense variables/paràmetres, sense sincronització automàtica amb el catàleg de plantilles de Meta.
+- Fins a 5 plantilles configurades estàticament per compte, o qualsevol plantilla APPROVED obtinguda en viu via el selector dinàmic (amb variables `{{n}}`); sense sincronització/cache automàtica de la llista estàtica des del catàleg de Meta.
 - L'enviament de la plantilla de recuperació és sempre **manual**, iniciat per un agent des del banner de la conversa; no hi ha reintent automàtic fora de finestra.
 - Els estats `delivered` i `read` s'actualitzen a la base de dades del mòdul; només el `read` es mostra visualment (via l'indicador natiu "obert" del thread) — el `delivered` no es mostra a la conversa.
 - Si Meta agrupa en un sol enviament de webhook esdeveniments de **números diferents**, només es processen els del compte corresponent al primer; la resta es descarta amb un avís al log. En la pràctica Meta sol enviar webhooks separats per número, però amb diversos números sota la mateixa App convé tenir-ho present.
@@ -185,6 +222,11 @@ Aquestes limitacions són conegudes i acceptades en l'abast del MVP:
 - La **bústia tècnica** del canal continua sent visible a **Gestionar → Bústies**.
 - El webhook no implementa rate limiting propi; la barrera principal és la signatura HMAC.
 - El lookup del `verify_token` al handshake no és constant-time.
+- El botó **"Chat"** de FreeScout (el que obre una conversa en mode xat) no s'activa a les converses de WhatsApp com fa el mòdul oficial de Meta; la mateixa vista es pot obrir manualment des de l'element "Chats" al menú esquerre de la bústia, o afegint `?chat_mode=1` a la URL de la conversa.
+- Les converses no porten una **etiqueta/label de WhatsApp** pròpia com fa el mòdul oficial de Meta, per la qual cosa no es poden filtrar ni informar per canal.
+- El format de text entrant de WhatsApp (`*negreta*`, `_cursiva_`, `~ratllat~`, `` ```monoespai``` ``) es mostra com a text pla amb els marcadors literals — no es renderitza.
+- Com que les bústies usades per WhatsApp han de tenir desactivat el servidor de correu entrant (per no barrejar converses de correu i de WhatsApp), el tauler de bústies de FreeScout no mostra els comptadors de tiquets (Sense assignar/Meus/Destacats/…) d'aquestes bústies.
+- Un missatge sortint fallit/no lliurat no reobre la conversa, i la nota de fallada mostra el `wamid` en cru en lloc d'un extracte del text del missatge — l'agent l'ha de notar manualment.
 
 ## Checklist per passar a compte real
 

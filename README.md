@@ -4,7 +4,7 @@
 
 FreeScout module that integrates **WhatsApp Business directly with the Meta Cloud API**, without paid intermediaries such as 1msg.io or Twilio. Messages travel from Meta to your FreeScout installation and nowhere else, with full control over credentials, data and the operational flow.
 
-The project is now public, and internal testing is complete, but it would still be especially valuable to find a company or person willing to integrate it and use it for a few days in a real environment to validate production behavior, uncover edge cases, and confirm that the operational flow fits day-to-day use.
+The project is public and has been running in real production use since v1.0, iterating through user-reported issues rather than a fixed roadmap: templates, media, stickers, contacts, location and reaction messages, connection health monitoring and guided account reactivation were all added in response to actual day-to-day use, not planned upfront. It's stable, but still actively evolving — see [Known limitations](#known-limitations) below for gaps found this way that aren't fixed yet.
 
 ## Key features
 
@@ -25,25 +25,29 @@ The project is now public, and internal testing is complete, but it would still 
 
 ![Add channel form](docs/add-channel.png)
 
-## MVP scope
+## Feature scope
 
-This v1 covers:
+Currently covers:
 
 - **Plain text** messages, inbound and outbound.
 - One or more WhatsApp numbers, each as an independent module account.
 - Automatic conversation creation in FreeScout from incoming messages.
 - Replies from FreeScout to WhatsApp honoring the core undo window.
-- Best-effort tracking of `delivered` and `read` states in the module database.
-- Since v1.2.0, a `read` receipt from Meta also marks the outbound thread as opened, using FreeScout's native "opened" indicator.
-- Since v1.3.0, manual recovery of an expired window with a single pre-approved HSM template — see [Expired window recovery](#expired-window-recovery-v130) below.
+- Best-effort tracking of `delivered` and `read` states in the module database; since v1.2.0, a `read` receipt from Meta also marks the outbound thread as opened, using FreeScout's native "opened" indicator.
+- Since v1.3.0, manual recovery of an expired window with a pre-approved HSM template — see [Expired window recovery](#expired-window-recovery-v130) below.
 - Since v1.4.0, media messages (image, video, audio, document): inbound download & attachment, image thumbnail preview, outbound send gated to the open 24h window — see [Media support](#media-support-v140) below.
+- Since v1.5.0, inbound location and reaction messages (including quoted-message context), and a connection health panel per account (last inbound/outbound, last error, "Test connection" button).
+- Since v1.5.1, official Meta channel IDs (`103`/`104`).
+- Since v1.6.0: up to 5 statically-configured recovery templates per account (in addition to the single-template flow from v1.3.0) or any Meta-approved template fetched live via a dynamic picker; inbound stickers and shared contact cards; asynchronous delivery-failure visibility (a note is added if Meta reports a message as failed after initial acceptance); automatic webhook subscription from the account form (no manual Meta Business Manager step).
+- Since v1.6.1, guided reactivation of an inactive account straight from "Test connection", with an audit trail (who/when) on the health panel.
 
-Out of scope in this version:
+Out of scope:
 
 - Image/video transformation or resizing, image gallery/carousel views.
 - A cloud storage adapter (S3, etc.) for media — attachments use FreeScout's existing local storage only.
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
+- FreeScout's **chat mode** button and its own **channel label/tag** on conversations (present in Meta's official WhatsApp module) — not implemented here yet, see [Known limitations](#known-limitations).
 
 ## What's new in v1.6.2
 
@@ -211,7 +215,7 @@ Media is stored using FreeScout's existing local attachment storage — no separ
 
 ## Known limitations
 
-These limitations are known and accepted within the MVP scope:
+These limitations are known and accepted within the current feature scope:
 
 - Message types other than text, media (incl. stickers), button, location, reaction and contacts (e.g. `order`, `interactive` list replies) are still dropped (logged, not shown in the conversation).
 - Inbound media has no size validation on this module's side beyond what Meta itself enforces before delivering the webhook.
@@ -224,6 +228,11 @@ These limitations are known and accepted within the MVP scope:
 - The channel's **technical mailbox** remains visible under **Manage → Mailboxes**.
 - The webhook implements no rate limiting of its own; the HMAC signature is the main barrier.
 - The `verify_token` lookup during the handshake is not constant-time.
+- FreeScout's **"Chat" button** (the toggle that opens a conversation in chat mode) is not enabled on WhatsApp conversations the way Meta's official module does it; the same view is still reachable manually via the "Chats" item in the mailbox's left menu, or by appending `?chat_mode=1` to the conversation URL.
+- Conversations aren't tagged with a dedicated **WhatsApp label/tag** the way Meta's official module does, so they can't be filtered or reported on by channel alone.
+- Inbound WhatsApp text formatting (`*bold*`, `_italic_`, `~strikethrough~`, `` ```monospace``` ``) is shown as plain text with the literal markers — not rendered.
+- Since mailboxes used for WhatsApp are required to have no incoming e-mail server configured (to avoid mixing e-mail and WhatsApp conversations), FreeScout's mailbox dashboard doesn't show ticket counts (Unassigned/Mine/Starred/…) for those mailboxes.
+- A failed/undelivered outbound message doesn't reopen the conversation, and its failure note shows the raw `wamid` rather than a snippet of the message text — the agent has to notice the note manually.
 
 ## Go-live checklist
 

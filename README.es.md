@@ -4,7 +4,7 @@
 
 Módulo para FreeScout que integra **WhatsApp Business directamente con la Meta Cloud API**, sin intermediarios de pago como 1msg.io o Twilio. Los mensajes van de Meta a tu instalación de FreeScout, con control completo de credenciales, datos y flujo operativo.
 
-El proyecto ya está publicado y las pruebas internas están completas, pero sigue siendo especialmente útil encontrar una empresa o persona que pueda integrarlo y usarlo durante unos días en un entorno real para validar el comportamiento en producción, detectar casos límite y confirmar que el flujo operativo encaja con el uso diario.
+El proyecto es público y lleva en uso real de producción desde la v1.0, iterando a partir de incidencias reportadas por usuarios en lugar de un roadmap fijado: plantillas, multimedia, stickers, contactos, mensajes de ubicación y reacción, monitorización del estado de conexión y reactivación guiada de cuentas se han añadido en respuesta al uso real del día a día, no planificados de antemano. Es estable, pero sigue evolucionando activamente — ver [Limitaciones conocidas](#limitaciones-conocidas) más abajo para los huecos detectados así que aún no están resueltos.
 
 ## Características principales
 
@@ -25,25 +25,62 @@ El proyecto ya está publicado y las pruebas internas están completas, pero sig
 
 ![Formulario de alta del canal](docs/add-channel.png)
 
-## Alcance del MVP
+## Alcance de funcionalidades
 
-Esta v1 cubre:
+Actualmente cubre:
 
 - Mensajes de **texto plano** entrantes y salientes.
 - Uno o más números de WhatsApp, cada uno como cuenta independiente del módulo.
 - Creación automática de conversaciones en FreeScout a partir de mensajes entrantes.
 - Respuesta desde FreeScout hacia WhatsApp respetando la ventana de deshacer del core.
-- Actualización best-effort de los estados `delivered` y `read` en la base de datos del módulo.
-- Desde la v1.2.0, el estado `read` de Meta también marca el thread outbound como abierto, con el indicador nativo "abierto" de FreeScout.
-- Desde la v1.3.0, recuperación manual de una ventana caducada con una única plantilla HSM preaprobada — ver [Recuperación de ventana caducada](#recuperación-de-ventana-caducada-v130) más abajo.
+- Actualización best-effort de los estados `delivered` y `read` en la base de datos del módulo; desde la v1.2.0, un `read` de Meta también marca el thread outbound como abierto, con el indicador nativo "abierto" de FreeScout.
+- Desde la v1.3.0, recuperación manual de una ventana caducada con una plantilla HSM preaprobada — ver [Recuperación de ventana caducada](#recuperación-de-ventana-caducada-v130) más abajo.
 - Desde la v1.4.0, mensajes multimedia (imagen, vídeo, audio, documento): descarga y adjunción entrante, previsualización en miniatura de imágenes, envío saliente limitado a la ventana abierta de 24h — ver [Soporte multimedia](#soporte-multimedia-v140) más abajo.
+- Desde la v1.5.0, mensajes entrantes de ubicación y reacción (incluyendo contexto del mensaje citado), y un panel de estado de conexión por cuenta (último inbound/outbound, último error, botón "Test connection").
+- Desde la v1.5.1, los IDs de canal oficiales de Meta (`103`/`104`).
+- Desde la v1.6.0: hasta 5 plantillas de recuperación configuradas estáticamente por cuenta (además del flujo de una sola plantilla de la v1.3.0), o cualquier plantilla aprobada por Meta obtenida en vivo mediante un selector dinámico; stickers y tarjetas de contacto entrantes; visibilidad de fallos de entrega asíncronos (se añade una nota si Meta informa de que un mensaje ha fallado tras haber sido aceptado inicialmente); registro automático del webhook desde el formulario de la cuenta (sin paso manual en Meta Business Manager).
+- Desde la v1.6.1, reactivación guiada de una cuenta inactiva directamente desde "Test connection", con trazabilidad (quién/cuándo) en el panel de estado.
 
-Queda fuera de alcance en esta versión:
+Queda fuera de alcance:
 
 - Transformación o redimensionado de imagen/vídeo, vistas de galería o carrusel.
 - Un adaptador de almacenamiento en la nube (S3, etc.) para multimedia — los adjuntos usan el almacenamiento local ya existente de FreeScout.
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
+- El botón de **modo chat** de FreeScout y una **etiqueta/label de canal** propia en las conversaciones (presentes en el módulo oficial de WhatsApp de Meta) — aún no implementados aquí, ver [Limitaciones conocidas](#limitaciones-conocidas).
+
+## Novedades en la v1.6.2
+
+- **Fix**: la nota de "mensaje no entregado" para el error `131047` (ventana de 24h) se registraba en el log con nivel `warning` en lugar de `error`, por lo que podía desaparecer silenciosamente de `laravel-*.log` en instalaciones con `log_level` por encima de warning, aunque la nota en la conversación sí aparecía. Ahora se registra como `error`, igual que el resto de fallos de entrega (texto y multimedia).
+- **Cosmético**: eliminados guiones largos erróneos de cadenas visibles para el usuario (traducciones y vistas de cuenta/plantilla); sustituidos por guiones normales.
+
+## Novedades en la v1.6.1
+
+- **Reactivación guiada de cuenta**: si una cuenta se había desactivado automáticamente (p. ej. tras un error de token inválido), un "Test connection" con éxito ahora la reactiva automáticamente, con trazabilidad (quién y cuándo) mostrada en el panel de estado de la cuenta — ya no hace falta editar la base de datos manualmente para recuperarla.
+
+## Novedades en la v1.6.0
+
+- **Plantillas de mensaje, multi-plantilla**: el banner de ventana caducada ahora admite hasta 5 plantillas configuradas (nombre, idioma, texto del botón, texto de recuperación) en lugar de una sola — útil para cuentas multiidioma. Las configuraciones de una sola plantilla existentes siguen funcionando sin cambios.
+- **Plantillas de mensaje, selector dinámico**: una nueva opción "Ver todas las plantillas aprobadas…" obtiene en vivo las plantillas APPROVED reales de tu WhatsApp Business Account desde Meta, muestra el texto del cuerpo y permite rellenar variables `{{n}}` — sin configuración estática necesaria. Complementa la lista estática anterior, no la sustituye.
+- **Stickers**: los mensajes `type:sticker` ahora son compatibles, se muestran como cualquier otro adjunto multimedia.
+- **Tarjetas de contacto**: los mensajes `type:contacts` ahora muestran el nombre y el/los número(s) de teléfono del contacto compartido.
+- **Las reacciones ahora citan a qué han reaccionado**: en lugar de un simple "Reacted: 👍", el módulo busca y cita un extracto corto del mensaje original.
+- **Visibilidad de fallos de entrega**: si Meta acepta un mensaje y luego lo informa como fallido de forma asíncrona, ahora se muestra como una nota visible en la conversación en lugar de un cambio de estado silencioso.
+- **Registro automático de webhook**: añadir una cuenta de WhatsApp ahora la suscribe automáticamente a los webhooks de Meta (con un botón manual "Subscribe webhook" de reintento en la página de la cuenta).
+- **Fix de log de depuración**: los payloads inbound/outbound ya no se truncaban a "Over 9 levels deep..." en los logs de debug (un problema de límite de profundidad de Monolog). El log de depuración también se puede limitar solo a este módulo (`METAWHATSAPP_DEBUG=true` en el `.env` de FreeScout), escribiendo en su propio fichero de log con rotación diaria, independiente del nivel de log global de la aplicación.
+- **Fix**: la página "Add new WhatsApp account" podía dar un 500 en PHP 8.1+ por un `null` pasado a `htmlspecialchars()`.
+
+## Novedades en la v1.5.1
+
+- **IDs de canal oficiales**: el módulo ahora usa los IDs de canal asignados oficialmente por el equipo de FreeScout (`103`/`104`) en lugar de los provisionales `100`/`101`. Las instalaciones existentes se migran automáticamente y de forma transparente — no hace falta hacer nada.
+- **Fix crítico**: la v1.5.0 publicó un `require_once` colocado antes de la declaración `namespace` del fichero, lo cual es PHP inválido y hacía que el módulo no cargara. Corregido; si instalaste la v1.5.0, actualiza a la v1.5.1 inmediatamente.
+
+## Novedades en la v1.5
+
+- **Mensajes de ubicación y reacción**: los mensajes de ubicación entrantes ahora se muestran como un enlace de Google Maps, y las reacciones (incluyendo eliminar una) se muestran como texto.
+- **Test de conexión y panel de estado**: panel por cuenta con un test de conexión en vivo e información de la última actividad.
+- Los mensajes multimedia sin pie de foto ya no se descartan directamente cuando el texto de marcador de posición está vacío — solo se descartan los mensajes sin texto ni multimedia.
+- Añadida una [matriz de capacidades](docs/capability-matrix.md) que documenta exactamente qué está soportado, planificado o fuera de alcance.
 
 ## Instalación
 
@@ -172,12 +209,12 @@ El multimedia se almacena con el almacenamiento local ya existente de FreeScout 
 
 ## Limitaciones conocidas
 
-Estas limitaciones son conocidas y aceptadas en el alcance del MVP:
+Estas limitaciones son conocidas y aceptadas dentro del alcance actual de funcionalidades:
 
-- Las **reacciones** de WhatsApp y otros tipos de mensaje no soportados se siguen descartando (se registran en el log, no se muestran en la conversación).
+- Los tipos de mensaje distintos de texto, multimedia (incl. stickers), botón, ubicación, reacción y contactos (p. ej. `order`, respuestas de lista `interactive`) se siguen descartando (se registran en el log, no se muestran en la conversación).
 - La descarga de multimedia entrante no tiene validación de tamaño propia del módulo más allá de la que Meta ya aplica antes de entregar el webhook.
 - No hay vista de galería o carrusel para imágenes/vídeos — cada adjunto aparece como una fila/miniatura independiente, igual que cualquier otro adjunto de FreeScout.
-- Solo **una** plantilla HSM preaprobada por cuenta (configurada en la cuenta); sin selector de plantillas, sin variables/parámetros, sin sincronización automática con el catálogo de plantillas de Meta.
+- Hasta 5 plantillas configuradas estáticamente por cuenta, o cualquier plantilla APPROVED obtenida en vivo mediante el selector dinámico (con variables `{{n}}`); sin sincronización/caché automática de la lista estática desde el catálogo de Meta.
 - El envío de la plantilla de recuperación es siempre **manual**, iniciado por un agente desde el banner de la conversación; no hay reintento automático fuera de ventana.
 - Los estados `delivered` y `read` se actualizan en la base de datos del módulo; solo el `read` se muestra visualmente (vía el indicador nativo "abierto" del thread) — el `delivered` no se muestra en la conversación.
 - Si Meta agrupa en un solo envío de webhook eventos de **números diferentes**, solo se procesan los de la cuenta correspondiente al primero; el resto se descarta con un aviso en el log. En la práctica Meta suele enviar webhooks separados por número, pero conviene tenerlo presente con varios números bajo la misma App.
@@ -185,6 +222,11 @@ Estas limitaciones son conocidas y aceptadas en el alcance del MVP:
 - El **buzón técnico** del canal sigue siendo visible en **Gestionar → Buzones**.
 - El webhook no implementa rate limiting propio; la barrera principal es la firma HMAC.
 - El lookup del `verify_token` en el handshake no es constant-time.
+- El botón **"Chat"** de FreeScout (el que abre una conversación en modo chat) no se activa en las conversaciones de WhatsApp como hace el módulo oficial de Meta; la misma vista se puede abrir manualmente desde el elemento "Chats" en el menú izquierdo del buzón, o añadiendo `?chat_mode=1` a la URL de la conversación.
+- Las conversaciones no llevan una **etiqueta/label de WhatsApp** propia como hace el módulo oficial de Meta, por lo que no se pueden filtrar ni informar por canal.
+- El formato de texto entrante de WhatsApp (`*negrita*`, `_cursiva_`, `~tachado~`, `` ```monoespacio``` ``) se muestra como texto plano con los marcadores literales — no se renderiza.
+- Como los buzones usados para WhatsApp deben tener desactivado el servidor de correo entrante (para no mezclar conversaciones de correo y de WhatsApp), el tablero de buzones de FreeScout no muestra los contadores de tickets (Sin asignar/Míos/Destacados/…) de esos buzones.
+- Un mensaje saliente fallido/no entregado no reabre la conversación, y la nota de fallo muestra el `wamid` en crudo en lugar de un extracto del texto del mensaje — el agente tiene que notarlo manualmente.
 
 ## Checklist para pasar a cuenta real
 
