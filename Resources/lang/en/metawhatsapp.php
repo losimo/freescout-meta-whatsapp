@@ -40,7 +40,7 @@ return [
     'template_cost_warning'        => 'Template messages are billed by Meta per conversation.',
     'template_lang'                => 'Template language code',
     'template_threshold'           => 'Window expiry threshold (minutes)',
-    'template_threshold_help'      => 'Meta\'s official customer service window is 24 hours from the customer\'s last message. This setting only defines when the module starts treating the window as expired, as an internal operational safety margin — it does not change Meta\'s rule. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">See Meta docs</a>.',
+    'template_threshold_help'      => 'Meta\'s official customer service window is 24 hours from the customer\'s last message. This setting only defines when the module starts treating the window as expired, as an internal operational safety margin - it does not change Meta\'s rule. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">See Meta docs</a>.',
 
     'templates_multi_help'         => 'Optional: configure up to 5 templates (e.g. one per language) instead of the single one above. Leave a row\'s name/language blank to skip it. When at least one row is filled in, agents see one button per template.',
     'template_row_id'              => 'Template name',
@@ -80,7 +80,7 @@ return [
 
     // Test connection button + account health snapshot.
     'test_connection_button'       => 'Test connection',
-    'test_connection_success'      => 'Connection OK — verified as ":name".',
+    'test_connection_success'      => 'Connection OK - verified as ":name".',
     'test_connection_failed'       => 'Connection test failed: :error',
     'test_connection_unknown_error' => 'Unknown error.',
     'health_snapshot_title'        => 'Account health',
@@ -90,7 +90,7 @@ return [
     'health_last_error'            => 'Last error',
     'health_last_reactivation'     => 'Last reactivation',
     'health_never'                 => 'Never',
-    'account_reactivated'          => 'Connection restored — account reactivated automatically (verified as ":name").',
+    'account_reactivated'          => 'Connection restored - account reactivated automatically (verified as ":name").',
 
     // Banner de finestra expirada (conversa).
     'window_expired_notice'        => 'The 24-hour customer service window appears to be expired. Free-form replies will likely be rejected by Meta.',
@@ -98,8 +98,8 @@ return [
     'template_sent'                => 'Template message queued for sending.',
     'template_not_configured'      => 'No recovery template is configured for this WhatsApp account.',
     'template_no_phone'            => 'No phone number could be resolved for this conversation.',
-    'template_no_phone_notice'     => 'This contact has no phone number on file (WhatsApp ID-only contacts are not yet supported for template sending — planned for phase 2b).',
-    'template_window_open'         => 'The customer window is open again — send a normal reply instead of a paid template.',
+    'template_no_phone_notice'     => 'This contact has no phone number on file (WhatsApp ID-only contacts are not yet supported for template sending - planned for phase 2b).',
+    'template_window_open'         => 'The customer window is open again - send a normal reply instead of a paid template.',
     'template_already_sent'        => 'A template was already sent moments ago for this conversation.',
 
     // Picker dinàmic de plantilles (issue #2, punt 2 complet).

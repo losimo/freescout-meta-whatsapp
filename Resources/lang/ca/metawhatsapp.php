@@ -40,7 +40,7 @@ return [
     'template_cost_warning'        => 'Meta factura els missatges de plantilla per conversa.',
     'template_lang'                => 'Codi d\'idioma de la plantilla',
     'template_threshold'           => 'Llindar de caducitat de la finestra (minuts)',
-    'template_threshold_help'      => 'La finestra oficial d\'atenció al client de Meta és de 24 hores des de l\'últim missatge del client. Aquesta opció només defineix quan el mòdul comença a tractar la finestra com a caducada, com a marge de seguretat operatiu intern — no canvia la regla de Meta. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Consulta la documentació de Meta</a>.',
+    'template_threshold_help'      => 'La finestra oficial d\'atenció al client de Meta és de 24 hores des de l\'últim missatge del client. Aquesta opció només defineix quan el mòdul comença a tractar la finestra com a caducada, com a marge de seguretat operatiu intern - no canvia la regla de Meta. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Consulta la documentació de Meta</a>.',
 
     'templates_multi_help'         => 'Opcional: configura fins a 5 plantilles (p. ex. una per idioma) en lloc de la única de dalt. Deixa el nom/idioma d\'una fila en blanc per ometre-la. Amb almenys una fila plena, els agents veuran un botó per plantilla.',
     'template_row_id'              => 'Nom de la plantilla',
@@ -80,7 +80,7 @@ return [
 
     // Botó de prova de connexió + instantània de salut del compte.
     'test_connection_button'       => 'Provar connexió',
-    'test_connection_success'      => 'Connexió correcta — verificada com a ":name".',
+    'test_connection_success'      => 'Connexió correcta - verificada com a ":name".',
     'test_connection_failed'       => 'La prova de connexió ha fallat: :error',
     'test_connection_unknown_error' => 'Error desconegut.',
     'health_snapshot_title'        => 'Salut del compte',
@@ -90,7 +90,7 @@ return [
     'health_last_error'            => 'Últim error',
     'health_last_reactivation'     => 'Última reactivació',
     'health_never'                 => 'Mai',
-    'account_reactivated'          => 'Connexió restaurada — compte reactivat automàticament (verificat com a ":name").',
+    'account_reactivated'          => 'Connexió restaurada - compte reactivat automàticament (verificat com a ":name").',
 
     // Banner de finestra expirada (conversa).
     'window_expired_notice'        => 'La finestra de 24 hores d\'atenció al client sembla haver caducat. És probable que Meta rebutgi les respostes de text lliure.',
@@ -98,7 +98,7 @@ return [
     'template_sent'                => 'Missatge de plantilla encuat per enviar.',
     'template_not_configured'      => 'Aquest compte de WhatsApp no té cap plantilla de recuperació configurada.',
     'template_no_phone'            => 'No s\'ha pogut resoldre cap número de telèfon per a aquesta conversa.',
-    'template_no_phone_notice'     => 'Aquest contacte no té telèfon registrat (els contactes només amb ID de WhatsApp encara no admeten l\'enviament de plantilles — previst per a la fase 2b).',
+    'template_no_phone_notice'     => 'Aquest contacte no té telèfon registrat (els contactes només amb ID de WhatsApp encara no admeten l\'enviament de plantilles - previst per a la fase 2b).',
     'template_window_open'         => 'La finestra del client ha tornat a obrir-se: envia una resposta normal en comptes d\'una plantilla de pagament.',
     'template_already_sent'        => 'Ja s\'ha enviat una plantilla fa uns moments per a aquesta conversa.',
 

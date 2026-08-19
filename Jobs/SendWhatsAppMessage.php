@@ -105,7 +105,9 @@ class SendWhatsAppMessage implements ShouldQueue
                 'account_id' => $account->id,
             ]);
         } elseif ($result['error_code'] === '131047') {
-            Log::warning('[MetaWhatsApp] Outside the 24h window (131047): message not delivered', [
+            // Missatge no lliurat: mateix nivell que la resta d'errors
+            // semàntics perquè no quedi filtrat per un log_level > warning.
+            Log::error('[MetaWhatsApp] Outside the 24h window (131047): message not delivered', [
                 'account_id' => $account->id,
                 'thread_id'  => $thread->id,
             ]);

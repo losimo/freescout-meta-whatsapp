@@ -22,7 +22,7 @@
 
             @if(!$result['ok'])
                 <div class="alert alert-danger">
-                    {{ __('metawhatsapp::metawhatsapp.templates_picker_fetch_error', ['error' => $result['error_message'] ?: '—']) }}
+                    {{ __('metawhatsapp::metawhatsapp.templates_picker_fetch_error', ['error' => $result['error_message'] ?: '-']) }}
                 </div>
             @elseif(empty($result['templates']))
                 <p class="text-muted">{{ __('metawhatsapp::metawhatsapp.templates_picker_empty') }}</p>

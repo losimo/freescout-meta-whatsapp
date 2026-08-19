@@ -45,6 +45,11 @@ Out of scope in this version:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.6.2
+
+- **Fix**: the "message not delivered" note for error `131047` (24h window) was logged at `warning` level instead of `error`, so it could be silently dropped from `laravel-*.log` on installations with `log_level` set above warning, even though the in-conversation note still appeared. Now logged as `error`, consistent with every other delivery failure (text and media).
+- **Cosmetic**: removed stray em dashes from user-facing strings (translations and account/template views); replaced with regular hyphens.
+
 ## What's new in v1.6.1
 
 - **Guided account reactivation**: if an account was auto-deactivated (e.g. after an invalid-token error), a successful "Test connection" now reactivates it automatically, with an audit trail (who and when) shown on the account health snapshot — no more manual database edits to recover.

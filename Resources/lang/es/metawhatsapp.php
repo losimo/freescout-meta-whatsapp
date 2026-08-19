@@ -40,7 +40,7 @@ return [
     'template_cost_warning'        => 'Meta factura los mensajes de plantilla por conversación.',
     'template_lang'                => 'Código de idioma de la plantilla',
     'template_threshold'           => 'Umbral de caducidad de la ventana (minutos)',
-    'template_threshold_help'      => 'La ventana oficial de atención al cliente de Meta es de 24 horas desde el último mensaje del cliente. Esta opción solo define cuándo el módulo empieza a tratar la ventana como caducada, como margen de seguridad operativo interno — no cambia la regla de Meta. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Consulta la documentación de Meta</a>.',
+    'template_threshold_help'      => 'La ventana oficial de atención al cliente de Meta es de 24 horas desde el último mensaje del cliente. Esta opción solo define cuándo el módulo empieza a tratar la ventana como caducada, como margen de seguridad operativo interno - no cambia la regla de Meta. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Consulta la documentación de Meta</a>.',
 
     'templates_multi_help'         => 'Opcional: configura hasta 5 plantillas (p. ej. una por idioma) en vez de la única de arriba. Deja el nombre/idioma de una fila en blanco para omitirla. Con al menos una fila rellenada, los agentes verán un botón por plantilla.',
     'template_row_id'              => 'Nombre de la plantilla',
@@ -80,7 +80,7 @@ return [
 
     // Botón de prueba de conexión + instantánea de salud de la cuenta.
     'test_connection_button'       => 'Probar conexión',
-    'test_connection_success'      => 'Conexión correcta — verificada como ":name".',
+    'test_connection_success'      => 'Conexión correcta - verificada como ":name".',
     'test_connection_failed'       => 'La prueba de conexión ha fallado: :error',
     'test_connection_unknown_error' => 'Error desconocido.',
     'health_snapshot_title'        => 'Salud de la cuenta',
@@ -90,7 +90,7 @@ return [
     'health_last_error'            => 'Último error',
     'health_last_reactivation'     => 'Última reactivación',
     'health_never'                 => 'Nunca',
-    'account_reactivated'          => 'Conexión restaurada — cuenta reactivada automáticamente (verificada como ":name").',
+    'account_reactivated'          => 'Conexión restaurada - cuenta reactivada automáticamente (verificada como ":name").',
 
     // Banner de finestra expirada (conversa).
     'window_expired_notice'        => 'La ventana de 24 horas de atención al cliente parece haber caducado. Es probable que Meta rechace las respuestas de texto libre.',
@@ -98,7 +98,7 @@ return [
     'template_sent'                => 'Mensaje de plantilla encolado para su envío.',
     'template_not_configured'      => 'Esta cuenta de WhatsApp no tiene ninguna plantilla de recuperación configurada.',
     'template_no_phone'            => 'No se ha podido resolver ningún número de teléfono para esta conversación.',
-    'template_no_phone_notice'     => 'Este contacto no tiene teléfono registrado (los contactos solo con ID de WhatsApp aún no admiten el envío de plantillas — previsto para la fase 2b).',
+    'template_no_phone_notice'     => 'Este contacto no tiene teléfono registrado (los contactos solo con ID de WhatsApp aún no admiten el envío de plantillas - previsto para la fase 2b).',
     'template_window_open'         => 'La ventana del cliente ha vuelto a abrirse: envía una respuesta normal en vez de una plantilla de pago.',
     'template_already_sent'        => 'Ya se ha enviado una plantilla hace unos momentos para esta conversación.',
 

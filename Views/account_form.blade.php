@@ -257,7 +257,7 @@
                         <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.mailbox') }}</label>
                         <div class="col-sm-8">
                             <select name="mailbox_id" class="form-control">
-                                <option value="">— {{ __('metawhatsapp::metawhatsapp.select_mailbox') }} —</option>
+                                <option value="">- {{ __('metawhatsapp::metawhatsapp.select_mailbox') }} -</option>
                                 @foreach($mailboxes as $mb)
                                     <option value="{{ $mb->id }}" {{ old('mailbox_id') == $mb->id ? 'selected' : '' }}>
                                         {{ $mb->name }}

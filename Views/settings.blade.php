@@ -46,7 +46,7 @@
                                         <span class="text-warning">&#9888; {{ __('metawhatsapp::metawhatsapp.mailbox_unlinked') }}</span>
                                     @endif
                                 </td>
-                                <td>{{ $account->mailbox->name ?? '—' }}</td>
+                                <td>{{ $account->mailbox->name ?? '-' }}</td>
                                 <td class="text-right">
                                     <a href="{{ route('metawhatsapp.edit', $account->id) }}" class="btn btn-default btn-xs">
                                         {{ __('metawhatsapp::metawhatsapp.edit') }}
