@@ -147,6 +147,9 @@ class SendWhatsAppMediaTest extends TestCase
             ->once()
             ->with('+34611222333', 'image', 'meta-media-1', 'hola', null)
             ->andReturn(['ok' => true, 'wamid' => 'wamid.sent-media-1', 'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false]);
+        $fakeClient->shouldReceive('markAsRead')
+            ->once()
+            ->andReturn(['ok' => true, 'http_status' => 200]);
 
         $job = \Mockery::mock(SendWhatsAppMedia::class, [$account->id, $thread->id, '+34611222333', $attachment->id, 'hola'])->makePartial();
         $job->shouldAllowMockingProtectedMethods();
@@ -156,6 +159,41 @@ class SendWhatsAppMediaTest extends TestCase
         $sent = WhatsAppMessage::where('attachment_id', $attachment->id)->first();
         $this->assertEquals(WhatsAppMessage::STATUS_SENT, $sent->status);
         $this->assertEquals('wamid.sent-media-1', $sent->wamid);
+    }
+
+    public function test_marca_com_a_llegit_lultim_missatge_entrant_despres_denviar_media()
+    {
+        $account = $this->createTestAccount();
+        [$thread, $attachment] = $this->makeConversationWithThreadAndAttachment($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+        $this->markWindowOpen($account, $thread);
+
+        // Missatge entrant més recent que el de markWindowOpen(): és
+        // aquest, no el que obre la finestra, el que s'ha de marcar llegit.
+        WhatsAppMessage::create([
+            'wamid'           => 'wamid.entrant-mes-recent',
+            'account_id'      => $account->id,
+            'conversation_id' => $thread->conversation_id,
+            'contact_phone'   => '+34611222333',
+            'direction'       => WhatsAppMessage::DIRECTION_INBOUND,
+            'status'          => WhatsAppMessage::STATUS_RECEIVED,
+        ]);
+
+        $fakeClient = \Mockery::mock(WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('uploadMedia')
+            ->once()
+            ->andReturn(['ok' => true, 'media_id' => 'meta-media-1', 'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false]);
+        $fakeClient->shouldReceive('sendMedia')
+            ->once()
+            ->andReturn(['ok' => true, 'wamid' => 'wamid.sent-media-1', 'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false]);
+        $fakeClient->shouldReceive('markAsRead')
+            ->once()
+            ->with('wamid.entrant-mes-recent')
+            ->andReturn(['ok' => true, 'http_status' => 200]);
+
+        $job = \Mockery::mock(SendWhatsAppMedia::class, [$account->id, $thread->id, '+34611222333', $attachment->id])->makePartial();
+        $job->shouldAllowMockingProtectedMethods();
+        $job->shouldReceive('apiClient')->andReturn($fakeClient);
+        $job->handle();
     }
 
     public function test_mediaCategory_mapa_prefixos_de_mime_correctament()

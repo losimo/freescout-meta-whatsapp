@@ -48,6 +48,53 @@ class WhatsAppApiClient
     }
 
     /**
+     * Marca un missatge entrant com a llegit (el doble tick blau al client).
+     * No reutilitza postMessagePayload() perquè la resposta d'aquest
+     * endpoint no té 'messages[0].id' com un enviament, té 'success': true.
+     * Segons la documentació de Meta els errors de retorn no cal gestionar-
+     * los: si falla (finestra de 30 dies, permisos, etc.) l'única
+     * conseqüència és que el client no veu el tick blau, no afecta
+     * l'enviament de la resposta de l'agent, que ja s'ha fet abans de
+     * cridar aquest mètode.
+     */
+    public function markAsRead(string $wamid): array
+    {
+        $url = rtrim(config('metawhatsapp.api_base', 'https://graph.facebook.com'), '/')
+            . '/' . self::API_VERSION
+            . '/' . $this->account->phone_number_id
+            . '/messages';
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode([
+                'messaging_product' => 'whatsapp',
+                'status'            => 'read',
+                'message_id'        => $wamid,
+            ]),
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . $this->accessToken,
+                'Content-Type: application/json',
+            ],
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $data = $response !== false ? (json_decode($response, true) ?: []) : [];
+
+        return [
+            'ok'          => $httpCode >= 200 && $httpCode < 300 && ($data['success'] ?? false) === true,
+            'http_status' => $httpCode,
+        ];
+    }
+
+    /**
      * Envia una plantilla pre-aprovada (fora de la finestra de 24 h).
      * $bodyParams són els valors de les variables {{1}}, {{2}}... del cos,
      * en ordre — buit per a plantilles sense variables (comportament previ,

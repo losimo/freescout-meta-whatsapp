@@ -151,6 +151,7 @@ class SendWhatsAppMedia implements ShouldQueue
                 'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
                 'status'          => WhatsAppMessage::STATUS_SENT,
             ]);
+            $this->markLastInboundAsRead($account, $thread);
             return;
         }
 
@@ -209,6 +210,23 @@ class SendWhatsAppMedia implements ShouldQueue
     protected function apiClient(WhatsAppAccount $account): WhatsAppApiClient
     {
         return new WhatsAppApiClient($account);
+    }
+
+    /**
+     * Marca com a llegit l'últim missatge entrant de la conversa (issue
+     * #23). Si no n'hi ha cap, simplement no fa res.
+     */
+    protected function markLastInboundAsRead(WhatsAppAccount $account, Thread $thread)
+    {
+        $lastInbound = WhatsAppMessage::where('conversation_id', $thread->conversation_id)
+            ->where('direction', WhatsAppMessage::DIRECTION_INBOUND)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($lastInbound && $lastInbound->wamid) {
+            $this->apiClient($account)->markAsRead($lastInbound->wamid);
+        }
     }
 
     protected function recordFailure(int $accountId, Thread $thread, string $errorCode)

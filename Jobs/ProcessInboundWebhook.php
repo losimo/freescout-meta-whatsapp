@@ -18,6 +18,7 @@ use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 use Modules\MetaWhatsApp\Support\Logger as MetaWhatsAppLogger;
+use Modules\MetaWhatsApp\Support\WhatsAppTextFormatter;
 
 class ProcessInboundWebhook implements ShouldQueue
 {
@@ -207,11 +208,19 @@ class ProcessInboundWebhook implements ShouldQueue
                 }
 
                 $isNew = !$conversation;
-                $body  = nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+                $body  = nl2br(WhatsAppTextFormatter::format(
+                    htmlspecialchars($text, ENT_QUOTES, 'UTF-8')
+                ));
 
                 if ($isNew) {
                     $conversation = new Conversation();
                     $conversation->type                   = Conversation::TYPE_CHAT;
+                    // Sense això, Conversation::getChannelName() torna '' i el
+                    // core amaga tant el botó "Chat Mode" com el fs-tag del
+                    // canal (conversations/view.blade.php: @if ($conversation
+                    // ->isChat() && $conversation->getChannelName())) — arrel
+                    // de la issue #5 (botó Chat + label WhatsApp absents).
+                    $conversation->channel                = WhatsAppAccount::CHANNEL;
                     $conversation->state                  = Conversation::STATE_PUBLISHED;
                     $displayPhone = $phone ?: ($profileName ?: $userId);
                     $conversation->subject                = $account->conversation_subject_template
@@ -413,14 +422,25 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         $thread = Thread::find($target->thread_id);
-        if (!$thread || !$thread->body) {
+
+        return $thread ? $this->excerptFromBody($thread->body) : null;
+    }
+
+    /**
+     * Extracte curt i en text pla del cos d'un thread, per citar-lo dins
+     * d'una nota. Mateix límit de 60 caràcters per a reaccions (#14) i per
+     * a lliuraments fallits (#19).
+     */
+    protected function excerptFromBody(?string $body): ?string
+    {
+        if (!$body) {
             return null;
         }
 
         $plain = trim(html_entity_decode(strip_tags(str_replace(
             ['<br>', '<br/>', '<br />'],
             ' ',
-            $thread->body
+            $body
         )), ENT_QUOTES, 'UTF-8'));
 
         if ($plain === '') {
@@ -742,8 +762,12 @@ class ProcessInboundWebhook implements ShouldQueue
             return;
         }
 
-        $marker = '[WhatsApp delivery failed] ' . $record->wamid;
-        if (Thread::where('conversation_id', $record->conversation_id)->where('body', 'like', $marker . '%')->exists()) {
+        // Idempotència per fila de missatge (issue #19). Abans es deduïa
+        // buscant el wamid dins el body dels threads; ara el text visible
+        // porta un extracte del missatge, no el wamid, i marcar-ho aquí és
+        // a més per missatge, de manera que en una tanda d'enviaments cada
+        // wamid fallit conserva la seva nota.
+        if ($record->failure_noted_at) {
             return;
         }
 
@@ -756,17 +780,73 @@ class ProcessInboundWebhook implements ShouldQueue
         $errorTitle = trim((string) ($status['errors'][0]['title'] ?? ''));
         $label      = $errorTitle !== '' ? ($errorCode . ' — ' . $errorTitle) : $errorCode;
 
+        // Extracte del missatge que no s'ha lliurat, en lloc del wamid cru
+        // (issue #19). Si no se'n pot treure text (multimèdia sense caption,
+        // thread esborrat), es manté el wamid com a identificador.
+        $excerpt    = $this->excerptForOutboundRecord($record);
+        $identifier = $excerpt !== null ? '"' . $excerpt . '"' : $record->wamid;
+
         $thread = new Thread();
         $thread->conversation_id = $conversation->id;
         $thread->user_id         = optional($this->resolveSystemUser($account, $conversation))->id;
         $thread->type            = Thread::TYPE_NOTE;
         $thread->status          = $conversation->status;
         $thread->state           = Thread::STATE_PUBLISHED;
-        $thread->body            = $marker . ' ' . __('metawhatsapp::metawhatsapp.async_delivery_failed', ['error' => $label ?: '—']);
+        $thread->body            = '[WhatsApp delivery failed] ' . $identifier . ' '
+            . __('metawhatsapp::metawhatsapp.async_delivery_failed', ['error' => $label ?: '—']);
         $thread->source_via      = Thread::PERSON_USER;
         $thread->source_type     = Thread::SOURCE_TYPE_WEB;
         $thread->customer_id     = $conversation->customer_id;
         $thread->save();
+
+        $record->failure_noted_at = now();
+        $record->save();
+
+        $this->reopenConversationAfterFailure($conversation);
+    }
+
+    /**
+     * Reobre la conversa en detectar un lliurament fallit (issue #19): la
+     * nota arriba de forma asíncrona i sovint l'agent ja ha marxat a una
+     * altra conversa, així que sense això la fallida passa desapercebuda.
+     *
+     * S'usa setStatus() del core, que ja recol·loca la conversa a la carpeta
+     * correcta; escriure ->status directament deixaria els comptadors de la
+     * barra lateral desquadrats. No es toca l'agent assignat: reactivar-la
+     * ja la torna a posar a la vista, i reassignar-la seria decidir per
+     * l'equip.
+     */
+    protected function reopenConversationAfterFailure(Conversation $conversation): void
+    {
+        // Una conversa marcada com a spam o esborrada no s'ha de ressuscitar
+        // per una fallida de lliurament, i si ja és activa no hi ha res a fer.
+        if (in_array((int) $conversation->status, [
+            Conversation::STATUS_ACTIVE,
+            Conversation::STATUS_SPAM,
+        ], true)) {
+            return;
+        }
+
+        if ((int) $conversation->state === Conversation::STATE_DELETED) {
+            return;
+        }
+
+        $conversation->setStatus(Conversation::STATUS_ACTIVE);
+        $conversation->save();
+    }
+
+    /**
+     * Extracte del cos del thread associat a un missatge outbound nostre.
+     */
+    protected function excerptForOutboundRecord(WhatsAppMessage $record): ?string
+    {
+        if (!$record->thread_id) {
+            return null;
+        }
+
+        $thread = Thread::find($record->thread_id);
+
+        return $thread ? $this->excerptFromBody($thread->body) : null;
     }
 
     public function failed(\Throwable $e)

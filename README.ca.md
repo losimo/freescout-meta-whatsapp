@@ -25,6 +25,18 @@ El projecte és públic i porta en ús real de producció des de la v1.0, iteran
 
 ![Formulari d'alta del canal](docs/add-channel.png)
 
+*Una conversa de WhatsApp tal com la veu un agent, amb el distintiu de canal que pinta el mateix FreeScout:*
+
+![Vista d'una conversa de WhatsApp](docs/conversation-view.png)
+
+*Salut del compte, amb els botons de prova de connexió i subscripció del webhook:*
+
+![Panell de salut del compte](docs/account-health.png)
+
+*Avís a la conversa quan la finestra de 24 hores del client sembla caducada:*
+
+![Avís de finestra caducada](docs/expired-window-banner.png)
+
 ## Abast de funcionalitats
 
 Actualment cobreix:
@@ -40,6 +52,7 @@ Actualment cobreix:
 - Des de la v1.5.1, els IDs de canal oficials de Meta (`103`/`104`).
 - Des de la v1.6.0: fins a 5 plantilles de recuperació configurades estàticament per compte (a més del flux d'una sola plantilla de la v1.3.0), o qualsevol plantilla aprovada per Meta obtinguda en viu via un selector dinàmic; stickers i targetes de contacte entrants; visibilitat de fallades de lliurament asíncrones (s'afegeix una nota si Meta informa que un missatge ha fallat després d'haver estat acceptat inicialment); registre automàtic del webhook des del formulari del compte (sense pas manual al Meta Business Manager).
 - Des de la v1.6.1, reactivació guiada d'un compte inactiu directament des de "Test connection", amb traçabilitat (qui/quan) al panell d'estat.
+- Des de la v1.7.0: el format de text entrant de WhatsApp es renderitza en lloc de mostrar-se literal; les converses porten el canal informat, de manera que apareixen l'etiqueta de WhatsApp i el botó de Chat Mode propis de FreeScout; l'últim missatge del client es marca com a llegit quan un agent respon; i una fallida de lliurament reobre la conversa citant un extracte del missatge que no ha arribat.
 
 Queda fora d'abast:
 
@@ -47,7 +60,16 @@ Queda fora d'abast:
 - Un adaptador d'emmagatzematge al núvol (S3, etc.) per a multimèdia — els adjunts usen l'emmagatzematge local ja existent de FreeScout.
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
-- El botó de **mode xat** de FreeScout i una **etiqueta/label de canal** pròpia a les converses (presents al mòdul oficial de WhatsApp de Meta) — encara no implementats aquí, vegeu [Limitacions conegudes](#limitacions-conegudes).
+
+## Novetats a la v1.7.0
+
+- **Format de WhatsApp als missatges entrants**: `*negreta*`, `_cursiva_`, `~ratllat~` i `` ```monoespaiat``` `` ara es renderitzen en lloc de mostrar-se literalment. Se segueixen les regles de WhatsApp, no les de CommonMark, així que un delimitador només val dins d'una mateixa línia.
+- **Distintiu de canal i botó de Chat Mode natius**: les converses ara porten el canal informat, que era l'únic que li faltava a FreeScout per mostrar la seva pròpia etiqueta de WhatsApp i el botó de Chat Mode, tant a la vista de conversa com al llistat. Les converses creades abans d'aquesta versió no reben el distintiu de manera retroactiva.
+- **Marcar com a llegits els missatges del client**: quan surt la resposta d'un agent, l'últim missatge del client es marca com a llegit (els tics blaus de WhatsApp). Si no hi ha cap missatge entrant per marcar, no es fa res.
+- **Les fallides de lliurament reobren la conversa**: un missatge que WhatsApp reporta com a fallit torna a posar la conversa en estat `Activa`, de manera que reapareix en lloc de passar desapercebuda la nota. Les converses marcades com a correu brossa o esborrades no es toquen, i mai es canvia l'agent assignat.
+- **Les notes de fallida citen el missatge**: la nota de lliurament fallit ara cita un extracte de 60 caràcters del missatge que no ha arribat, en lloc del `wamid` cru. El multimèdia enviat sense caption manté el `wamid`, perquè no hi ha text per citar.
+- **Correcció**: els comptadors de bústia del tauler (No assignat/Els meus/Destacat) quedaven amagats a les bústies de WhatsApp, perquè el core les pinta com a inactives quan no tenen servidor de correu entrant. Tornen a ser visibles, sense tocar la guarda de recollida de correu del core.
+- **Correcció**: els camps Cc/Bcc podien aparèixer un instant abans de quedar amagats a les bústies de WhatsApp. El CSS del mòdul s'injectava al final de la pàgina en lloc de dins el `<head>`.
 
 ## Novetats a la v1.6.2
 
@@ -222,11 +244,6 @@ Aquestes limitacions són conegudes i acceptades dins l'abast actual de funciona
 - La **bústia tècnica** del canal continua sent visible a **Gestionar → Bústies**.
 - El webhook no implementa rate limiting propi; la barrera principal és la signatura HMAC.
 - El lookup del `verify_token` al handshake no és constant-time.
-- El botó **"Chat"** de FreeScout (el que obre una conversa en mode xat) no s'activa a les converses de WhatsApp com fa el mòdul oficial de Meta; la mateixa vista es pot obrir manualment des de l'element "Chats" al menú esquerre de la bústia, o afegint `?chat_mode=1` a la URL de la conversa.
-- Les converses no porten una **etiqueta/label de WhatsApp** pròpia com fa el mòdul oficial de Meta, per la qual cosa no es poden filtrar ni informar per canal.
-- El format de text entrant de WhatsApp (`*negreta*`, `_cursiva_`, `~ratllat~`, `` ```monoespai``` ``) es mostra com a text pla amb els marcadors literals — no es renderitza.
-- Com que les bústies usades per WhatsApp han de tenir desactivat el servidor de correu entrant (per no barrejar converses de correu i de WhatsApp), el tauler de bústies de FreeScout no mostra els comptadors de tiquets (Sense assignar/Meus/Destacats/…) d'aquestes bústies.
-- Un missatge sortint fallit/no lliurat no reobre la conversa, i la nota de fallada mostra el `wamid` en cru en lloc d'un extracte del text del missatge — l'agent l'ha de notar manualment.
 
 ## Checklist per passar a compte real
 
@@ -253,6 +270,7 @@ Abans de fer el pas de proves a producció:
 | Els missatges entren però no surten | Error `131047` per finestra de 24 hores o error `190` per token caducat |
 | El compte surt com a `⚠ Bústia desvinculada` | La bústia associada s'ha eliminat o ja no és resoluble |
 | No es processa res | El worker de cues està aturat (`php artisan queue:work`) |
+| Un fix d'una actualització del mòdul no sembla aplicar-se | El worker de cues continua executant codi antic en memòria. Reiniciar el cron no el recarrega; cal `php artisan queue:restart` |
 
 Tots els logs del mòdul porten el prefix `[MetaWhatsApp]`.
 

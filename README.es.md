@@ -25,6 +25,18 @@ El proyecto es público y lleva en uso real de producción desde la v1.0, iteran
 
 ![Formulario de alta del canal](docs/add-channel.png)
 
+*Una conversación de WhatsApp tal como la ve un agente, con el distintivo de canal que pinta el propio FreeScout:*
+
+![Vista de una conversación de WhatsApp](docs/conversation-view.png)
+
+*Salud de la cuenta, con los botones de prueba de conexión y suscripción del webhook:*
+
+![Panel de salud de la cuenta](docs/account-health.png)
+
+*Aviso en la conversación cuando la ventana de 24 horas del cliente parece caducada:*
+
+![Aviso de ventana caducada](docs/expired-window-banner.png)
+
 ## Alcance de funcionalidades
 
 Actualmente cubre:
@@ -40,6 +52,7 @@ Actualmente cubre:
 - Desde la v1.5.1, los IDs de canal oficiales de Meta (`103`/`104`).
 - Desde la v1.6.0: hasta 5 plantillas de recuperación configuradas estáticamente por cuenta (además del flujo de una sola plantilla de la v1.3.0), o cualquier plantilla aprobada por Meta obtenida en vivo mediante un selector dinámico; stickers y tarjetas de contacto entrantes; visibilidad de fallos de entrega asíncronos (se añade una nota si Meta informa de que un mensaje ha fallado tras haber sido aceptado inicialmente); registro automático del webhook desde el formulario de la cuenta (sin paso manual en Meta Business Manager).
 - Desde la v1.6.1, reactivación guiada de una cuenta inactiva directamente desde "Test connection", con trazabilidad (quién/cuándo) en el panel de estado.
+- Desde la v1.7.0: el formato de texto entrante de WhatsApp se renderiza en lugar de mostrarse literal; las conversaciones llevan el canal informado, de modo que aparecen la etiqueta de WhatsApp y el botón de Chat Mode propios de FreeScout; el último mensaje del cliente se marca como leído cuando un agente responde; y un fallo de entrega reabre la conversación citando un extracto del mensaje que no ha llegado.
 
 Queda fuera de alcance:
 
@@ -47,7 +60,16 @@ Queda fuera de alcance:
 - Un adaptador de almacenamiento en la nube (S3, etc.) para multimedia — los adjuntos usan el almacenamiento local ya existente de FreeScout.
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
-- El botón de **modo chat** de FreeScout y una **etiqueta/label de canal** propia en las conversaciones (presentes en el módulo oficial de WhatsApp de Meta) — aún no implementados aquí, ver [Limitaciones conocidas](#limitaciones-conocidas).
+
+## Novedades en la v1.7.0
+
+- **Formato de WhatsApp en los mensajes entrantes**: `*negrita*`, `_cursiva_`, `~tachado~` y `` ```monoespaciado``` `` ahora se renderizan en lugar de mostrarse literalmente. Se siguen las reglas de WhatsApp, no las de CommonMark, así que un delimitador solo vale dentro de una misma línea.
+- **Distintivo de canal y botón de Chat Mode nativos**: las conversaciones ahora llevan el canal informado, que era lo único que le faltaba a FreeScout para mostrar su propia etiqueta de WhatsApp y el botón de Chat Mode, tanto en la vista de conversación como en el listado. Las conversaciones creadas antes de esta versión no reciben el distintivo de forma retroactiva.
+- **Marcar como leídos los mensajes del cliente**: cuando sale la respuesta de un agente, el último mensaje del cliente se marca como leído (los ticks azules de WhatsApp). Si no hay ningún mensaje entrante que marcar, no se hace nada.
+- **Los fallos de entrega reabren la conversación**: un mensaje que WhatsApp reporta como fallido vuelve a poner la conversación en estado `Activa`, de modo que reaparece en lugar de pasar desapercibida la nota. Las conversaciones marcadas como spam o eliminadas no se tocan, y nunca se cambia el agente asignado.
+- **Las notas de fallo citan el mensaje**: la nota de entrega fallida ahora cita un extracto de 60 caracteres del mensaje que no ha llegado, en lugar del `wamid` crudo. El multimedia enviado sin caption mantiene el `wamid`, porque no hay texto que citar.
+- **Corrección**: los contadores de buzón del panel (Sin asignar/Míos/Destacado) quedaban ocultos en los buzones de WhatsApp, porque el core los pinta como inactivos cuando no tienen servidor de correo entrante. Vuelven a ser visibles, sin tocar la guarda de recogida de correo del core.
+- **Corrección**: los campos Cc/Bcc podían aparecer un instante antes de quedar ocultos en los buzones de WhatsApp. El CSS del módulo se inyectaba al final de la página en lugar de dentro del `<head>`.
 
 ## Novedades en la v1.6.2
 
@@ -222,11 +244,6 @@ Estas limitaciones son conocidas y aceptadas dentro del alcance actual de funcio
 - El **buzón técnico** del canal sigue siendo visible en **Gestionar → Buzones**.
 - El webhook no implementa rate limiting propio; la barrera principal es la firma HMAC.
 - El lookup del `verify_token` en el handshake no es constant-time.
-- El botón **"Chat"** de FreeScout (el que abre una conversación en modo chat) no se activa en las conversaciones de WhatsApp como hace el módulo oficial de Meta; la misma vista se puede abrir manualmente desde el elemento "Chats" en el menú izquierdo del buzón, o añadiendo `?chat_mode=1` a la URL de la conversación.
-- Las conversaciones no llevan una **etiqueta/label de WhatsApp** propia como hace el módulo oficial de Meta, por lo que no se pueden filtrar ni informar por canal.
-- El formato de texto entrante de WhatsApp (`*negrita*`, `_cursiva_`, `~tachado~`, `` ```monoespacio``` ``) se muestra como texto plano con los marcadores literales — no se renderiza.
-- Como los buzones usados para WhatsApp deben tener desactivado el servidor de correo entrante (para no mezclar conversaciones de correo y de WhatsApp), el tablero de buzones de FreeScout no muestra los contadores de tickets (Sin asignar/Míos/Destacados/…) de esos buzones.
-- Un mensaje saliente fallido/no entregado no reabre la conversación, y la nota de fallo muestra el `wamid` en crudo en lugar de un extracto del texto del mensaje — el agente tiene que notarlo manualmente.
 
 ## Checklist para pasar a cuenta real
 
@@ -253,6 +270,7 @@ Antes de pasar de pruebas a producción:
 | Los mensajes entran pero no salen | Error `131047` por ventana de 24 horas o error `190` por token caducado |
 | La cuenta aparece como `⚠ Buzón desvinculado` | El buzón asociado se ha eliminado o ya no es resoluble |
 | No se procesa nada | El worker de colas está parado (`php artisan queue:work`) |
+| Un fix de una actualización del módulo no parece aplicarse | El worker de colas sigue ejecutando código antiguo en memoria. Reiniciar el cron no lo recarga; hace falta `php artisan queue:restart` |
 
 Todos los logs del módulo llevan el prefijo `[MetaWhatsApp]`.
 

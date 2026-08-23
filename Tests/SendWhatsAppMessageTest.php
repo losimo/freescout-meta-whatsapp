@@ -137,4 +137,61 @@ class SendWhatsAppMessageTest extends TestCase
             ->whereNull('attachment_id')
             ->count());
     }
+
+    public function test_marca_com_a_llegit_lultim_missatge_entrant_despres_denviar()
+    {
+        $account = $this->createTestAccount();
+        $thread  = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+
+        WhatsAppMessage::create([
+            'wamid'           => 'wamid.entrant-antic',
+            'account_id'      => $account->id,
+            'conversation_id' => $thread->conversation_id,
+            'thread_id'       => $thread->id,
+            'contact_phone'   => '+34611222333',
+            'direction'       => WhatsAppMessage::DIRECTION_INBOUND,
+            'status'          => WhatsAppMessage::STATUS_RECEIVED,
+        ]);
+        // El més recent és el que s'ha de marcar com a llegit, no el primer.
+        WhatsAppMessage::create([
+            'wamid'           => 'wamid.entrant-recent',
+            'account_id'      => $account->id,
+            'conversation_id' => $thread->conversation_id,
+            'thread_id'       => $thread->id,
+            'contact_phone'   => '+34611222333',
+            'direction'       => WhatsAppMessage::DIRECTION_INBOUND,
+            'status'          => WhatsAppMessage::STATUS_RECEIVED,
+        ]);
+
+        $fakeClient = \Mockery::mock(\Modules\MetaWhatsApp\Services\WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('sendText')
+            ->once()
+            ->andReturn(['ok' => true, 'wamid' => 'wamid.resposta-agent', 'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false]);
+        $fakeClient->shouldReceive('markAsRead')
+            ->once()
+            ->with('wamid.entrant-recent')
+            ->andReturn(['ok' => true, 'http_status' => 200]);
+
+        $job = \Mockery::mock(SendWhatsAppMessage::class, [$account->id, $thread->id, '+34611222333'])->makePartial();
+        $job->shouldAllowMockingProtectedMethods();
+        $job->shouldReceive('apiClient')->andReturn($fakeClient);
+        $job->handle();
+    }
+
+    public function test_no_marca_llegit_si_no_hi_ha_cap_missatge_entrant()
+    {
+        $account = $this->createTestAccount();
+        $thread  = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+
+        $fakeClient = \Mockery::mock(\Modules\MetaWhatsApp\Services\WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('sendText')
+            ->once()
+            ->andReturn(['ok' => true, 'wamid' => 'wamid.resposta-agent', 'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false]);
+        $fakeClient->shouldNotReceive('markAsRead');
+
+        $job = \Mockery::mock(SendWhatsAppMessage::class, [$account->id, $thread->id, '+34611222333'])->makePartial();
+        $job->shouldAllowMockingProtectedMethods();
+        $job->shouldReceive('apiClient')->andReturn($fakeClient);
+        $job->handle();
+    }
 }

@@ -43,6 +43,10 @@ class ProcessInboundWebhookTest extends TestCase
         $this->assertEquals(Conversation::TYPE_CHAT, $conversation->type);
         $this->assertEquals($account->mailbox_id, $conversation->mailbox_id);
         $this->assertEquals(Conversation::STATUS_ACTIVE, $conversation->status);
+        // channel ha d'anar ple perquè el core mostri el botó "Chat Mode" i
+        // el fs-tag amb el nom del canal (issue #5): isChat() no n'hi ha prou.
+        $this->assertEquals(WhatsAppAccount::CHANNEL, $conversation->channel);
+        $this->assertEquals(WhatsAppAccount::CHANNEL_NAME, $conversation->getChannelName());
 
         $thread = Thread::find($msg->thread_id);
         $this->assertEquals(Thread::TYPE_CUSTOMER, $thread->type);
@@ -151,11 +155,14 @@ class ProcessInboundWebhookTest extends TestCase
 
         $note = Thread::where('conversation_id', $conversation->id)
             ->where('type', Thread::TYPE_NOTE)
-            ->where('body', 'like', '[WhatsApp delivery failed] wamid.out-fail1%')
+            ->where('body', 'like', '[WhatsApp delivery failed]%')
             ->first();
         $this->assertNotNull($note, 'Ha de crear una nota interna visible amb la fallida.');
         $this->assertStringContainsString('131047', $note->body);
         $this->assertStringContainsString('Re-engagement message', $note->body);
+        // Issue #19: extracte del missatge, no el wamid cru.
+        $this->assertStringContainsString('"Hola, tens un missatge pendent"', $note->body);
+        $this->assertStringNotContainsString('wamid.out-fail1', $note->body);
     }
 
     public function test_status_failed_asincron_no_duplica_la_nota_en_rebre_el_webhook_dues_vegades()
@@ -200,9 +207,167 @@ class ProcessInboundWebhookTest extends TestCase
         $this->assertEquals(
             1,
             Thread::where('conversation_id', $conversation->id)
-                ->where('body', 'like', '[WhatsApp delivery failed] wamid.out-fail2%')
+                ->where('body', 'like', '[WhatsApp delivery failed]%')
                 ->count()
         );
+    }
+
+    /**
+     * Helper per als casos de fallida asíncrona (#19): deixa la conversa amb
+     * un missatge outbound nostre llest per rebre un status 'failed'.
+     */
+    protected function seedOutboundForFailure($account, string $inboundWamid, string $outboundWamid, string $body): array
+    {
+        $this->runJob($account, $this->inboundPayload($account, $inboundWamid, '34611222333', 'hola'));
+        $inbound      = WhatsAppMessage::where('wamid', $inboundWamid)->first();
+        $conversation = Conversation::find($inbound->conversation_id);
+
+        $thread = new Thread();
+        $thread->conversation_id = $conversation->id;
+        $thread->type            = Thread::TYPE_MESSAGE;
+        $thread->status          = $conversation->status;
+        $thread->state           = Thread::STATE_PUBLISHED;
+        $thread->body            = $body;
+        $thread->source_via      = Thread::PERSON_USER;
+        $thread->source_type     = Thread::SOURCE_TYPE_WEB;
+        $thread->customer_id     = $conversation->customer_id;
+        $thread->save();
+
+        WhatsAppMessage::create([
+            'wamid'           => $outboundWamid,
+            'account_id'      => $account->id,
+            'conversation_id' => $conversation->id,
+            'thread_id'       => $thread->id,
+            'contact_phone'   => '+34611222333',
+            'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+            'status'          => WhatsAppMessage::STATUS_SENT,
+        ]);
+
+        return [$conversation, $thread];
+    }
+
+    protected function failedStatusPayload($account, string $wamid): array
+    {
+        $payload = $this->inboundPayload($account, 'x', 'x', 'x');
+        $payload['entry'][0]['changes'][0]['value'] = [
+            'messaging_product' => 'whatsapp',
+            'metadata'          => ['phone_number_id' => $account->phone_number_id],
+            'statuses'          => [[
+                'id' => $wamid, 'status' => 'failed', 'errors' => [['code' => 131047]],
+            ]],
+        ];
+
+        return $payload;
+    }
+
+    public function test_extracte_de_la_nota_es_talla_als_60_caracters()
+    {
+        $account = $this->createTestAccount();
+        $llarg   = str_repeat('a', 80);
+        [$conversation] = $this->seedOutboundForFailure($account, 'wamid.fail-in-long', 'wamid.out-long', $llarg);
+
+        $this->runJob($account, $this->failedStatusPayload($account, 'wamid.out-long'));
+
+        $note = Thread::where('conversation_id', $conversation->id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->where('body', 'like', '[WhatsApp delivery failed]%')
+            ->first();
+        $this->assertNotNull($note);
+        $this->assertStringContainsString('"' . str_repeat('a', 60) . '…"', $note->body);
+    }
+
+    public function test_sense_cos_de_missatge_la_nota_cau_al_wamid()
+    {
+        // Multimèdia sense caption: no hi ha text per citar, així que cal
+        // conservar el wamid com a identificador.
+        $account = $this->createTestAccount();
+        [$conversation] = $this->seedOutboundForFailure($account, 'wamid.fail-in-empty', 'wamid.out-empty', '');
+
+        $this->runJob($account, $this->failedStatusPayload($account, 'wamid.out-empty'));
+
+        $note = Thread::where('conversation_id', $conversation->id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->where('body', 'like', '[WhatsApp delivery failed]%')
+            ->first();
+        $this->assertNotNull($note);
+        $this->assertStringContainsString('wamid.out-empty', $note->body);
+    }
+
+    public function test_una_fallida_reobre_la_conversa_tancada()
+    {
+        $account = $this->createTestAccount();
+        [$conversation] = $this->seedOutboundForFailure($account, 'wamid.fail-in-closed', 'wamid.out-closed', 'text');
+
+        $conversation->status = Conversation::STATUS_CLOSED;
+        $conversation->save();
+
+        $this->runJob($account, $this->failedStatusPayload($account, 'wamid.out-closed'));
+
+        $this->assertEquals(
+            Conversation::STATUS_ACTIVE,
+            Conversation::find($conversation->id)->status,
+            'Una fallida de lliurament ha de tornar la conversa a Activa.'
+        );
+    }
+
+    public function test_una_fallida_no_treu_la_conversa_de_correu_brossa()
+    {
+        $account = $this->createTestAccount();
+        [$conversation] = $this->seedOutboundForFailure($account, 'wamid.fail-in-spam', 'wamid.out-spam', 'text');
+
+        $conversation->status = Conversation::STATUS_SPAM;
+        $conversation->save();
+
+        $this->runJob($account, $this->failedStatusPayload($account, 'wamid.out-spam'));
+
+        $this->assertEquals(
+            Conversation::STATUS_SPAM,
+            Conversation::find($conversation->id)->status,
+            'Una conversa marcada com a spam no s\'ha de ressuscitar.'
+        );
+    }
+
+    public function test_dos_missatges_fallits_a_la_mateixa_conversa_generen_dues_notes()
+    {
+        // Cas límit plantejat pel reportador: una tanda d'enviaments seguits
+        // on en fallen més d'un. La idempotència és per missatge, no per
+        // conversa, així que cada wamid fallit manté la seva nota.
+        $account = $this->createTestAccount();
+        [$conversation] = $this->seedOutboundForFailure($account, 'wamid.fail-in-multi', 'wamid.out-multi1', 'primer missatge');
+
+        $segon = new Thread();
+        $segon->conversation_id = $conversation->id;
+        $segon->type            = Thread::TYPE_MESSAGE;
+        $segon->status          = $conversation->status;
+        $segon->state           = Thread::STATE_PUBLISHED;
+        $segon->body            = 'segon missatge';
+        $segon->source_via      = Thread::PERSON_USER;
+        $segon->source_type     = Thread::SOURCE_TYPE_WEB;
+        $segon->customer_id     = $conversation->customer_id;
+        $segon->save();
+
+        WhatsAppMessage::create([
+            'wamid'           => 'wamid.out-multi2',
+            'account_id'      => $account->id,
+            'conversation_id' => $conversation->id,
+            'thread_id'       => $segon->id,
+            'contact_phone'   => '+34611222333',
+            'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+            'status'          => WhatsAppMessage::STATUS_SENT,
+        ]);
+
+        $this->runJob($account, $this->failedStatusPayload($account, 'wamid.out-multi1'));
+        $this->runJob($account, $this->failedStatusPayload($account, 'wamid.out-multi2'));
+
+        $notes = Thread::where('conversation_id', $conversation->id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->where('body', 'like', '[WhatsApp delivery failed]%')
+            ->get();
+
+        $this->assertCount(2, $notes);
+        $bodies = $notes->pluck('body')->implode(' | ');
+        $this->assertStringContainsString('"primer missatge"', $bodies);
+        $this->assertStringContainsString('"segon missatge"', $bodies);
     }
 
     public function test_status_failed_dun_missatge_inbound_no_crea_nota()

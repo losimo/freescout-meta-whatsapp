@@ -39,6 +39,9 @@ Effort legend (planned items only): S / M / L
 | Native "opened" indicator | ✅ | Meta's `read` status sets the thread's native `opened_at`. Shipped v1.2.0. | #3 | – |
 | Failed-send error code | ✅ | `error_code` stored on the message row; full error text is logged, not persisted. | | – |
 | Async delivery failure visibility | ✅ | A message Meta initially accepted but later reports as `failed` now creates a visible internal note in the conversation, not just a silent DB status change. Shipped v1.6.0. | | – |
+| Reopen conversation on delivery failure | ✅ | A failed delivery sets the conversation back to `Active` via core's `setStatus()` (which also refreshes folder counters). Spam and deleted conversations are left alone; the assigned agent is never changed. Shipped v1.7.0. | #19 | – |
+| Failure note quotes the message | ✅ | The note quotes a 60-char excerpt of the undelivered message instead of the raw `wamid`; falls back to the `wamid` when there's no text (media without a caption). Idempotency moved to a `failure_noted_at` column, so each failed message in a batch keeps its own note. Shipped v1.7.0. | #19 | – |
+| Mark customer messages as read | ✅ | After an agent's reply is sent, the customer's most recent inbound message is marked as read via `POST /{phone_number_id}/messages` with `status:read`. No-op when there's no inbound message; Meta's errors are silently ignored. Shipped v1.7.0. | #23 | – |
 
 ## Conversation / account behavior
 
@@ -46,7 +49,7 @@ Effort legend (planned items only): S / M / L
 |---|---|---|---|---|
 | Per-mailbox "start new conversation" setting | ✅ | Honors FreeScout core's chat setting. Shipped v1.2.0. | #1, #3 | – |
 | Customizable conversation subject | ✅ | Per-account `conversation_subject_template` with `%YEAR%`/`:phone`; falls back to the default when empty. Shipped v1.4.1. | #15 | – |
-| "Chat mode" quick-reply button on conversations | ❌ | Reporter hasn't confirmed it's still needed post-Media-MVP; not yet re-scoped. | #5 | – |
+| "Chat mode" quick-reply button on conversations | ✅ | Conversations now store the channel, which is all core needed to render its own Chat Mode button and WhatsApp tag, in both the conversation view and the list. No custom badge or URL. Not backfilled onto older conversations. Shipped v1.7.0. | #5 | – |
 | Official/registered channel ID | ✅ | `103`/`104`, officially assigned by the FreeScout team. Shipped v1.5.1. | #4 | – |
 | Auto-deactivation on invalid token (error 190) | ✅ | Account is marked inactive so no further calls are burned. | | – |
 | Guided reactivation flow (UI, revalidation, audit trail) | ✅ | Test connection success on an inactive account reactivates it automatically; `reactivated_at`/`reactivated_by` shown on the health snapshot. Shipped v1.6.1. | #9 | – |

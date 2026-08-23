@@ -30,11 +30,13 @@ class WhatsAppMessage extends Model
         'error_code',
         'delivered_at',
         'read_at',
+        'failure_noted_at',
     ];
 
     protected $casts = [
-        'delivered_at' => 'datetime',
-        'read_at'      => 'datetime',
+        'delivered_at'     => 'datetime',
+        'read_at'          => 'datetime',
+        'failure_noted_at' => 'datetime',
     ];
 
     public function account()

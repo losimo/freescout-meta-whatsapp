@@ -25,6 +25,18 @@ The project is public and has been running in real production use since v1.0, it
 
 ![Add channel form](docs/add-channel.png)
 
+*A WhatsApp conversation as an agent sees it, with the channel badge FreeScout renders natively:*
+
+![WhatsApp conversation view](docs/conversation-view.png)
+
+*Per-account health snapshot, with the live connection test and webhook subscription buttons:*
+
+![Account health panel](docs/account-health.png)
+
+*Expired-window banner shown in a conversation when the 24h customer window looks closed:*
+
+![Expired window banner](docs/expired-window-banner.png)
+
 ## Feature scope
 
 Currently covers:
@@ -40,6 +52,7 @@ Currently covers:
 - Since v1.5.1, official Meta channel IDs (`103`/`104`).
 - Since v1.6.0: up to 5 statically-configured recovery templates per account (in addition to the single-template flow from v1.3.0) or any Meta-approved template fetched live via a dynamic picker; inbound stickers and shared contact cards; asynchronous delivery-failure visibility (a note is added if Meta reports a message as failed after initial acceptance); automatic webhook subscription from the account form (no manual Meta Business Manager step).
 - Since v1.6.1, guided reactivation of an inactive account straight from "Test connection", with an audit trail (who/when) on the health panel.
+- Since v1.7.0: inbound WhatsApp text formatting is rendered rather than shown literally; conversations carry the channel, so FreeScout's own WhatsApp tag and Chat Mode button appear; the customer's last message is marked as read after an agent replies; and a failed delivery reopens the conversation with a quoted excerpt of the message that didn't arrive.
 
 Out of scope:
 
@@ -47,7 +60,16 @@ Out of scope:
 - A cloud storage adapter (S3, etc.) for media — attachments use FreeScout's existing local storage only.
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
-- FreeScout's **chat mode** button and its own **channel label/tag** on conversations (present in Meta's official WhatsApp module) — not implemented here yet, see [Known limitations](#known-limitations).
+
+## What's new in v1.7.0
+
+- **Inbound WhatsApp formatting**: `*bold*`, `_italic_`, `~strikethrough~` and `` ```monospace``` `` now render as formatted text instead of showing their markup literally. WhatsApp's own rules are followed, not CommonMark, so a delimiter only applies within a single line.
+- **Native channel badge and Chat Mode button**: conversations now carry the channel, which is all FreeScout needed to show its own WhatsApp tag and Chat Mode button, both in the conversation view and in the conversation list. Conversations created before this version don't get the badge retroactively.
+- **Mark customer messages as read**: after an agent's reply goes out, the customer's most recent message is marked as read (the blue ticks in WhatsApp). If there's no inbound message to mark, nothing happens.
+- **Delivery failures reopen the conversation**: a message reported as failed by WhatsApp now sets the conversation back to `Active`, so it comes back into view instead of the note being missed. Conversations marked as spam or deleted are left alone, and the assigned agent is never changed.
+- **Failure notes quote the message**: the delivery-failure note now quotes a 60-character excerpt of the message that didn't arrive, instead of the raw `wamid`. Media sent without a caption keeps the `wamid`, since there's no text to quote.
+- **Fix**: dashboard mailbox counters (Unassigned/Mine/Starred) were hidden for WhatsApp mailboxes, because core styles them as inactive when there's no incoming mail server. They're visible again, without touching core's mail-fetching guard.
+- **Fix**: the Cc/Bcc fields could flash into view for a moment before being hidden on WhatsApp mailboxes. The module's CSS was being injected at the end of the page instead of in `<head>`.
 
 ## What's new in v1.6.2
 
@@ -228,11 +250,6 @@ These limitations are known and accepted within the current feature scope:
 - The channel's **technical mailbox** remains visible under **Manage → Mailboxes**.
 - The webhook implements no rate limiting of its own; the HMAC signature is the main barrier.
 - The `verify_token` lookup during the handshake is not constant-time.
-- FreeScout's **"Chat" button** (the toggle that opens a conversation in chat mode) is not enabled on WhatsApp conversations the way Meta's official module does it; the same view is still reachable manually via the "Chats" item in the mailbox's left menu, or by appending `?chat_mode=1` to the conversation URL.
-- Conversations aren't tagged with a dedicated **WhatsApp label/tag** the way Meta's official module does, so they can't be filtered or reported on by channel alone.
-- Inbound WhatsApp text formatting (`*bold*`, `_italic_`, `~strikethrough~`, `` ```monospace``` ``) is shown as plain text with the literal markers — not rendered.
-- Since mailboxes used for WhatsApp are required to have no incoming e-mail server configured (to avoid mixing e-mail and WhatsApp conversations), FreeScout's mailbox dashboard doesn't show ticket counts (Unassigned/Mine/Starred/…) for those mailboxes.
-- A failed/undelivered outbound message doesn't reopen the conversation, and its failure note shows the raw `wamid` rather than a snippet of the message text — the agent has to notice the note manually.
 
 ## Go-live checklist
 
@@ -259,6 +276,7 @@ Before moving from testing to production:
 | Messages come in but replies do not go out | Error `131047` (24-hour window) or error `190` (expired token) |
 | Account shows `⚠ Mailbox unlinked` | The linked mailbox was deleted or is no longer resolvable |
 | Nothing gets processed | Queue worker stopped (`php artisan queue:work`) |
+| A fix from a module update does not seem to apply | Queue worker keeps running with old code in memory. Restarting cron does not reload it; run `php artisan queue:restart` |
 
 All module logs carry the `[MetaWhatsApp]` prefix.
 

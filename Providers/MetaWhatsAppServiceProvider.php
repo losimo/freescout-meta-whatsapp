@@ -60,9 +60,20 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
         // Neteja UX a les pàgines de canals WhatsApp: amaga els artefactes
         // d'email del core (toggle Cc/Bcc al reply, email tècnic al sidebar).
         // Només s'aplica si la pàgina pertany a una bústia amb compte WhatsApp.
-        \Eventy::addAction('layout.body_bottom', function () {
+        //
+        // S'injecta a layout.head (dins <head>, abans que el navegador
+        // comenci a pintar el <body>) i no a layout.body_bottom (just abans
+        // de </body>): amb body_bottom hi havia una finestra real on el
+        // Cc/Bcc i els comptadors del dashboard es podien veure sense
+        // amagar un instant, un flash, abans que arribés l'<style> del
+        // final de la pàgina (detectat arran de la issue #17).
+        \Eventy::addAction('layout.head', function () {
             if ($this->currentPageIsWhatsAppMailbox()) {
                 echo '<style>#toggle-cc, .sidebar-title-email { display: none !important; }</style>';
+            }
+
+            if (\Route::currentRouteName() == 'dashboard') {
+                echo $this->dashboardCounterFixCss();
             }
         });
 
@@ -130,6 +141,43 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
 
         return $mailboxId
             && WhatsAppAccount::where('mailbox_id', $mailboxId)->exists();
+    }
+
+    /**
+     * FreeScout's dashboard hides ticket counters (Unassigned/Mine/Starred)
+     * behind the `dash-card-inactive` class whenever a mailbox has no
+     * incoming e-mail server configured — Mailbox::isInActive() (core) is
+     * false. WhatsApp mailboxes are intentionally configured this way (to
+     * avoid mixing e-mail and WhatsApp conversations), but the counters
+     * themselves are always computed server-side regardless of that class
+     * (see resources/views/secure/dashboard.blade.php); only the CSS toggle
+     * hides them. This overrides that toggle for WhatsApp mailboxes only,
+     * without touching Mailbox::isInActive() itself — doing that instead
+     * would also flip freescout:fetch-emails' per-mailbox guard and make it
+     * attempt a real IMAP connection with an empty server (issue #22).
+     */
+    protected function dashboardCounterFixCss(): string
+    {
+        $mailboxIds = WhatsAppAccount::pluck('mailbox_id')->filter();
+        if ($mailboxIds->isEmpty()) {
+            return '';
+        }
+
+        // Cada selector complet (base + descendent) s'ha de repetir per
+        // mailbox: una coma en CSS separa selectors sencers, no prefixos
+        // compartits — '.a, .b .x' NO aplica .x a .a i .b totes dues.
+        $listSelectors    = [];
+        $contentSelectors = [];
+        foreach ($mailboxIds as $id) {
+            $base = '.dash-card.dash-card-inactive[data-mailbox-id="'.(int) $id.'"]';
+            $listSelectors[]    = $base.' .dash-card-list';
+            $contentSelectors[] = $base.' .dash-card-inactive-content';
+        }
+
+        return '<style>'
+            .implode(', ', $listSelectors).' { display: block; }'
+            .implode(', ', $contentSelectors).' { display: none; }'
+            .'</style>';
     }
 
     /**
