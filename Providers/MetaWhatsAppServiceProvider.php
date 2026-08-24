@@ -168,15 +168,23 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
         // compartits — '.a, .b .x' NO aplica .x a .a i .b totes dues.
         $listSelectors    = [];
         $contentSelectors = [];
+        $cardSelectors    = [];
         foreach ($mailboxIds as $id) {
             $base = '.dash-card.dash-card-inactive[data-mailbox-id="'.(int) $id.'"]';
             $listSelectors[]    = $base.' .dash-card-list';
             $contentSelectors[] = $base.' .dash-card-inactive-content';
+            $cardSelectors[]    = $base;
         }
 
+        // El core també pinta la targeta inactiva amb fons gris
+        // (.dash-card.dash-card-inactive { background: #f4f5f5 }). Ensenyar
+        // els comptadors damunt d'un fons d'inactiu era una mitja mesura:
+        // la targeta activa no defineix cap fons, així que es retorna a
+        // transparent per igualar-la.
         return '<style>'
             .implode(', ', $listSelectors).' { display: block; }'
             .implode(', ', $contentSelectors).' { display: none; }'
+            .implode(', ', $cardSelectors).' { background: transparent; }'
             .'</style>';
     }
 

@@ -39,7 +39,7 @@
 
     @if ($phone)
         {{-- Picker dinàmic (issue #2, punt 2 complet): complementa la llista
-             estàtica de dalt, no la substitueix — llista EN VIU totes les
+             estàtica de dalt, no la substitueix: llista EN VIU totes les
              plantilles APPROVED del WABA, amb variables. --}}
         <p style="margin-top: 8px;">
             <a href="{{ route('metawhatsapp.browse_templates', ['id' => $conversation->id]) }}">

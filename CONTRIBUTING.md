@@ -76,6 +76,12 @@ Any PR should include:
 
 If the change alters any documented limitation or expectation, the documentation must be updated too.
 
+## Language
+
+**English is the working language of this codebase**: commit messages, code comments, test names, log messages and issue discussion. Only user-facing strings are translated, and those live in `Resources/lang/` (English, Catalan and Castellano), never hardcoded.
+
+Earlier code carries Catalan comments and test names, from before the project had outside contributors. Those are being replaced as files are touched rather than in one sweep, so you will find both for a while. New code should be English throughout.
+
 ## Discussion policy
 
 Always keep these cases separate:

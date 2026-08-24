@@ -320,7 +320,7 @@
                                 <p class="form-control-static">
                                     @if($healthSnapshot['last_outbound'])
                                         {{ $healthSnapshot['last_outbound']->created_at->format('Y-m-d H:i') }}
-                                        &mdash; {{ __('metawhatsapp::metawhatsapp.health_last_status') }}: {{ $healthSnapshot['last_outbound']->status }}
+                                        - {{ __('metawhatsapp::metawhatsapp.health_last_status') }}: {{ $healthSnapshot['last_outbound']->status }}
                                     @else
                                         {{ __('metawhatsapp::metawhatsapp.health_never') }}
                                     @endif
@@ -333,7 +333,7 @@
                             <div class="col-sm-8">
                                 <p class="form-control-static">
                                     @if($healthSnapshot['last_error'])
-                                        {{ $healthSnapshot['last_error']->error_code }} &mdash; {{ $healthSnapshot['last_error']->created_at->format('Y-m-d H:i') }}
+                                        {{ $healthSnapshot['last_error']->error_code }} - {{ $healthSnapshot['last_error']->created_at->format('Y-m-d H:i') }}
                                     @else
                                         {{ __('metawhatsapp::metawhatsapp.health_never') }}
                                     @endif
@@ -348,7 +348,7 @@
                                     @if($account->reactivated_at)
                                         {{ $account->reactivated_at->format('Y-m-d H:i') }}
                                         @if($account->reactivatedBy)
-                                            &mdash; {{ $account->reactivatedBy->getFullName() }}
+                                            - {{ $account->reactivatedBy->getFullName() }}
                                         @endif
                                     @else
                                         {{ __('metawhatsapp::metawhatsapp.health_never') }}

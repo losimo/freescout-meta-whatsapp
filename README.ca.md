@@ -19,23 +19,23 @@ El projecte és públic i porta en ús real de producció des de la v1.0, iteran
 
 *Llistat de canals WhatsApp configurats:*
 
-![Llistat de comptes WhatsApp](docs/accounts-list.png)
+![Llistat de comptes WhatsApp](docs/ca/accounts-list.png)
 
 *Alta d'un canal nou (formulari channel-first):*
 
-![Formulari d'alta del canal](docs/add-channel.png)
+![Formulari d'alta del canal](docs/ca/add-channel.png)
 
 *Una conversa de WhatsApp tal com la veu un agent, amb el distintiu de canal que pinta el mateix FreeScout:*
 
-![Vista d'una conversa de WhatsApp](docs/conversation-view.png)
+![Vista d'una conversa de WhatsApp](docs/ca/conversation-view.png)
 
 *Salut del compte, amb els botons de prova de connexió i subscripció del webhook:*
 
-![Panell de salut del compte](docs/account-health.png)
+![Panell de salut del compte](docs/ca/account-health.png)
 
 *Avís a la conversa quan la finestra de 24 hores del client sembla caducada:*
 
-![Avís de finestra caducada](docs/expired-window-banner.png)
+![Avís de finestra caducada](docs/ca/expired-window-banner.png)
 
 ## Abast de funcionalitats
 
@@ -60,6 +60,15 @@ Queda fora d'abast:
 - Un adaptador d'emmagatzematge al núvol (S3, etc.) per a multimèdia — els adjunts usen l'emmagatzematge local ja existent de FreeScout.
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
+
+## Novetats a la v1.8.0
+
+- **Les fallides de lliurament es registren vingui com vingui l'error de Meta.** Meta retorna els errors de la Cloud API o bé a la resposta de l'enviament, o bé més tard pel webhook d'estats, i el canal documentat no és fiable: el `131047` figura com a síncron però arriba pel webhook. El mòdul només tenia la semàntica d'errors al camí de la resposta, així que per als missatges de text la branca del `131047` no s'executava mai, i el camí del webhook, que sí que s'executa, no escrivia res al registre. Per això la correcció de registre de la v1.6.2 semblava no canviar res. Ara tots els jobs de sortida i el webhook comparteixen un únic gestor de fallides.
+- **Un segon codi d'error diferent per al mateix missatge es reporta** en lloc de substituir el primer en silenci, i un estat posterior sense clau `errors` ja no pot buidar un codi ja registrat.
+- **S'aprofita l'`error_data.details` de Meta** per al text de la fallida quan hi és, que és on hi ha la informació accionable; abans només es llegia el `title` curt.
+- **Correcció**: un compte amb el token rebutjat per Meta pel webhook ja no es desactiva. Això només passa quan el rebuig arriba a la nostra pròpia crida, que és inequívoc. La fallida es continua registrant i el codi es continua desant.
+- **Correcció**: les targetes del tauler de les bústies de WhatsApp ja no conserven el fons gris d'inactiu. Ensenyar els comptadors damunt d'una targeta amb aspecte d'inactiva era mitja correcció.
+- **Documentació**: si tens més d'un número, han de ser del mateix portfolio de negoci, o una mateixa persona rep un identificador diferent per número i no es pot reconèixer com un únic client. Documentat com a requisit previ.
 
 ## Novetats a la v1.7.0
 
@@ -148,6 +157,10 @@ Abans de configurar el canal a FreeScout, cal tenir preparat un entorn mínim a 
 >
 > - `whatsapp_business_messaging`
 > - `whatsapp_business_management`
+
+> **Si tens més d'un número, mantén-los al mateix portfolio de negoci**
+>
+> Els identificadors d'usuari amb àmbit de negoci (BSUID) estan lligats al portfolio, així que una mateixa persona que escrigui a dos números teus rep **un sol** identificador si tots dos números són del mateix WABA, i **un identificador per número** si són de portfolios separats. Amb els números repartits, el mòdul no pot reconèixer aquella persona com un únic client i la resolució de contactes que es descriu més avall no es comporta com esperaries. Consulta la [nota de Meta sobre els BSUID](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids/#business-scoped-user-id).
 
 ## Configuració del canal
 

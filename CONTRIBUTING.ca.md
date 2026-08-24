@@ -76,6 +76,12 @@ Qualsevol PR hauria d'incloure:
 
 Si el canvi altera alguna limitació o expectativa documentada, la documentació també s'ha d'actualitzar.
 
+## Idioma
+
+**L'anglès és l'idioma de treball d'aquest codi**: missatges de commit, comentaris, noms dels tests, logs i discussió als issues. Només es tradueix el text visible per l'usuari, que viu a `Resources/lang/` (anglès, català i castellà) i mai va escrit dins el codi.
+
+El codi anterior porta comentaris i noms de test en català, d'abans que el projecte tingués col·laboradors de fora. Es van substituint a mesura que es toquen els fitxers, no de cop, així que durant un temps hi conviuran tots dos. El codi nou ha de ser en anglès.
+
 ## Política de discussions
 
 Separa sempre aquests casos:

@@ -37,7 +37,7 @@ return [
 
     'template_name'                => 'Nom de la plantilla de recuperació',
     'template_name_help'           => 'Nom exacte d\'una plantilla ja aprovada a WhatsApp Manager. No s\'admeten variables.',
-    'template_cost_warning'        => 'Meta factura els missatges de plantilla per conversa.',
+    'template_cost_warning'        => 'Meta factura els missatges de plantilla per missatge lliurat.',
     'template_lang'                => 'Codi d\'idioma de la plantilla',
     'template_threshold'           => 'Llindar de caducitat de la finestra (minuts)',
     'template_threshold_help'      => 'La finestra oficial d\'atenció al client de Meta és de 24 hores des de l\'últim missatge del client. Aquesta opció només defineix quan el mòdul comença a tractar la finestra com a caducada, com a marge de seguretat operatiu intern - no canvia la regla de Meta. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Consulta la documentació de Meta</a>.',

@@ -37,7 +37,7 @@ return [
 
     'template_name'                => 'Recovery template name',
     'template_name_help'           => 'Exact name of a template already approved in WhatsApp Manager. No variables are supported.',
-    'template_cost_warning'        => 'Template messages are billed by Meta per conversation.',
+    'template_cost_warning'        => 'Meta bills template messages per message delivered.',
     'template_lang'                => 'Template language code',
     'template_threshold'           => 'Window expiry threshold (minutes)',
     'template_threshold_help'      => 'Meta\'s official customer service window is 24 hours from the customer\'s last message. This setting only defines when the module starts treating the window as expired, as an internal operational safety margin - it does not change Meta\'s rule. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">See Meta docs</a>.',

@@ -138,6 +138,81 @@ class SendWhatsAppMessageTest extends TestCase
             ->count());
     }
 
+    /**
+     * Issue #25, punt 5: si Meta SÍ que retorna el 131047 a la resposta
+     * HTTP, el camí síncron l'ha d'identificar igual que l'asíncron i
+     * deixar la fila com a fallida.
+     */
+    public function test_un_131047_sincron_es_registra_i_deixa_la_fila_fallida()
+    {
+        \Log::spy();
+        $account = $this->createTestAccount();
+        $thread  = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+
+        $fakeClient = \Mockery::mock(\Modules\MetaWhatsApp\Services\WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('sendText')->once()->andReturn([
+            'ok' => false, 'wamid' => null, 'http_status' => 400,
+            'error_code' => '131047', 'error_message' => 'Re-engagement message', 'transient' => false,
+        ]);
+
+        $job = \Mockery::mock(SendWhatsAppMessage::class, [$account->id, $thread->id, '+34611222333'])->makePartial();
+        $job->shouldAllowMockingProtectedMethods();
+        $job->shouldReceive('apiClient')->andReturn($fakeClient);
+        $job->handle();
+
+        \Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
+            return $message === '[MetaWhatsApp] Outside the 24h window (131047): message not delivered'
+                && ($context['source'] ?? null) === 'sync';
+        })->once();
+
+        $failed = WhatsAppMessage::where('thread_id', $thread->id)
+            ->where('status', WhatsAppMessage::STATUS_FAILED)
+            ->first();
+        $this->assertNotNull($failed);
+        $this->assertEquals('131047', $failed->error_code);
+
+        $this->assertTrue(
+            (bool) WhatsAppAccount::find($account->id)->is_active,
+            'Un 131047 no ha de tocar l\'estat del compte.'
+        );
+    }
+
+    /**
+     * Issue #25, punt 6: el comportament del 190 síncron no canvia. Segueix
+     * desactivant el compte, a diferència de l'asíncron.
+     */
+    public function test_un_190_sincron_segueix_desactivant_el_compte()
+    {
+        \Log::spy();
+        $account = $this->createTestAccount();
+        $thread  = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+
+        $fakeClient = \Mockery::mock(\Modules\MetaWhatsApp\Services\WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('sendText')->once()->andReturn([
+            'ok' => false, 'wamid' => null, 'http_status' => 401,
+            'error_code' => '190', 'error_message' => 'Access token has expired', 'transient' => false,
+        ]);
+
+        $job = \Mockery::mock(SendWhatsAppMessage::class, [$account->id, $thread->id, '+34611222333'])->makePartial();
+        $job->shouldAllowMockingProtectedMethods();
+        $job->shouldReceive('apiClient')->andReturn($fakeClient);
+        $job->handle();
+
+        $this->assertFalse(
+            (bool) WhatsAppAccount::find($account->id)->is_active,
+            'Un 190 síncron ha de continuar desactivant el compte (regressió issue #25).'
+        );
+        $this->assertEquals(
+            '190',
+            WhatsAppMessage::where('thread_id', $thread->id)->value('error_code')
+        );
+
+        \Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
+            return $message === '[MetaWhatsApp] Access token rejected by Meta (190)'
+                && ($context['source'] ?? null) === 'sync';
+        })->once();
+    }
+
     public function test_marca_com_a_llegit_lultim_missatge_entrant_despres_denviar()
     {
         $account = $this->createTestAccount();

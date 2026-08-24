@@ -76,6 +76,12 @@ Cualquier PR debería incluir:
 
 Si el cambio altera alguna limitación o expectativa documentada, la documentación también debe actualizarse.
 
+## Idioma
+
+**El inglés es el idioma de trabajo de este código**: mensajes de commit, comentarios, nombres de los tests, logs y discusión en los issues. Solo se traduce el texto visible para el usuario, que vive en `Resources/lang/` (inglés, catalán y castellano) y nunca va escrito dentro del código.
+
+El código anterior lleva comentarios y nombres de test en catalán, de antes de que el proyecto tuviera colaboradores externos. Se van sustituyendo a medida que se tocan los ficheros, no de golpe, así que durante un tiempo convivirán ambos. El código nuevo debe ser en inglés.
+
 ## Política de discusiones
 
 Separa siempre estos casos:

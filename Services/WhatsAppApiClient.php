@@ -8,7 +8,14 @@ use Modules\MetaWhatsApp\Support\Logger as MetaWhatsAppLogger;
 
 class WhatsAppApiClient
 {
-    const API_VERSION = 'v19.0';
+    // Versió de la Graph API contra la qual parlem. Cal revisar-la de tant
+    // en tant: Meta retira cada versió al cap d'uns dos anys i, quan passa,
+    // no dona error sinó que redirigeix les crides "to the next oldest
+    // usable version", així que una versió caducada aquí deixa de descriure
+    // contra què parlem realment. La v19.0 va caducar el 2026-05-21 i les
+    // crides s'estaven servint com a v20.0 sense que ho haguéssim decidit.
+    // La v24.0 té suport fins al febrer del 2028.
+    const API_VERSION = 'v24.0';
 
     /** @var WhatsAppAccount */
     protected $account;

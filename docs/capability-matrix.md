@@ -1,6 +1,6 @@
 # Capability matrix
 
-**Last updated:** v1.6.0
+**Last updated:** v1.8.0
 
 A live map of what this module supports against the Meta WhatsApp Cloud API, kept up to date at every release. Update this file whenever a capability's status changes — it's the reference to check before triaging a new issue, not a one-off spec.
 
@@ -38,7 +38,9 @@ Effort legend (planned items only): S / M / L
 | Delivered / read timestamps | ✅ | `delivered_at` / `read_at` on `meta_whatsapp_messages`, with a fallback when `read` arrives without a prior `delivered`. Shipped v1.4.1. | #16 | – |
 | Native "opened" indicator | ✅ | Meta's `read` status sets the thread's native `opened_at`. Shipped v1.2.0. | #3 | – |
 | Failed-send error code | ✅ | `error_code` stored on the message row; full error text is logged, not persisted. | | – |
-| Async delivery failure visibility | ✅ | A message Meta initially accepted but later reports as `failed` now creates a visible internal note in the conversation, not just a silent DB status change. Shipped v1.6.0. | | – |
+| Async delivery failure visibility | ✅ | A message Meta initially accepted but later reports as `failed` creates a visible internal note in the conversation, not just a silent DB status change. Shipped v1.6.0. | | – |
+| Failures logged on both channels | ✅ | Meta reports errors in the send response, over the statuses webhook, or both, and the documented channel is unreliable (131047 is documented synchronous, arrives asynchronous). One shared handler covers all outbound jobs and the webhook. Shipped v1.8.0. | #25 | – |
+| Asynchronous 190 does not deactivate | ✅ | A token rejection attached to a delivery status is weaker evidence than one returned to our own call, so it is logged and persisted but leaves the account active. Synchronous 190 still deactivates. Shipped v1.8.0. | #25 | – |
 | Reopen conversation on delivery failure | ✅ | A failed delivery sets the conversation back to `Active` via core's `setStatus()` (which also refreshes folder counters). Spam and deleted conversations are left alone; the assigned agent is never changed. Shipped v1.7.0. | #19 | – |
 | Failure note quotes the message | ✅ | The note quotes a 60-char excerpt of the undelivered message instead of the raw `wamid`; falls back to the `wamid` when there's no text (media without a caption). Idempotency moved to a `failure_noted_at` column, so each failed message in a batch keeps its own note. Shipped v1.7.0. | #19 | – |
 | Mark customer messages as read | ✅ | After an agent's reply is sent, the customer's most recent inbound message is marked as read via `POST /{phone_number_id}/messages` with `status:read`. No-op when there's no inbound message; Meta's errors are silently ignored. Shipped v1.7.0. | #23 | – |

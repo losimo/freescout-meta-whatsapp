@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+use Modules\MetaWhatsApp\Support\DeliveryFailure;
 
 class SendWhatsAppMedia implements ShouldQueue
 {
@@ -162,28 +163,26 @@ class SendWhatsAppMedia implements ShouldQueue
             );
         }
 
-        // Errors semàntics: reintentar no canvia el resultat.
-        if ($result['error_code'] === '190') {
+        // Semantic errors: retrying does not change the outcome. Same
+        // shared handler as the text job and the webhook (issue #25).
+        DeliveryFailure::record(
+            $account,
+            DeliveryFailure::SOURCE_SYNC,
+            DeliveryFailure::SUBJECT_MEDIA,
+            $result['error_code'],
+            $result['error_message'],
+            [
+                'thread_id'     => $thread->id,
+                'attachment_id' => $attachment->id,
+            ]
+        );
+
+        // Only a synchronous 190 deactivates, as in the text job.
+        if (DeliveryFailure::isInvalidToken($result['error_code'])) {
             $account->is_active = false;
             $account->save();
             Log::error('[MetaWhatsApp] Access token rejected by Meta (190): account deactivated', [
                 'account_id' => $account->id,
-            ]);
-        } elseif ($result['error_code'] === '131047') {
-            // Missatge no lliurat: mateix nivell que la resta d'errors
-            // semàntics perquè no quedi filtrat per un log_level > warning.
-            Log::error('[MetaWhatsApp] Outside the 24h window (131047): media not delivered', [
-                'account_id'    => $account->id,
-                'thread_id'     => $thread->id,
-                'attachment_id' => $attachment->id,
-            ]);
-        } else {
-            Log::error('[MetaWhatsApp] Meta semantic error sending media', [
-                'account_id'    => $account->id,
-                'thread_id'     => $thread->id,
-                'attachment_id' => $attachment->id,
-                'error_code'    => $result['error_code'],
-                'error'         => $result['error_message'],
             ]);
         }
 

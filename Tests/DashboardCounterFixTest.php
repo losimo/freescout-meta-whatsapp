@@ -54,6 +54,23 @@ class DashboardCounterFixTest extends TestCase
         $this->assertStringContainsString(' .dash-card-inactive-content { display: none; }', $css);
     }
 
+    /**
+     * Seguiment de la issue #22: ensenyar els comptadors damunt del fons
+     * gris d'inactiu era una mitja mesura. La targeta ha de tornar a
+     * semblar activa del tot.
+     */
+    public function test_treu_el_fons_gris_dinactiu_de_la_targeta()
+    {
+        $account = $this->createTestAccount();
+
+        $css = $this->css();
+
+        $this->assertStringContainsString(
+            '.dash-card.dash-card-inactive[data-mailbox-id="' . $account->mailbox_id . '"] { background: transparent; }',
+            $css
+        );
+    }
+
     public function test_no_afecta_bustis_sense_compte_whatsapp()
     {
         $whatsappAccount = $this->createTestAccount();

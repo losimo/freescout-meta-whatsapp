@@ -196,6 +196,41 @@ class SendWhatsAppMediaTest extends TestCase
         $job->handle();
     }
 
+    /**
+     * Issue #25: el registre de fallides del job de multimèdia no tenia cap
+     * cobertura. Ha de dir "media", no "message", i ha de portar
+     * l'attachment_id, que és l'únic que identifica quin adjunt ha fallat
+     * quan una resposta en porta uns quants.
+     */
+    public function test_una_fallida_de_multimedia_es_registra_amb_lattachment_id()
+    {
+        \Log::spy();
+        $account = $this->createTestAccount();
+        [$thread, $attachment] = $this->makeConversationWithThreadAndAttachment($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+        $this->markWindowOpen($account, $thread);
+
+        $fakeClient = \Mockery::mock(WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('uploadMedia')->once()->andReturn([
+            'ok' => true, 'media_id' => 'meta-media-9', 'http_status' => 200,
+            'error_code' => null, 'error_message' => null, 'transient' => false,
+        ]);
+        $fakeClient->shouldReceive('sendMedia')->once()->andReturn([
+            'ok' => false, 'wamid' => null, 'http_status' => 400,
+            'error_code' => '131047', 'error_message' => 'Re-engagement message', 'transient' => false,
+        ]);
+
+        $job = \Mockery::mock(SendWhatsAppMedia::class, [$account->id, $thread->id, '+34611222333', $attachment->id])->makePartial();
+        $job->shouldAllowMockingProtectedMethods();
+        $job->shouldReceive('apiClient')->andReturn($fakeClient);
+        $job->handle();
+
+        \Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) use ($attachment) {
+            return $message === '[MetaWhatsApp] Outside the 24h window (131047): media not delivered'
+                && ($context['source'] ?? null) === 'sync'
+                && ($context['attachment_id'] ?? null) === $attachment->id;
+        })->once();
+    }
+
     public function test_mediaCategory_mapa_prefixos_de_mime_correctament()
     {
         $this->assertEquals('image', SendWhatsAppMedia::mediaCategory('image/jpeg'));

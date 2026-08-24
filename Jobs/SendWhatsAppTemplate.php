@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+use Modules\MetaWhatsApp\Support\DeliveryFailure;
 
 /**
  * Mirall de SendWhatsAppMessage per al mecanisme de recuperació: envia una
@@ -155,22 +156,23 @@ class SendWhatsAppTemplate implements ShouldQueue
             );
         }
 
-        // Errors semàntics: reintentar no canvia el resultat. Diferència (b):
-        // no hi ha branch 131047 aquí (vegeu docblock de la classe).
-        if ($result['error_code'] === '190') {
-            // Token invàlid o expirat: desactivar el compte perquè l'admin
-            // ho vegi al llistat (○ Inactiu) i no cremar més crides.
+        // Semantic errors: retrying does not change the outcome. Shares the
+        // handler with the other outbound jobs and the webhook (issue #25),
+        // so the three cannot drift apart again.
+        DeliveryFailure::record(
+            $account,
+            DeliveryFailure::SOURCE_SYNC,
+            DeliveryFailure::SUBJECT_TEMPLATE,
+            $result['error_code'],
+            $result['error_message'],
+            ['thread_id' => $thread->id]
+        );
+
+        if (DeliveryFailure::isInvalidToken($result['error_code'])) {
             $account->is_active = false;
             $account->save();
             Log::error('[MetaWhatsApp] Access token rejected by Meta (190): account deactivated', [
                 'account_id' => $account->id,
-            ]);
-        } else {
-            Log::error('[MetaWhatsApp] Meta semantic error sending template', [
-                'account_id' => $account->id,
-                'thread_id'  => $thread->id,
-                'error_code' => $result['error_code'],
-                'error'      => $result['error_message'],
             ]);
         }
 

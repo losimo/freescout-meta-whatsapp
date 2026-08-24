@@ -19,23 +19,23 @@ The project is public and has been running in real production use since v1.0, it
 
 *List of configured WhatsApp channels:*
 
-![WhatsApp accounts list](docs/accounts-list.png)
+![WhatsApp accounts list](docs/en/accounts-list.png)
 
 *Adding a new channel (channel-first form):*
 
-![Add channel form](docs/add-channel.png)
+![Add channel form](docs/en/add-channel.png)
 
 *A WhatsApp conversation as an agent sees it, with the channel badge FreeScout renders natively:*
 
-![WhatsApp conversation view](docs/conversation-view.png)
+![WhatsApp conversation view](docs/en/conversation-view.png)
 
 *Per-account health snapshot, with the live connection test and webhook subscription buttons:*
 
-![Account health panel](docs/account-health.png)
+![Account health panel](docs/en/account-health.png)
 
 *Expired-window banner shown in a conversation when the 24h customer window looks closed:*
 
-![Expired window banner](docs/expired-window-banner.png)
+![Expired window banner](docs/en/expired-window-banner.png)
 
 ## Feature scope
 
@@ -60,6 +60,15 @@ Out of scope:
 - A cloud storage adapter (S3, etc.) for media — attachments use FreeScout's existing local storage only.
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
+
+## What's new in v1.8.0
+
+- **Delivery failures are logged whichever way Meta reports them.** Meta returns Cloud API errors either in the response to the send, or later over the statuses webhook, and the documented channel is not reliable: `131047` is documented as synchronous but arrives over the webhook. The module only carried error semantics on the response path, so for text messages the `131047` branch never ran, and the webhook path that does run wrote nothing to the log at all. This is why the v1.6.2 logging fix appeared to change nothing. All outbound jobs and the webhook now share one failure handler.
+- **A second, different error code for the same message is reported** instead of quietly replacing the first, and a later status with no `errors` array can no longer blank a code already recorded.
+- **Meta's `error_data.details` is used** for the failure text when present, which is where the actionable wording lives; previously only the short `title` was read.
+- **Fix**: an account whose token Meta rejects over the webhook is no longer deactivated. That only happens when the rejection comes back from our own call, which is unambiguous. The failure is still logged and the error code stored.
+- **Fix**: dashboard cards for WhatsApp mailboxes no longer keep the grey "inactive" background. Showing the counters over an inactive-looking card was half a fix.
+- **Docs**: if you run more than one number, they must belong to the same business portfolio, or the same person gets a different business-scoped ID per number and cannot be recognised as one customer. Documented as a prerequisite.
 
 ## What's new in v1.7.0
 
@@ -154,6 +163,10 @@ Before configuring the channel in FreeScout, prepare a minimal setup at [Meta fo
 >
 > - `whatsapp_business_messaging`
 > - `whatsapp_business_management`
+
+> **If you run more than one number, keep them in the same business portfolio**
+>
+> Business-scoped user IDs are scoped to a portfolio, so the same person messaging two of your numbers gets **one** ID if both numbers belong to the same WABA, and a **different ID per number** if they sit in separate portfolios. With numbers split across portfolios the module cannot recognise that person as a single customer, and the contact resolution described below will not behave as you expect. See [Meta's note on business-scoped user IDs](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids/#business-scoped-user-id).
 
 ## Channel configuration
 

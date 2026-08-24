@@ -370,6 +370,144 @@ class ProcessInboundWebhookTest extends TestCase
         $this->assertStringContainsString('"segon missatge"', $bodies);
     }
 
+    /**
+     * Issue #25, punt 1: una fallida asíncrona ha de deixar rastre al
+     * registre. Abans només creava la nota a la conversa i el log quedava
+     * mut, que és el que la #18 demanava des del principi.
+     */
+    public function test_una_fallida_asincrona_es_registra_al_log()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+        $this->seedOutboundForFailure($account, 'wamid.in-log', 'wamid.out-log', 'text');
+
+        $payload = $this->failedStatusPayload($account, 'wamid.out-log');
+        $payload['entry'][0]['changes'][0]['value']['statuses'][0]['errors'][0]['title'] = 'Re-engagement message';
+        $this->runJob($account, $payload);
+
+        Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
+            return strpos($message, '131047') !== false
+                && ($context['source'] ?? null) === 'async'
+                && ($context['error_code'] ?? null) === '131047'
+                && ($context['wamid'] ?? null) === 'wamid.out-log';
+        })->once();
+    }
+
+    /**
+     * Issue #25, punt 2: el 131047 arriba pel webhook (Meta el documenta
+     * com a síncron, però a la pràctica no ho és) i s'ha d'identificar
+     * com a finestra caducada, no com un error genèric.
+     */
+    public function test_un_131047_asincron_sidentifica_com_a_finestra_caducada()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+        $this->seedOutboundForFailure($account, 'wamid.in-win', 'wamid.out-win', 'text');
+
+        $this->runJob($account, $this->failedStatusPayload($account, 'wamid.out-win'));
+
+        Log::shouldHaveReceived('error')->withArgs(function ($message) {
+            return $message === '[MetaWhatsApp] Outside the 24h window (131047): message not delivered';
+        })->once();
+
+        $this->assertEquals('131047', WhatsAppMessage::where('wamid', 'wamid.out-win')->value('error_code'));
+    }
+
+    /**
+     * Issue #25, punt 3: un 190 asíncron es registra i es persisteix, però
+     * NO desactiva el compte. Un token rebutjat dins d'un estat de
+     * lliurament és evidència més feble que un que rebutja la nostra crida.
+     */
+    public function test_un_190_asincron_no_desactiva_el_compte()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+        $this->seedOutboundForFailure($account, 'wamid.in-190', 'wamid.out-190', 'text');
+
+        $payload = $this->failedStatusPayload($account, 'wamid.out-190');
+        $payload['entry'][0]['changes'][0]['value']['statuses'][0]['errors'][0]['code'] = 190;
+        $this->runJob($account, $payload);
+
+        $this->assertTrue(
+            (bool) WhatsAppAccount::find($account->id)->is_active,
+            'Un 190 asíncron no ha de desactivar el compte (issue #25).'
+        );
+        $this->assertEquals('190', WhatsAppMessage::where('wamid', 'wamid.out-190')->value('error_code'));
+
+        Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
+            return $message === '[MetaWhatsApp] Access token rejected by Meta (190)'
+                && ($context['source'] ?? null) === 'async';
+        })->once();
+    }
+
+    /**
+     * Issue #25, punt 4: Meta pot lliurar el mateix error pels dos canals.
+     * failure_noted_at (issue #19) evita registrar-lo i anotar-lo dues
+     * vegades.
+     */
+    public function test_failure_noted_at_evita_registrar_la_fallida_dues_vegades()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+        [$conversation] = $this->seedOutboundForFailure($account, 'wamid.in-dup', 'wamid.out-dup', 'text');
+
+        $payload = $this->failedStatusPayload($account, 'wamid.out-dup');
+        $this->runJob($account, $payload);
+        $this->runJob($account, $payload);
+
+        Log::shouldHaveReceived('error')->withArgs(function ($message) {
+            return strpos($message, '131047') !== false;
+        })->once();
+
+        $this->assertEquals(
+            1,
+            Thread::where('conversation_id', $conversation->id)
+                ->where('type', Thread::TYPE_NOTE)
+                ->where('body', 'like', '[WhatsApp delivery failed]%')
+                ->count()
+        );
+    }
+
+    /**
+     * Una fallida sobre un missatge ENTRANT no és nostra per reportar, i
+     * si es registrés no pararia mai: no hi ha res que la marqui com a
+     * vista i Meta reenvia els webhooks.
+     */
+    public function test_una_fallida_sobre_un_missatge_entrant_no_es_registra()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.in-only', '34611222333', 'hola'));
+
+        $payload = $this->failedStatusPayload($account, 'wamid.in-only');
+        $this->runJob($account, $payload);
+        $this->runJob($account, $payload);
+
+        Log::shouldNotHaveReceived('error');
+    }
+
+    /**
+     * Un segon 'failed' sense clau errors no ha d'esborrar el codi que ja
+     * teníem: era la raó per la qual el missatge va fallar.
+     */
+    public function test_un_status_sense_errors_no_esborra_el_codi_derror()
+    {
+        $account = $this->createTestAccount();
+        $this->seedOutboundForFailure($account, 'wamid.in-keep', 'wamid.out-keep', 'text');
+
+        $this->runJob($account, $this->failedStatusPayload($account, 'wamid.out-keep'));
+
+        $sense = $this->failedStatusPayload($account, 'wamid.out-keep');
+        unset($sense['entry'][0]['changes'][0]['value']['statuses'][0]['errors']);
+        $this->runJob($account, $sense);
+
+        $this->assertEquals(
+            '131047',
+            WhatsAppMessage::where('wamid', 'wamid.out-keep')->value('error_code'),
+            'Un status posterior sense errors no ha de buidar el codi.'
+        );
+    }
+
     public function test_status_failed_dun_missatge_inbound_no_crea_nota()
     {
         // El 'failed' de Meta reporta l'entrega d'un enviament nostre: no té
@@ -538,7 +676,7 @@ class ProcessInboundWebhookTest extends TestCase
         $this->assertNotNull($msg);
 
         $thread = Thread::find($msg->thread_id);
-        $this->assertStringContainsString('Plaça Catalunya — Barcelona, Spain', $thread->body);
+        $this->assertStringContainsString('Plaça Catalunya - Barcelona, Spain', $thread->body);
         $this->assertStringContainsString('https://www.google.com/maps?q=41.3874,2.1686', $thread->body);
     }
 

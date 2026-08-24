@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+use Modules\MetaWhatsApp\Support\DeliveryFailure;
 
 class SendWhatsAppMessage implements ShouldQueue
 {
@@ -96,28 +97,25 @@ class SendWhatsAppMessage implements ShouldQueue
             );
         }
 
-        // Errors semàntics: reintentar no canvia el resultat.
-        if ($result['error_code'] === '190') {
-            // Token invàlid o expirat: desactivar el compte perquè l'admin
-            // ho vegi al llistat (○ Inactiu) i no cremar més crides.
+        // Semantic errors: retrying does not change the outcome. Logging
+        // and error-code semantics live in DeliveryFailure so this path
+        // cannot drift from the asynchronous one (issue #25).
+        DeliveryFailure::record(
+            $account,
+            DeliveryFailure::SOURCE_SYNC,
+            DeliveryFailure::SUBJECT_MESSAGE,
+            $result['error_code'],
+            $result['error_message'],
+            ['thread_id' => $thread->id]
+        );
+
+        // Only a synchronous 190 deactivates: the call itself was rejected,
+        // which is unambiguous. The asynchronous one is left alone.
+        if (DeliveryFailure::isInvalidToken($result['error_code'])) {
             $account->is_active = false;
             $account->save();
             Log::error('[MetaWhatsApp] Access token rejected by Meta (190): account deactivated', [
                 'account_id' => $account->id,
-            ]);
-        } elseif ($result['error_code'] === '131047') {
-            // Missatge no lliurat: mateix nivell que la resta d'errors
-            // semàntics perquè no quedi filtrat per un log_level > warning.
-            Log::error('[MetaWhatsApp] Outside the 24h window (131047): message not delivered', [
-                'account_id' => $account->id,
-                'thread_id'  => $thread->id,
-            ]);
-        } else {
-            Log::error('[MetaWhatsApp] Meta semantic error sending message', [
-                'account_id' => $account->id,
-                'thread_id'  => $thread->id,
-                'error_code' => $result['error_code'],
-                'error'      => $result['error_message'],
             ]);
         }
 

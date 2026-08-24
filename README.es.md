@@ -19,23 +19,23 @@ El proyecto es público y lleva en uso real de producción desde la v1.0, iteran
 
 *Listado de canales de WhatsApp configurados:*
 
-![Listado de cuentas de WhatsApp](docs/accounts-list.png)
+![Listado de cuentas de WhatsApp](docs/es/accounts-list.png)
 
 *Alta de un canal nuevo (formulario channel-first):*
 
-![Formulario de alta del canal](docs/add-channel.png)
+![Formulario de alta del canal](docs/es/add-channel.png)
 
 *Una conversación de WhatsApp tal como la ve un agente, con el distintivo de canal que pinta el propio FreeScout:*
 
-![Vista de una conversación de WhatsApp](docs/conversation-view.png)
+![Vista de una conversación de WhatsApp](docs/es/conversation-view.png)
 
 *Salud de la cuenta, con los botones de prueba de conexión y suscripción del webhook:*
 
-![Panel de salud de la cuenta](docs/account-health.png)
+![Panel de salud de la cuenta](docs/es/account-health.png)
 
 *Aviso en la conversación cuando la ventana de 24 horas del cliente parece caducada:*
 
-![Aviso de ventana caducada](docs/expired-window-banner.png)
+![Aviso de ventana caducada](docs/es/expired-window-banner.png)
 
 ## Alcance de funcionalidades
 
@@ -60,6 +60,15 @@ Queda fuera de alcance:
 - Un adaptador de almacenamiento en la nube (S3, etc.) para multimedia — los adjuntos usan el almacenamiento local ya existente de FreeScout.
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
+
+## Novedades en la v1.8.0
+
+- **Los fallos de entrega se registran venga como venga el error de Meta.** Meta devuelve los errores de la Cloud API o bien en la respuesta del envío, o bien más tarde por el webhook de estados, y el canal documentado no es fiable: el `131047` figura como síncrono pero llega por el webhook. El módulo solo tenía la semántica de errores en el camino de la respuesta, así que para los mensajes de texto la rama del `131047` no se ejecutaba nunca, y el camino del webhook, que sí se ejecuta, no escribía nada en el registro. Por eso la corrección de registro de la v1.6.2 parecía no cambiar nada. Ahora todos los jobs de salida y el webhook comparten un único gestor de fallos.
+- **Un segundo código de error distinto para el mismo mensaje se reporta** en lugar de sustituir al primero en silencio, y un estado posterior sin clave `errors` ya no puede vaciar un código ya registrado.
+- **Se aprovecha el `error_data.details` de Meta** para el texto del fallo cuando está presente, que es donde está la información accionable; antes solo se leía el `title` corto.
+- **Corrección**: una cuenta con el token rechazado por Meta a través del webhook ya no se desactiva. Eso solo ocurre cuando el rechazo llega a nuestra propia llamada, que es inequívoco. El fallo se sigue registrando y el código se sigue guardando.
+- **Corrección**: las tarjetas del panel de los buzones de WhatsApp ya no conservan el fondo gris de inactivo. Mostrar los contadores sobre una tarjeta con aspecto de inactiva era media corrección.
+- **Documentación**: si tienes más de un número, deben ser del mismo portfolio de negocio, o una misma persona recibe un identificador distinto por número y no se puede reconocer como un único cliente. Documentado como requisito previo.
 
 ## Novedades en la v1.7.0
 
@@ -148,6 +157,10 @@ Antes de configurar el canal en FreeScout, prepara un entorno mínimo en [Meta f
 >
 > - `whatsapp_business_messaging`
 > - `whatsapp_business_management`
+
+> **Si tienes más de un número, mantenlos en el mismo portfolio de negocio**
+>
+> Los identificadores de usuario con ámbito de negocio (BSUID) están ligados al portfolio, así que una misma persona que escriba a dos números tuyos recibe **un solo** identificador si ambos números son del mismo WABA, y **un identificador por número** si están en portfolios separados. Con los números repartidos, el módulo no puede reconocer a esa persona como un único cliente y la resolución de contactos que se describe más abajo no se comporta como esperarías. Consulta la [nota de Meta sobre los BSUID](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids/#business-scoped-user-id).
 
 ## Configuración del canal
 

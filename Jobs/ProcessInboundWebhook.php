@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+use Modules\MetaWhatsApp\Support\DeliveryFailure;
 use Modules\MetaWhatsApp\Support\Logger as MetaWhatsAppLogger;
 use Modules\MetaWhatsApp\Support\WhatsAppTextFormatter;
 
@@ -344,7 +345,7 @@ class ProcessInboundWebhook implements ShouldQueue
 
         $name    = trim($location['name'] ?? '');
         $address = trim($location['address'] ?? '');
-        $label   = trim($name . ($name !== '' && $address !== '' ? ' — ' : '') . $address);
+        $label   = trim($name . ($name !== '' && $address !== '' ? ' - ' : '') . $address);
         $link    = "https://www.google.com/maps?q={$lat},{$lng}";
 
         return $label !== '' ? "{$label}\n{$link}" : $link;
@@ -707,9 +708,6 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         $record->status = $map[$newStatus];
-        if ($newStatus === 'failed') {
-            $record->error_code = (string) ($status['errors'][0]['code'] ?? '');
-        }
 
         if (in_array($newStatus, ['delivered', 'read'], true)) {
             $statusAt = isset($status['timestamp'])
@@ -743,34 +741,58 @@ class ProcessInboundWebhook implements ShouldQueue
             }
         }
 
-        // Reconciliació d'esdeveniments outbound (inspirat en kapsowhatsapp):
-        // una fallida ASÍNCRONA (el 'sent' inicial va anar bé, Meta rebutja
-        // el missatge després) no tenia cap senyal visible per a l'agent —
-        // només un canvi de status silenciós a la BD. Nota interna amb el
-        // codi d'error, un cop per wamid.
         if ($newStatus === 'failed') {
-            $this->recordAsyncDeliveryFailureNote($account, $record, $status);
+            $this->handleAsyncDeliveryFailure($account, $record, $status);
         }
     }
 
-    protected function recordAsyncDeliveryFailureNote(WhatsAppAccount $account, WhatsAppMessage $record, array $status): void
+    /**
+     * Whole asynchronous failure sequence, in one place so the order is
+     * not an implicit dependency between two call sites (issue #25).
+     *
+     * Both guards run before anything is written. A 'failed' status on an
+     * INBOUND row is not ours to report: Meta's delivery statuses describe
+     * our own sends. Logging those would also never stop, because nothing
+     * would mark them as seen and Meta redelivers webhooks.
+     *
+     * An asynchronous 190 is deliberately NOT deactivating the account: a
+     * token rejection attached to a delivery status is weaker evidence
+     * than one returned to our own call, and deactivating is disruptive.
+     */
+    protected function handleAsyncDeliveryFailure(WhatsAppAccount $account, WhatsAppMessage $record, array $status): void
     {
-        // Només té sentit per als missatges que nosaltres hem enviat: el
-        // 'failed' de Meta reporta l'entrega d'un enviament outbound, mai
-        // res relacionat amb el missatge inbound del client.
         if ($record->direction !== WhatsAppMessage::DIRECTION_OUTBOUND || !$record->conversation_id) {
             return;
         }
 
-        // Idempotència per fila de missatge (issue #19). Abans es deduïa
-        // buscant el wamid dins el body dels threads; ara el text visible
-        // porta un extracte del missatge, no el wamid, i marcar-ho aquí és
-        // a més per missatge, de manera que en una tanda d'enviaments cada
-        // wamid fallit conserva la seva nota.
+        // Idempotència per fila de missatge (issue #19), que aquí cobreix
+        // el registre i la nota alhora: Meta pot lliurar el mateix error
+        // pels dos canals i reenvia els webhooks.
         if ($record->failure_noted_at) {
             return;
         }
 
+        $error = $status['errors'][0] ?? [];
+
+        DeliveryFailure::record(
+            $account,
+            DeliveryFailure::SOURCE_ASYNC,
+            DeliveryFailure::SUBJECT_MESSAGE,
+            (string) ($error['code'] ?? ''),
+            DeliveryFailure::errorTextFrom($error),
+            [
+                'conversation_id' => $record->conversation_id,
+                'thread_id'       => $record->thread_id,
+                'wamid'           => $record->wamid,
+            ],
+            $record
+        );
+
+        $this->recordAsyncDeliveryFailureNote($account, $record, $status);
+    }
+
+    protected function recordAsyncDeliveryFailureNote(WhatsAppAccount $account, WhatsAppMessage $record, array $status): void
+    {
         $conversation = Conversation::find($record->conversation_id);
         if (!$conversation) {
             return;
@@ -778,7 +800,7 @@ class ProcessInboundWebhook implements ShouldQueue
 
         $errorCode  = (string) ($status['errors'][0]['code'] ?? '');
         $errorTitle = trim((string) ($status['errors'][0]['title'] ?? ''));
-        $label      = $errorTitle !== '' ? ($errorCode . ' — ' . $errorTitle) : $errorCode;
+        $label      = $errorTitle !== '' ? ($errorCode . ' - ' . $errorTitle) : $errorCode;
 
         // Extracte del missatge que no s'ha lliurat, en lloc del wamid cru
         // (issue #19). Si no se'n pot treure text (multimèdia sense caption,
@@ -793,7 +815,7 @@ class ProcessInboundWebhook implements ShouldQueue
         $thread->status          = $conversation->status;
         $thread->state           = Thread::STATE_PUBLISHED;
         $thread->body            = '[WhatsApp delivery failed] ' . $identifier . ' '
-            . __('metawhatsapp::metawhatsapp.async_delivery_failed', ['error' => $label ?: '—']);
+            . __('metawhatsapp::metawhatsapp.async_delivery_failed', ['error' => $label ?: '-']);
         $thread->source_via      = Thread::PERSON_USER;
         $thread->source_type     = Thread::SOURCE_TYPE_WEB;
         $thread->customer_id     = $conversation->customer_id;
