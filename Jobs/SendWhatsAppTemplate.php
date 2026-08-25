@@ -58,9 +58,16 @@ class SendWhatsAppTemplate implements ShouldQueue
      * estàtica, es valida $templateId/$templateLanguage contra
      * $account->findTemplate() abans d'enviar (defensa en profunditat).
      * Array (fins i tot buit) = plantilla dinàmica del catàleg APPROVED en
-     * viu de Meta, ja validada pel controlador — no es torna a validar
-     * contra la llista estàtica, i els valors s'envien com a paràmetres
-     * {{1}}, {{2}}... del cos.
+     * viu de Meta: NO es valida contra la llista estàtica, i els valors
+     * s'envien com a paràmetres {{1}}, {{2}}... del cos.
+     *
+     * Atenció: aquest comentari deia que la plantilla dinàmica arriba "ja
+     * validada pel controlador". Era fals. sendDynamicTemplate() només
+     * comprova que el nom i l'idioma no siguin cadenes buides; no els
+     * contrasta amb res. I ha de ser així, perquè el picker existeix
+     * precisament per enviar qualsevol plantilla aprovada al WABA, no
+     * només les cinc configurades. La confiança recau en qui té accés a
+     * la conversa, no en una validació que no existeix.
      */
     public function __construct(int $accountId, int $threadId, string $toPhone, ?string $templateId = null, ?string $templateLanguage = null, ?array $variables = null)
     {
@@ -76,10 +83,21 @@ class SendWhatsAppTemplate implements ShouldQueue
     {
         $account = WhatsAppAccount::find($this->accountId);
         if (!$account || !$account->is_active) {
-            Log::warning('[MetaWhatsApp] SendWhatsAppTemplate: account missing or inactive', [
+            // Not a silent return: the controller has already created the
+            // audit thread and told the agent the template was queued, so
+            // leaving no trace produces a conversation that looks like a
+            // send happened when nothing left the building. Accounts are
+            // deactivated automatically on error 190, which typically bites
+            // on a Monday with a token that expired over the weekend.
+            Log::error('[MetaWhatsApp] Template not sent: account missing or inactive', [
                 'account_id' => $this->accountId,
                 'thread_id'  => $this->threadId,
             ]);
+
+            $thread = Thread::find($this->threadId);
+            if ($thread) {
+                $this->recordFailure($this->accountId, $thread, 'account_inactive');
+            }
             return;
         }
 
@@ -152,7 +170,7 @@ class SendWhatsAppTemplate implements ShouldQueue
         // Errors transitoris (5xx, xarxa): reintent via $tries, sense fila.
         if ($result['transient']) {
             throw new \RuntimeException(
-                '[MetaWhatsApp] Error transitori enviant plantilla a Meta: ' . $result['error_message']
+                '[MetaWhatsApp] Transient error sending template to Meta: ' . $result['error_message']
             );
         }
 

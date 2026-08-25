@@ -93,7 +93,7 @@ class SendWhatsAppMessage implements ShouldQueue
         // Errors transitoris (5xx, xarxa): reintent via $tries, sense fila.
         if ($result['transient']) {
             throw new \RuntimeException(
-                '[MetaWhatsApp] Error transitori enviant a Meta: ' . $result['error_message']
+                '[MetaWhatsApp] Transient error sending message to Meta: ' . $result['error_message']
             );
         }
 

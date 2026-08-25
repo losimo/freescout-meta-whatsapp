@@ -89,6 +89,7 @@ return [
     'health_last_status'           => 'Last delivery status',
     'health_last_error'            => 'Last error',
     'health_last_reactivation'     => 'Last reactivation',
+    'health_inactive_help'         => 'Nothing can be sent while the channel is inactive. Use Test connection below: a successful test reactivates it automatically.',
     'health_never'                 => 'Never',
     'account_reactivated'          => 'Connection restored - account reactivated automatically (verified as ":name").',
 
@@ -103,6 +104,7 @@ return [
     'template_already_sent'        => 'A template was already sent moments ago for this conversation.',
 
     // Picker dinàmic de plantilles (issue #2, punt 2 complet).
+    'account_inactive_notice'          => 'This WhatsApp channel is currently inactive, so nothing can be sent. Open the channel settings to check the connection and reactivate it.',
     'browse_templates_link'        => 'Browse all approved templates…',
     'templates_picker_title'       => 'Send a WhatsApp template',
     'templates_picker_back'        => '← Back to conversation',

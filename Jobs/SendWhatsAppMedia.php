@@ -124,7 +124,7 @@ class SendWhatsAppMedia implements ShouldQueue
         if (!$upload['ok']) {
             if ($upload['transient']) {
                 throw new \RuntimeException(
-                    '[MetaWhatsApp] Error transitori pujant adjunt a Meta: ' . $upload['error_message']
+                    '[MetaWhatsApp] Transient error uploading attachment to Meta: ' . $upload['error_message']
                 );
             }
             Log::error('[MetaWhatsApp] Meta rejected media upload', [
@@ -159,7 +159,7 @@ class SendWhatsAppMedia implements ShouldQueue
         // Errors transitoris (5xx, xarxa): reintent via $tries, sense fila.
         if ($result['transient']) {
             throw new \RuntimeException(
-                '[MetaWhatsApp] Error transitori enviant adjunt a Meta: ' . $result['error_message']
+                '[MetaWhatsApp] Transient error sending attachment to Meta: ' . $result['error_message']
             );
         }
 

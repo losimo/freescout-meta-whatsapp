@@ -61,6 +61,11 @@ Queda fora d'abast:
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
+## Novetats a la v1.8.1
+
+- **Correcció**: els últims missatges de registre que encara sortien en català ara són en anglès. La correcció original va traduir les crides a `Log::` i es va deixar els missatges de les excepcions, que arriben igualment al `laravel-*.log`, tant perquè el worker registra l'excepció no capturada com pel `failed()` del propi mòdul. Com que només salten en errors transitoris, van passar desapercebuts dos mesos.
+- **Correcció**: enviar una plantilla amb el compte inactiu no deixava cap rastre, mentre que la conversa continuava aparentant que el missatge havia sortit. Ara l'intent es registra com a fallida i es loguetja, el banner de la conversa ja no ofereix botons d'enviament amb el canal aturat, i el panell de salut per fi diu si el canal està actiu.
+
 ## Novetats a la v1.8.0
 
 - **Les fallides de lliurament es registren vingui com vingui l'error de Meta.** Meta retorna els errors de la Cloud API o bé a la resposta de l'enviament, o bé més tard pel webhook d'estats, i el canal documentat no és fiable: el `131047` figura com a síncron però arriba pel webhook. El mòdul només tenia la semàntica d'errors al camí de la resposta, així que per als missatges de text la branca del `131047` no s'executava mai, i el camí del webhook, que sí que s'executa, no escrivia res al registre. Per això la correcció de registre de la v1.6.2 semblava no canviar res. Ara tots els jobs de sortida i el webhook comparteixen un únic gestor de fallides.

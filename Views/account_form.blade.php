@@ -301,6 +301,25 @@
                     </form>
 
                     <div class="form-horizontal">
+                        {{-- Primer de tot: si el canal està viu o mort. El
+                             panell donava dates i errors i no responia la
+                             pregunta que es fa qui l'obre. Un compte es
+                             desactiva sol amb l'error 190 i fins ara això
+                             no es veia enlloc del formulari. --}}
+                        <div class="form-group">
+                            <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.status') }}</label>
+                            <div class="col-sm-8">
+                                <p class="form-control-static">
+                                    @if($account->is_active)
+                                        <span class="text-success">&#9679; {{ __('metawhatsapp::metawhatsapp.active') }}</span>
+                                    @else
+                                        <span class="text-danger">&#9679; {{ __('metawhatsapp::metawhatsapp.inactive') }}</span>
+                                        <span class="help-block" style="margin-top:4px">{{ __('metawhatsapp::metawhatsapp.health_inactive_help') }}</span>
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.health_last_inbound') }}</label>
                             <div class="col-sm-8">

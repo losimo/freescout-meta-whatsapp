@@ -4,7 +4,15 @@
     <p>{{ __('metawhatsapp::metawhatsapp.window_expired_notice') }}</p>
 
     @php $templates = $account->getTemplateList(); @endphp
-    @if (!empty($templates) && $phone)
+    @if (!($accountActive ?? true))
+        {{-- Canal aturat: cap botó, perquè res del que cliqui l'agent
+             sortirà. Se'l dirigeix a on es pot reactivar. --}}
+        <p style="margin-top: 8px;">
+            <a href="{{ route('metawhatsapp.edit', ['id' => $account->id]) }}">
+                {{ __('metawhatsapp::metawhatsapp.account_inactive_notice') }}
+            </a>
+        </p>
+    @elseif (!empty($templates) && $phone)
         {{-- Un botó per plantilla configurada (issue #2, punt 2: multi-idioma).
              Amb una sola plantilla, template_id/template_language no calen:
              el controlador ja fa fallback a l'única disponible. --}}

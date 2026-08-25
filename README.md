@@ -61,6 +61,11 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.8.1
+
+- **Fix**: the last log messages still written in Catalan are now in English. The original fix translated the `Log::` calls and left the exception messages, which reach `laravel-*.log` anyway, both through the queue worker logging the uncaught exception and through the module's own `failed()` handler. Because they only fire on transient errors, they went unnoticed for two months.
+- **Fix**: sending a template on an inactive account left no trace while the conversation still looked like the message had gone out. The attempt is now recorded as a failure and logged, the conversation banner no longer offers send buttons for a stopped channel, and the account health panel finally shows whether the channel is active at all.
+
 ## What's new in v1.8.0
 
 - **Delivery failures are logged whichever way Meta reports them.** Meta returns Cloud API errors either in the response to the send, or later over the statuses webhook, and the documented channel is not reliable: `131047` is documented as synchronous but arrives over the webhook. The module only carried error semantics on the response path, so for text messages the `131047` branch never ran, and the webhook path that does run wrote nothing to the log at all. This is why the v1.6.2 logging fix appeared to change nothing. All outbound jobs and the webhook now share one failure handler.

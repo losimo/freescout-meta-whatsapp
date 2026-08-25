@@ -89,6 +89,7 @@ return [
     'health_last_status'           => 'Últim estat de lliurament',
     'health_last_error'            => 'Últim error',
     'health_last_reactivation'     => 'Última reactivació',
+    'health_inactive_help'         => 'Amb el canal inactiu no es pot enviar res. Fes servir Provar connexió aquí sota: si la prova va bé, es reactiva automàticament.',
     'health_never'                 => 'Mai',
     'account_reactivated'          => 'Connexió restaurada - compte reactivat automàticament (verificat com a ":name").',
 
@@ -102,6 +103,7 @@ return [
     'template_window_open'         => 'La finestra del client ha tornat a obrir-se: envia una resposta normal en comptes d\'una plantilla de pagament.',
     'template_already_sent'        => 'Ja s\'ha enviat una plantilla fa uns moments per a aquesta conversa.',
 
+    'account_inactive_notice'          => 'Aquest canal de WhatsApp està inactiu, així que no es pot enviar res. Obre la configuració del canal per comprovar la connexió i reactivar-lo.',
     'browse_templates_link'        => 'Veure totes les plantilles aprovades…',
     'templates_picker_title'       => 'Enviar una plantilla de WhatsApp',
     'templates_picker_back'        => '← Tornar a la conversa',

@@ -89,6 +89,7 @@ return [
     'health_last_status'           => 'Último estado de entrega',
     'health_last_error'            => 'Último error',
     'health_last_reactivation'     => 'Última reactivación',
+    'health_inactive_help'         => 'Con el canal inactivo no se puede enviar nada. Usa Probar conexión aquí abajo: si la prueba va bien, se reactiva automáticamente.',
     'health_never'                 => 'Nunca',
     'account_reactivated'          => 'Conexión restaurada - cuenta reactivada automáticamente (verificada como ":name").',
 
@@ -102,6 +103,7 @@ return [
     'template_window_open'         => 'La ventana del cliente ha vuelto a abrirse: envía una respuesta normal en vez de una plantilla de pago.',
     'template_already_sent'        => 'Ya se ha enviado una plantilla hace unos momentos para esta conversación.',
 
+    'account_inactive_notice'          => 'Este canal de WhatsApp está inactivo, así que no se puede enviar nada. Abre la configuración del canal para comprobar la conexión y reactivarlo.',
     'browse_templates_link'        => 'Ver todas las plantillas aprobadas…',
     'templates_picker_title'       => 'Enviar una plantilla de WhatsApp',
     'templates_picker_back'        => '← Volver a la conversación',

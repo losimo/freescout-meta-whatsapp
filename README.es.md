@@ -61,6 +61,11 @@ Queda fuera de alcance:
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
+## Novedades en la v1.8.1
+
+- **Corrección**: los últimos mensajes de registro que aún salían en catalán ahora están en inglés. La corrección original tradujo las llamadas a `Log::` y dejó los mensajes de las excepciones, que llegan igualmente al `laravel-*.log`, tanto porque el worker registra la excepción no capturada como por el `failed()` del propio módulo. Como solo saltan en errores transitorios, pasaron desapercibidos dos meses.
+- **Corrección**: enviar una plantilla con la cuenta inactiva no dejaba ningún rastro, mientras que la conversación seguía aparentando que el mensaje había salido. Ahora el intento se registra como fallo y se loguea, el banner de la conversación ya no ofrece botones de envío con el canal parado, y el panel de salud por fin dice si el canal está activo.
+
 ## Novedades en la v1.8.0
 
 - **Los fallos de entrega se registran venga como venga el error de Meta.** Meta devuelve los errores de la Cloud API o bien en la respuesta del envío, o bien más tarde por el webhook de estados, y el canal documentado no es fiable: el `131047` figura como síncrono pero llega por el webhook. El módulo solo tenía la semántica de errores en el camino de la respuesta, así que para los mensajes de texto la rama del `131047` no se ejecutaba nunca, y el camino del webhook, que sí se ejecuta, no escribía nada en el registro. Por eso la corrección de registro de la v1.6.2 parecía no cambiar nada. Ahora todos los jobs de salida y el webhook comparten un único gestor de fallos.

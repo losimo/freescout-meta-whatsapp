@@ -98,6 +98,10 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 'conversation' => $conversation,
                 'account'      => $account,
                 'phone'        => $phone,
+                // Un compte inactiu no pot enviar res. Oferir-hi els botons
+                // fa que l'agent hi insisteixi sense que surti mai cap
+                // missatge; val més dir-li que el canal està aturat.
+                'accountActive' => (bool) $account->is_active,
             ])->render();
         }, 20, 2);
 

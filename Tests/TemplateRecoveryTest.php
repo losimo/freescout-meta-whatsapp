@@ -658,4 +658,29 @@ class TemplateRecoveryTest extends TestCase
             $html
         );
     }
+
+    /**
+     * Un compte inactiu no pot enviar res, però el controlador ja ha creat
+     * el fil d'auditoria i ha dit a l'agent que la plantilla estava
+     * encuada. Sortir en silenci deixava una conversa que aparenta un
+     * enviament que no ha existit.
+     */
+    public function test_un_compte_inactiu_registra_la_fallida_en_lloc_de_callar()
+    {
+        \Log::spy();
+        $account = $this->createTestAccount(['is_active' => false]);
+        $thread  = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+
+        (new SendWhatsAppTemplate($account->id, $thread->id, '+34611222333'))->handle();
+
+        $failed = WhatsAppMessage::where('thread_id', $thread->id)
+            ->where('status', WhatsAppMessage::STATUS_FAILED)
+            ->first();
+        $this->assertNotNull($failed, 'Ha de quedar rastre de la plantilla no enviada.');
+        $this->assertEquals('account_inactive', $failed->error_code);
+
+        \Log::shouldHaveReceived('error')->withArgs(function ($message) {
+            return $message === '[MetaWhatsApp] Template not sent: account missing or inactive';
+        })->once();
+    }
 }
