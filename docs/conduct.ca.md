@@ -1,6 +1,6 @@
 # Codi de conducta
 
-[Català](CODE_OF_CONDUCT.ca.md) · [English](CODE_OF_CONDUCT.md) · [Castellano](CODE_OF_CONDUCT.es.md)
+[Català](conduct.ca.md) · [English](../CODE_OF_CONDUCT.md) · [Castellano](conduct.es.md)
 
 Aquest projecte vol una comunitat oberta i exigent alhora. La regla general cap en una frase: tracta les persones amb respecte i les idees amb rigor.
 
@@ -22,11 +22,13 @@ Aquest projecte vol una comunitat oberta i exigent alhora. La regla general cap 
 
 Aquest codi s'aplica a issues, PRs, discussions i qualsevol altra comunicació vinculada al projecte.
 
-Els incompliments es poden reportar de manera privada al mantenidor: losimo@gmail.com.
+Els incompliments es poden reportar de manera privada al mantenidor: losimo@gmail.com. Les denúncies es tracten de manera confidencial: el teu nom no es comparteix amb la persona denunciada, ni amb ningú altre, sense preguntar-t'ho abans.
+
+Aquest projecte el manté una sola persona, així que si la teva queixa és sobre el mantenidor no hi ha cap instància interna a qui recórrer. En aquest cas ho pots reportar directament a GitHub: https://docs.github.com/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam
 
 ## Mesures
 
-Les mesures seran proporcionals i progressives: avís, bloqueig temporal o expulsió permanent. Els casos greus poden rebre una resposta immediata.
+Les mesures seran proporcionals i progressives. A la pràctica són amagar o esborrar comentaris, bloquejar el compte del repositori i reportar-lo a GitHub. Els casos greus poden anar directament a l'última.
 
 ## Final
 

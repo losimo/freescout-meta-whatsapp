@@ -1,6 +1,6 @@
 # Code of Conduct
 
-[Català](CODE_OF_CONDUCT.ca.md) · [English](CODE_OF_CONDUCT.md) · [Castellano](CODE_OF_CONDUCT.es.md)
+[Català](docs/conduct.ca.md) · [English](CODE_OF_CONDUCT.md) · [Castellano](docs/conduct.es.md)
 
 This project wants a community that is open and demanding at the same time. The general rule fits in one sentence: treat people with respect and ideas with rigor.
 
@@ -22,11 +22,13 @@ This project wants a community that is open and demanding at the same time. The 
 
 This code applies to issues, PRs, discussions and any other communication linked to the project.
 
-Violations can be reported privately to the maintainer: losimo@gmail.com.
+Violations can be reported privately to the maintainer: losimo@gmail.com. Reports are treated confidentially: your name is not shared with the person you are reporting, or with anyone else, without asking you first.
+
+This project is maintained by one person, so if your complaint is about the maintainer there is no internal appeal. In that case you can report it to GitHub directly: https://docs.github.com/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam
 
 ## Measures
 
-Measures will be proportional and progressive: warning, temporary block or permanent ban. Serious cases may receive an immediate response.
+Measures will be proportional and progressive. In practice they are hiding or deleting comments, blocking the account from the repository, and reporting it to GitHub. Serious cases may skip straight to the last of these.
 
 ## Final
 
