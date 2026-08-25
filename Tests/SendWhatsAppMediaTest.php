@@ -69,14 +69,50 @@ class SendWhatsAppMediaTest extends TestCase
         ]);
     }
 
-    public function test_compte_inactiu_no_envia_ni_crea_fila()
+    /**
+     * Mateix canvi que al job de text (issue #29): amb el compte inactiu
+     * no s'envia res, però ha de quedar-ne constància.
+     */
+    public function test_compte_inactiu_no_envia_pero_deixa_constancia()
     {
         $account = $this->createTestAccount(['is_active' => false]);
         [$thread, $attachment] = $this->makeConversationWithThreadAndAttachment($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
 
         (new SendWhatsAppMedia($account->id, $thread->id, '+34611222333', $attachment->id))->handle();
 
-        $this->assertEquals(0, WhatsAppMessage::where('attachment_id', $attachment->id)->count());
+        $failed = WhatsAppMessage::where('thread_id', $thread->id)
+            ->where('status', WhatsAppMessage::STATUS_FAILED)
+            ->first();
+        $this->assertNotNull($failed);
+        $this->assertEquals('account_inactive', $failed->error_code);
+
+        $this->assertEquals(
+            0,
+            WhatsAppMessage::where('attachment_id', $attachment->id)
+                ->where('status', WhatsAppMessage::STATUS_SENT)
+                ->count()
+        );
+    }
+
+    /**
+     * Una resposta amb tres adjunts encua tres jobs. La nota ha de sortir
+     * una vegada, no tres.
+     */
+    public function test_una_sola_nota_encara_que_hi_hagi_diversos_adjunts()
+    {
+        $account = $this->createTestAccount(['is_active' => false]);
+        [$thread, $attachment] = $this->makeConversationWithThreadAndAttachment($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+
+        (new SendWhatsAppMedia($account->id, $thread->id, '+34611222333', $attachment->id))->handle();
+        (new SendWhatsAppMedia($account->id, $thread->id, '+34611222333', $attachment->id))->handle();
+
+        $this->assertEquals(
+            1,
+            Thread::where('conversation_id', $thread->conversation_id)
+                ->where('type', Thread::TYPE_NOTE)
+                ->where('body', 'like', '[WhatsApp not sent]%')
+                ->count()
+        );
     }
 
     public function test_idempotencia_per_adjunt_curtcircuita_abans_del_http()

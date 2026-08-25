@@ -13,6 +13,7 @@ use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 use Modules\MetaWhatsApp\Support\DeliveryFailure;
+use Modules\MetaWhatsApp\Support\OutboundGuard;
 
 class SendWhatsAppMedia implements ShouldQueue
 {
@@ -55,13 +56,16 @@ class SendWhatsAppMedia implements ShouldQueue
 
     public function handle()
     {
-        $account = WhatsAppAccount::find($this->accountId);
-        if (!$account || !$account->is_active) {
-            Log::warning('[MetaWhatsApp] SendWhatsAppMedia: account missing or inactive', [
-                'account_id'    => $this->accountId,
-                'thread_id'     => $this->threadId,
-                'attachment_id' => $this->attachmentId,
-            ]);
+        $account = OutboundGuard::accountForSending(
+            $this->accountId,
+            $this->threadId,
+            OutboundGuard::SUBJECT_MEDIA
+        );
+        if (!$account) {
+            $thread = Thread::find($this->threadId);
+            if ($thread) {
+                $this->recordFailure($this->accountId, $thread, 'account_inactive');
+            }
             return;
         }
 
@@ -230,19 +234,25 @@ class SendWhatsAppMedia implements ShouldQueue
 
     protected function recordFailure(int $accountId, Thread $thread, string $errorCode)
     {
-        WhatsAppMessage::create([
-            // Els fallits no tenen wamid de Meta: clau sintètica única per
+        // firstOrCreate i no create: el wamid sintètic té UNIQUE i aquest
+        // mètode es pot cridar dues vegades per al mateix adjunt, per
+        // exemple en un reintent del worker. Amb create, la segona petava
+        // per clau duplicada.
+        WhatsAppMessage::firstOrCreate(
+            // Els fallits no tenen wamid de Meta: clau sintètica per
             // thread+adjunt (el wamid té UNIQUE a la taula).
-            'wamid'           => 'failed-thread-' . $thread->id . '-att-' . $this->attachmentId,
-            'account_id'      => $accountId,
-            'conversation_id' => $thread->conversation_id,
-            'thread_id'       => $thread->id,
-            'attachment_id'   => $this->attachmentId,
-            'contact_phone'   => $this->toPhone,
-            'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
-            'status'          => WhatsAppMessage::STATUS_FAILED,
-            'error_code'      => substr($errorCode, 0, 20),
-        ]);
+            ['wamid' => 'failed-thread-' . $thread->id . '-att-' . $this->attachmentId],
+            [
+                'account_id'      => $accountId,
+                'conversation_id' => $thread->conversation_id,
+                'thread_id'       => $thread->id,
+                'attachment_id'   => $this->attachmentId,
+                'contact_phone'   => $this->toPhone,
+                'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+                'status'          => WhatsAppMessage::STATUS_FAILED,
+                'error_code'      => substr($errorCode, 0, 20),
+            ]
+        );
     }
 
     public function failed(\Throwable $e)

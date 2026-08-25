@@ -61,6 +61,14 @@ Queda fora d'abast:
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
+## Novetats a la v1.9.0
+
+- **Una sola font de plantilles.** La plantilla heretada (`template_name` / `template_lang`) i les cinc ranures eren un o l'altre: amb una ranura vàlida, el parell antic no es llegia mai, mentre que el formulari li donava el lloc principal. Una migració plega el valor que quedi a la primera ranura lliure i elimina les dues columnes. Mai sobreescriu una ranura amb contingut, i deixa el valor al registre si totes cinc estan plenes, cas en què ja era inabastable.
+- **Els botons i el selector en viu ja no surten alhora.** Amb plantilles configurades, l'agent veu només aquells botons; sense cap, només el selector. Els administradors conserven el selector en tots dos casos, perquè el WhatsApp Manager és incòmode per consultar què té Meta aprovat.
+- **La secció de plantilles explica quina configuració guanya** i què veurà l'agent, cosa que fins ara només se sabia llegint el codi.
+- **Correcció**: amb el canal inactiu no s'enviava res i només les plantilles ho deien. Les respostes de text i el multimèdia, que són el cas habitual, sortien en silenci. Ara tots els camins comparteixen una sola comprovació, registren la fallida i deixen nota a la conversa, i el banner avisa encara que la finestra del client sigui oberta.
+- **Correcció**: el banner oferia als agents enllaços a la configuració del canal, que és només d'administrador, i seguir-los donava un 403. Ara reben la mateixa informació com a text dient què ha de fer un administrador.
+
 ## Novetats a la v1.8.1
 
 - **Correcció**: els últims missatges de registre que encara sortien en català ara són en anglès. La correcció original va traduir les crides a `Log::` i es va deixar els missatges de les excepcions, que arriben igualment al `laravel-*.log`, tant perquè el worker registra l'excepció no capturada com pel `failed()` del propi mòdul. Com que només salten en errors transitoris, van passar desapercebuts dos mesos.

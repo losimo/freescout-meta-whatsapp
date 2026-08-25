@@ -87,7 +87,15 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 return;
             }
             $account = WhatsAppAccount::find($accountId);
-            if (!$account || !WhatsAppMessage::windowExpired($conversation->id, $account)) {
+            if (!$account) {
+                return;
+            }
+
+            // Un canal aturat s'ha d'avisar encara que la finestra sigui
+            // oberta (issue #29): és quan l'agent escriu amb tota
+            // normalitat que la pèrdua passa més desapercebuda.
+            $inactive = !$account->is_active;
+            if (!$inactive && !WhatsAppMessage::windowExpired($conversation->id, $account)) {
                 return;
             }
             $phone = WhatsAppMessage::where('conversation_id', $conversation->id)
@@ -101,7 +109,7 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 // Un compte inactiu no pot enviar res. Oferir-hi els botons
                 // fa que l'agent hi insisteixi sense que surti mai cap
                 // missatge; val més dir-li que el canal està aturat.
-                'accountActive' => (bool) $account->is_active,
+                'accountActive' => !$inactive,
             ])->render();
         }, 20, 2);
 

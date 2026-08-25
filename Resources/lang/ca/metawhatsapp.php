@@ -35,14 +35,12 @@ return [
     'webhook_url_help'             => 'Copia aquesta URL a la configuració del webhook de la teva aplicació Meta.',
     'copy'                         => 'Copia',
 
-    'template_name'                => 'Nom de la plantilla de recuperació',
-    'template_name_help'           => 'Nom exacte d\'una plantilla ja aprovada a WhatsApp Manager. No s\'admeten variables.',
     'template_cost_warning'        => 'Meta factura els missatges de plantilla per missatge lliurat.',
     'template_lang'                => 'Codi d\'idioma de la plantilla',
     'template_threshold'           => 'Llindar de caducitat de la finestra (minuts)',
     'template_threshold_help'      => 'La finestra oficial d\'atenció al client de Meta és de 24 hores des de l\'últim missatge del client. Aquesta opció només defineix quan el mòdul comença a tractar la finestra com a caducada, com a marge de seguretat operatiu intern - no canvia la regla de Meta. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Consulta la documentació de Meta</a>.',
 
-    'templates_multi_help'         => 'Opcional: configura fins a 5 plantilles (p. ex. una per idioma) en lloc de la única de dalt. Deixa el nom/idioma d\'una fila en blanc per ometre-la. Amb almenys una fila plena, els agents veuran un botó per plantilla.',
+    'templates_multi_help'         => 'Fins a cinc plantilles, per exemple una per idioma. Una fila sense nom o sense codi d\'idioma es descarta en desar.',
     'template_row_id'              => 'Nom de la plantilla',
     'template_row_display_name'    => 'Text del botó',
     'template_row_recovery_text'   => 'Text de recuperació mostrat a la conversa',
@@ -104,6 +102,12 @@ return [
     'template_already_sent'        => 'Ja s\'ha enviat una plantilla fa uns moments per a aquesta conversa.',
 
     'account_inactive_notice'          => 'Aquest canal de WhatsApp està inactiu, així que no es pot enviar res. Obre la configuració del canal per comprovar la connexió i reactivar-lo.',
+    'not_sent_channel_inactive'   => 'No s\'ha enviat res a WhatsApp: aquest canal està inactiu. Quan un administrador restableixi la connexió, caldrà tornar a enviar el missatge.',
+    'account_inactive_banner'      => 'Aquest canal de WhatsApp està inactiu. Les respostes que escriguis aquí no arribaran al client fins que un administrador restableixi la connexió.',
+    'templates_section_help' => 'Configura fins a cinc plantilles aprovades aquí sota. Amb almenys una de plena, els agents veuen un botó per plantilla i res més. Sense cap, els agents reben un enllaç per consultar totes les plantilles que Meta té aprovades per a aquest compte. Els administradors conserven sempre aquest enllaç, perquè és una via més ràpida de consultar noms i idiomes que no pas el WhatsApp Manager.',
+    'browse_templates_admin_only' => 'Només visible per a administradors.',
+    'account_inactive_notice_agent' => 'Demana a un administrador que revisi la connexió del canal de WhatsApp.',
+    'template_not_configured_agent' => 'Aquest canal de WhatsApp no té cap plantilla configurada. Un administrador n\'hi ha d\'afegir una perquè la puguis enviar.',
     'browse_templates_link'        => 'Veure totes les plantilles aprovades…',
     'templates_picker_title'       => 'Enviar una plantilla de WhatsApp',
     'templates_picker_back'        => '← Tornar a la conversa',

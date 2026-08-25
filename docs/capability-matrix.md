@@ -1,6 +1,6 @@
 # Capability matrix
 
-**Last updated:** v1.8.0
+**Last updated:** v1.9.0
 
 A live map of what this module supports against the Meta WhatsApp Cloud API, kept up to date at every release. Update this file whenever a capability's status changes — it's the reference to check before triaging a new issue, not a one-off spec.
 

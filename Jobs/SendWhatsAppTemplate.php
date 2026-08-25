@@ -12,12 +12,13 @@ use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 use Modules\MetaWhatsApp\Support\DeliveryFailure;
+use Modules\MetaWhatsApp\Support\OutboundGuard;
 
 /**
  * Mirall de SendWhatsAppMessage per al mecanisme de recuperació: envia una
  * plantilla pre-aprovada quan la finestra de servei de 24 h ha expirat.
- * Diferències respecte al job de text pla: (a) llegeix template_name/
- * template_lang del compte i avorta si no hi són; (b) crida sendTemplate()
+ * Diferències respecte al job de text pla: (a) llegeix les plantilles
+ * configurades del compte i avorta si no n'hi ha cap; (b) crida sendTemplate()
  * en lloc de sendText() — per tant no hi ha branch 131047 (fora de
  * finestra), ja que la plantilla és precisament el mecanisme legal per
  * a aquest cas.
@@ -49,7 +50,7 @@ class SendWhatsAppTemplate implements ShouldQueue
 
     /**
      * $templateId/$templateLanguage identifiquen quina plantilla cal enviar.
-     * Si es deixen null, cau al parell legacy template_name/template_lang
+     * Si es deixen null, s'agafa la primera plantilla configurada
      * del compte (comptes d'una sola plantilla, compatibilitat amb crides
      * existents).
      *
@@ -81,19 +82,12 @@ class SendWhatsAppTemplate implements ShouldQueue
 
     public function handle()
     {
-        $account = WhatsAppAccount::find($this->accountId);
-        if (!$account || !$account->is_active) {
-            // Not a silent return: the controller has already created the
-            // audit thread and told the agent the template was queued, so
-            // leaving no trace produces a conversation that looks like a
-            // send happened when nothing left the building. Accounts are
-            // deactivated automatically on error 190, which typically bites
-            // on a Monday with a token that expired over the weekend.
-            Log::error('[MetaWhatsApp] Template not sent: account missing or inactive', [
-                'account_id' => $this->accountId,
-                'thread_id'  => $this->threadId,
-            ]);
-
+        $account = OutboundGuard::accountForSending(
+            $this->accountId,
+            $this->threadId,
+            OutboundGuard::SUBJECT_TEMPLATE
+        );
+        if (!$account) {
             $thread = Thread::find($this->threadId);
             if ($thread) {
                 $this->recordFailure($this->accountId, $thread, 'account_inactive');
@@ -134,8 +128,12 @@ class SendWhatsAppTemplate implements ShouldQueue
             $templateName = $template['id'] ?? null;
             $templateLang = $template['language'] ?? null;
         } else {
-            $templateName = $account->template_name;
-            $templateLang = $account->template_lang;
+            // Sense plantilla identificada: la primera configurada. Abans
+            // aquí es llegia el parell template_name/template_lang, que la
+            // #2 va plegar dins les ranures i ja no existeix.
+            $first        = $account->getTemplateList()[0] ?? null;
+            $templateName = $first['id'] ?? null;
+            $templateLang = $first['language'] ?? null;
         }
 
         if (empty($templateName) || empty($templateLang)) {
@@ -208,17 +206,20 @@ class SendWhatsAppTemplate implements ShouldQueue
 
     protected function recordFailure(int $accountId, Thread $thread, string $errorCode)
     {
-        WhatsAppMessage::create([
-            // Els fallits no tenen wamid de Meta: clau sintètica única per thread.
-            'wamid'           => 'failed-thread-' . $thread->id,
-            'account_id'      => $accountId,
-            'conversation_id' => $thread->conversation_id,
-            'thread_id'       => $thread->id,
-            'contact_phone'   => $this->toPhone,
-            'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
-            'status'          => WhatsAppMessage::STATUS_FAILED,
-            'error_code'      => substr($errorCode, 0, 20),
-        ]);
+        // firstOrCreate i no create: vegeu el mateix mètode al job de text.
+        WhatsAppMessage::firstOrCreate(
+            // Els fallits no tenen wamid de Meta: clau sintètica per thread.
+            ['wamid' => 'failed-thread-' . $thread->id],
+            [
+                'account_id'      => $accountId,
+                'conversation_id' => $thread->conversation_id,
+                'thread_id'       => $thread->id,
+                'contact_phone'   => $this->toPhone,
+                'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+                'status'          => WhatsAppMessage::STATUS_FAILED,
+                'error_code'      => substr($errorCode, 0, 20),
+            ]
+        );
     }
 
     public function failed(\Throwable $e)

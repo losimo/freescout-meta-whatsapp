@@ -61,6 +61,14 @@ Queda fuera de alcance:
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
+## Novedades en la v1.9.0
+
+- **Una sola fuente de plantillas.** La plantilla heredada (`template_name` / `template_lang`) y las cinco ranuras eran una u otra: con una ranura válida, el par antiguo no se leía nunca, mientras el formulario le daba el lugar principal. Una migración pliega el valor que quede en la primera ranura libre y elimina ambas columnas. Nunca sobrescribe una ranura con contenido, y deja el valor en el registro si las cinco están llenas, caso en que ya era inalcanzable.
+- **Los botones y el selector en vivo ya no salen a la vez.** Con plantillas configuradas, el agente ve solo esos botones; sin ninguna, solo el selector. Los administradores conservan el selector en ambos casos, porque WhatsApp Manager es incómodo para consultar qué tiene Meta aprobado.
+- **La sección de plantillas explica qué configuración gana** y qué verá el agente, algo que hasta ahora solo se sabía leyendo el código.
+- **Corrección**: con el canal inactivo no se enviaba nada y solo las plantillas lo decían. Las respuestas de texto y el multimedia, que son el caso habitual, salían en silencio. Ahora todos los caminos comparten una sola comprobación, registran el fallo y dejan nota en la conversación, y el banner avisa aunque la ventana del cliente esté abierta.
+- **Corrección**: el banner ofrecía a los agentes enlaces a la configuración del canal, que es solo de administrador, y seguirlos daba un 403. Ahora reciben la misma información como texto diciendo qué debe hacer un administrador.
+
 ## Novedades en la v1.8.1
 
 - **Corrección**: los últimos mensajes de registro que aún salían en catalán ahora están en inglés. La corrección original tradujo las llamadas a `Log::` y dejó los mensajes de las excepciones, que llegan igualmente al `laravel-*.log`, tanto porque el worker registra la excepción no capturada como por el `failed()` del propio módulo. Como solo saltan en errores transitorios, pasaron desapercibidos dos meses.

@@ -35,14 +35,12 @@ return [
     'webhook_url_help'             => 'Copy this URL to the webhook configuration of your Meta App.',
     'copy'                         => 'Copy',
 
-    'template_name'                => 'Recovery template name',
-    'template_name_help'           => 'Exact name of a template already approved in WhatsApp Manager. No variables are supported.',
     'template_cost_warning'        => 'Meta bills template messages per message delivered.',
     'template_lang'                => 'Template language code',
     'template_threshold'           => 'Window expiry threshold (minutes)',
     'template_threshold_help'      => 'Meta\'s official customer service window is 24 hours from the customer\'s last message. This setting only defines when the module starts treating the window as expired, as an internal operational safety margin - it does not change Meta\'s rule. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">See Meta docs</a>.',
 
-    'templates_multi_help'         => 'Optional: configure up to 5 templates (e.g. one per language) instead of the single one above. Leave a row\'s name/language blank to skip it. When at least one row is filled in, agents see one button per template.',
+    'templates_multi_help'         => 'Up to five templates, for example one per language. A row with no name or no language code is discarded when saving.',
     'template_row_id'              => 'Template name',
     'template_row_display_name'    => 'Button label',
     'template_row_recovery_text'   => 'Recovery text shown in the conversation',
@@ -105,6 +103,12 @@ return [
 
     // Picker dinàmic de plantilles (issue #2, punt 2 complet).
     'account_inactive_notice'          => 'This WhatsApp channel is currently inactive, so nothing can be sent. Open the channel settings to check the connection and reactivate it.',
+    'not_sent_channel_inactive'   => 'Nothing was sent to WhatsApp: this channel is inactive. Once an administrator restores the connection, the message has to be sent again.',
+    'account_inactive_banner'      => 'This WhatsApp channel is inactive. Replies written here will not reach the customer until an administrator restores the connection.',
+    'templates_section_help' => 'Configure up to five approved templates below. When at least one is filled in, agents see one button per template and nothing else. When none are, agents get a link to browse every template Meta has approved for this account. Administrators always keep that link, since it is a quicker way to check names and languages than WhatsApp Manager.',
+    'browse_templates_admin_only' => 'Visible to administrators only.',
+    'account_inactive_notice_agent' => 'Ask an administrator to check the WhatsApp channel connection.',
+    'template_not_configured_agent' => 'No template is configured for this WhatsApp channel. An administrator has to add one before you can send it.',
     'browse_templates_link'        => 'Browse all approved templates…',
     'templates_picker_title'       => 'Send a WhatsApp template',
     'templates_picker_back'        => '← Back to conversation',

@@ -35,14 +35,12 @@ return [
     'webhook_url_help'             => 'Copia esta URL en la configuración del webhook de tu aplicación Meta.',
     'copy'                         => 'Copiar',
 
-    'template_name'                => 'Nombre de la plantilla de recuperación',
-    'template_name_help'           => 'Nombre exacto de una plantilla ya aprobada en WhatsApp Manager. No se admiten variables.',
     'template_cost_warning'        => 'Meta factura los mensajes de plantilla por mensaje entregado.',
     'template_lang'                => 'Código de idioma de la plantilla',
     'template_threshold'           => 'Umbral de caducidad de la ventana (minutos)',
     'template_threshold_help'      => 'La ventana oficial de atención al cliente de Meta es de 24 horas desde el último mensaje del cliente. Esta opción solo define cuándo el módulo empieza a tratar la ventana como caducada, como margen de seguridad operativo interno - no cambia la regla de Meta. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Consulta la documentación de Meta</a>.',
 
-    'templates_multi_help'         => 'Opcional: configura hasta 5 plantillas (p. ej. una por idioma) en vez de la única de arriba. Deja el nombre/idioma de una fila en blanco para omitirla. Con al menos una fila rellenada, los agentes verán un botón por plantilla.',
+    'templates_multi_help'         => 'Hasta cinco plantillas, por ejemplo una por idioma. Una fila sin nombre o sin código de idioma se descarta al guardar.',
     'template_row_id'              => 'Nombre de la plantilla',
     'template_row_display_name'    => 'Texto del botón',
     'template_row_recovery_text'   => 'Texto de recuperación mostrado en la conversación',
@@ -104,6 +102,12 @@ return [
     'template_already_sent'        => 'Ya se ha enviado una plantilla hace unos momentos para esta conversación.',
 
     'account_inactive_notice'          => 'Este canal de WhatsApp está inactivo, así que no se puede enviar nada. Abre la configuración del canal para comprobar la conexión y reactivarlo.',
+    'not_sent_channel_inactive'   => 'No se ha enviado nada a WhatsApp: este canal está inactivo. Cuando un administrador restablezca la conexión, habrá que enviar el mensaje de nuevo.',
+    'account_inactive_banner'      => 'Este canal de WhatsApp está inactivo. Las respuestas que escribas aquí no llegarán al cliente hasta que un administrador restablezca la conexión.',
+    'templates_section_help' => 'Configura hasta cinco plantillas aprobadas aquí abajo. Con al menos una rellenada, los agentes ven un botón por plantilla y nada más. Sin ninguna, los agentes reciben un enlace para consultar todas las plantillas que Meta tiene aprobadas para esta cuenta. Los administradores conservan siempre ese enlace, porque es una vía más rápida de consultar nombres e idiomas que el WhatsApp Manager.',
+    'browse_templates_admin_only' => 'Solo visible para administradores.',
+    'account_inactive_notice_agent' => 'Pide a un administrador que revise la conexión del canal de WhatsApp.',
+    'template_not_configured_agent' => 'Este canal de WhatsApp no tiene ninguna plantilla configurada. Un administrador tiene que añadir una para que puedas enviarla.',
     'browse_templates_link'        => 'Ver todas las plantillas aprobadas…',
     'templates_picker_title'       => 'Enviar una plantilla de WhatsApp',
     'templates_picker_back'        => '← Volver a la conversación',

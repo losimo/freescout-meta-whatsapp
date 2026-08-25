@@ -120,14 +120,16 @@ class TemplateRecoveryTest extends TestCase
     public function test_el_compte_persisteix_la_configuracio_de_plantilla()
     {
         $account = $this->createTestAccount();
-        $account->template_name              = 'recover_conversation';
-        $account->template_lang              = 'es_ES';
+        $account->templates                  = [[
+            'id' => 'recover_conversation', 'language' => 'es_ES',
+            'display_name' => 'recover_conversation', 'recovery_text' => null,
+        ]];
         $account->template_threshold_minutes = 120;
         $account->save();
 
         $fresh = WhatsAppAccount::find($account->id);
-        $this->assertEquals('recover_conversation', $fresh->template_name);
-        $this->assertEquals('es_ES', $fresh->template_lang);
+        $this->assertEquals('recover_conversation', $fresh->getTemplateList()[0]['id']);
+        $this->assertEquals('es_ES', $fresh->getTemplateList()[0]['language']);
         $this->assertEquals(120, $fresh->template_threshold_minutes);
     }
 
@@ -170,8 +172,10 @@ class TemplateRecoveryTest extends TestCase
     public function test_el_job_de_plantilla_envia_el_payload_template_i_desa_el_wamid()
     {
         $account = $this->createTestAccount();
-        $account->template_name = 'recover_conversation';
-        $account->template_lang = 'es_ES';
+        $account->templates = [[
+            'id' => 'recover_conversation', 'language' => 'es_ES',
+            'display_name' => 'recover_conversation', 'recovery_text' => null,
+        ]];
         $account->save();
         $thread = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
 
@@ -203,7 +207,7 @@ class TemplateRecoveryTest extends TestCase
 
     public function test_el_job_de_plantilla_sense_config_marca_failed_i_no_crida_meta()
     {
-        // Compte sense template_name/template_lang configurats.
+        // Compte sense cap plantilla configurada.
         $account = $this->createTestAccount();
         $thread  = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
 
@@ -234,8 +238,10 @@ class TemplateRecoveryTest extends TestCase
     public function test_post_enviament_de_plantilla_configurat_i_autoritzat_encua_job_i_crea_thread_auditoria()
     {
         $account = $this->createTestAccount();
-        $account->template_name = 'recover_conversation';
-        $account->template_lang = 'es_ES';
+        $account->templates = [[
+            'id' => 'recover_conversation', 'language' => 'es_ES',
+            'display_name' => 'recover_conversation', 'recovery_text' => null,
+        ]];
         $account->save();
 
         $this->runJob($account, $this->inboundPayload($account, 'wamid.ctrl1', '34611222333', 'hola'));
@@ -269,7 +275,7 @@ class TemplateRecoveryTest extends TestCase
 
     public function test_post_sense_plantilla_configurada_retorna_error_i_no_encua()
     {
-        // createTestAccount() no fixa template_name/template_lang.
+        // createTestAccount() no configura cap plantilla.
         $account = $this->createTestAccount();
 
         $this->runJob($account, $this->inboundPayload($account, 'wamid.ctrl2', '34611222333', 'hola'));
@@ -315,8 +321,10 @@ class TemplateRecoveryTest extends TestCase
     public function test_post_sense_telefon_resoluble_retorna_error_i_no_encua()
     {
         $account = $this->createTestAccount();
-        $account->template_name = 'recover_conversation';
-        $account->template_lang = 'es_ES';
+        $account->templates = [[
+            'id' => 'recover_conversation', 'language' => 'es_ES',
+            'display_name' => 'recover_conversation', 'recovery_text' => null,
+        ]];
         $account->save();
 
         // Fila BSUID-only: resol el compte (és "del mòdul") però sense
@@ -359,8 +367,10 @@ class TemplateRecoveryTest extends TestCase
         // recent: la finestra és oberta i el POST s'ha de rebutjar amb el
         // missatge template_window_open (re-check de finestra al servidor).
         $account = $this->createTestAccount();
-        $account->template_name = 'recover_conversation';
-        $account->template_lang = 'es_ES';
+        $account->templates = [[
+            'id' => 'recover_conversation', 'language' => 'es_ES',
+            'display_name' => 'recover_conversation', 'recovery_text' => null,
+        ]];
         $account->save();
 
         $this->runJob($account, $this->inboundPayload($account, 'wamid.win1', '34611222333', 'hola'));
@@ -392,8 +402,10 @@ class TemplateRecoveryTest extends TestCase
         // crear el thread d'auditoria i encuar el job; el segon (dins dels
         // 60 segons) s'ha de rebutjar sense duplicar-los.
         $account = $this->createTestAccount();
-        $account->template_name = 'recover_conversation';
-        $account->template_lang = 'es_ES';
+        $account->templates = [[
+            'id' => 'recover_conversation', 'language' => 'es_ES',
+            'display_name' => 'recover_conversation', 'recovery_text' => null,
+        ]];
         $account->save();
 
         $this->runJob($account, $this->inboundPayload($account, 'wamid.idem1', '34611222333', 'hola'));
@@ -448,8 +460,10 @@ class TemplateRecoveryTest extends TestCase
     public function test_get_template_list_cau_al_parell_legacy_quan_templates_es_buit()
     {
         $account = $this->createTestAccount();
-        $account->template_name = 'recover_conversation';
-        $account->template_lang = 'es_ES';
+        $account->templates = [[
+            'id' => 'recover_conversation', 'language' => 'es_ES',
+            'display_name' => 'recover_conversation', 'recovery_text' => null,
+        ]];
         $account->save();
 
         $list = WhatsAppAccount::find($account->id)->getTemplateList();
@@ -629,19 +643,24 @@ class TemplateRecoveryTest extends TestCase
         $this->assertStringContainsString('templates[4][id]', $response->getContent());
     }
 
-    public function test_banner_sense_template_lang_no_mostra_boto_i_mostra_no_configurat()
+    public function test_banner_sense_idioma_no_mostra_boto_i_mostra_no_configurat()
     {
         // Acord banner-controlador: el guard del controlador exigeix nom I
         // idioma; el banner ha de fer el mateix o mostraria un botó que
         // sempre acabaria en template_not_configured (UI sense sortida).
         $account = $this->createTestAccount();
-        $account->template_name = 'recover_conversation';
-        $account->template_lang = null;
+        // Mitja parella: una ranura sense idioma no produeix cap plantilla.
+        $account->templates = [[
+            'id' => 'recover_conversation', 'language' => null,
+            'display_name' => 'recover_conversation', 'recovery_text' => null,
+        ]];
         $account->save();
 
         $conversation = new Conversation();
         $conversation->id = 999999;
 
+        // Com a administrador: és qui rep l'enllaç a la configuració.
+        $this->actingAs($this->makeAdminUser());
         $html = \View::make('metawhatsapp::partials/window_banner', [
             'conversation' => $conversation,
             'account'      => $account,
@@ -651,7 +670,7 @@ class TemplateRecoveryTest extends TestCase
         $this->assertStringNotContainsString(
             '/send-template',
             $html,
-            'Sense template_lang no s\'ha de renderitzar el formulari d\'enviament.'
+            'Sense idioma no s\'ha de renderitzar el formulari d\'enviament.'
         );
         $this->assertStringContainsString(
             __('metawhatsapp::metawhatsapp.template_not_configured'),
@@ -679,8 +698,126 @@ class TemplateRecoveryTest extends TestCase
         $this->assertNotNull($failed, 'Ha de quedar rastre de la plantilla no enviada.');
         $this->assertEquals('account_inactive', $failed->error_code);
 
-        \Log::shouldHaveReceived('error')->withArgs(function ($message) {
-            return $message === '[MetaWhatsApp] Template not sent: account missing or inactive';
+        \Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
+            return $message === '[MetaWhatsApp] Nothing sent: the WhatsApp channel is missing or inactive'
+                && ($context['subject'] ?? null) === 'template';
         })->once();
+    }
+
+    /**
+     * Issue #2: la plantilla heretada s'ha plegat dins les ranures i el
+     * model ja no hi té cap fallback. Amb una ranura vàlida es fa servir
+     * aquella; sense cap, no n'hi ha cap, sense mitges tintes.
+     */
+    public function test_una_sola_font_de_plantilles_sense_fallback()
+    {
+        $account = $this->createTestAccount();
+        $this->assertSame([], $account->getTemplateList());
+
+        $account->templates = [
+            ['id' => 'a', 'language' => 'ca', 'display_name' => 'A', 'recovery_text' => null],
+            ['id' => '',  'language' => 'ca', 'display_name' => 'B', 'recovery_text' => null],
+            ['id' => 'c', 'language' => '',   'display_name' => 'C', 'recovery_text' => null],
+        ];
+        $account->save();
+
+        $list = WhatsAppAccount::find($account->id)->getTemplateList();
+        $this->assertCount(1, $list, 'Les files a mitges no compten com a plantilla.');
+        $this->assertEquals('a', $list[0]['id']);
+    }
+
+    /**
+     * Les columnes heretades ja no existeixen i no s'han de poder desar
+     * per assignació massiva.
+     */
+    public function test_les_columnes_heretades_ja_no_hi_son()
+    {
+        $this->assertFalse(
+            \Schema::hasColumn('meta_whatsapp_accounts', 'template_name'),
+            'template_name havia de desaparèixer amb la migració (issue #2).'
+        );
+        $this->assertFalse(
+            \Schema::hasColumn('meta_whatsapp_accounts', 'template_lang')
+        );
+    }
+
+    /**
+     * Les rutes de configuració del canal són només d'administrador, així
+     * que el banner no pot oferir-les-hi a un agent: el portarien a un
+     * 403. Un enllaç l'havia introduït jo amb l'avís de canal aturat;
+     * l'altre venia de la v1.3.0 i feia el mateix des del principi.
+     */
+    public function test_el_banner_no_ofereix_a_un_agent_enllacos_que_no_pot_obrir()
+    {
+        $account = $this->createTestAccount();
+        $conversation = new Conversation();
+        $conversation->id = 999998;
+
+        $this->actingAs(factory(User::class)->create(['role' => User::ROLE_USER]));
+
+        foreach ([true, false] as $active) {
+            $html = \View::make('metawhatsapp::partials/window_banner', [
+                'conversation'  => $conversation,
+                'account'       => $account,
+                'phone'         => '+34611222333',
+                'accountActive' => $active,
+            ])->render();
+
+            $this->assertStringNotContainsString(
+                '/meta-whatsapp/settings/',
+                $html,
+                'Un agent no pot rebre cap enllaç a la configuració del canal.'
+            );
+        }
+    }
+
+    public function test_un_administrador_si_que_rep_lenllac_a_la_configuracio()
+    {
+        $account = $this->createTestAccount();
+        $conversation = new Conversation();
+        $conversation->id = 999997;
+
+        $this->actingAs($this->makeAdminUser());
+
+        $html = \View::make('metawhatsapp::partials/window_banner', [
+            'conversation'  => $conversation,
+            'account'       => $account,
+            'phone'         => '+34611222333',
+            'accountActive' => false,
+        ])->render();
+
+        $this->assertStringContainsString('/meta-whatsapp/settings/', $html);
+    }
+
+    /**
+     * Punt 2 de la #2: amb plantilles configurades el selector dinàmic
+     * queda per als administradors, i un agent només veu els botons.
+     */
+    public function test_amb_plantilles_configurades_lagent_no_veu_el_selector()
+    {
+        $account = $this->createTestAccount();
+        $account->templates = [[
+            'id' => 'recover_conversation', 'language' => 'es_ES',
+            'display_name' => 'Continuar', 'recovery_text' => null,
+        ]];
+        $account->save();
+
+        $conversation = new Conversation();
+        $conversation->id = 999996;
+
+        $this->actingAs(factory(User::class)->create(['role' => User::ROLE_USER]));
+        $agentHtml = \View::make('metawhatsapp::partials/window_banner', [
+            'conversation' => $conversation, 'account' => $account, 'phone' => '+34611222333',
+        ])->render();
+
+        $this->assertStringContainsString('/send-template', $agentHtml, 'Ha de veure els botons.');
+        $this->assertStringNotContainsString('/templates', $agentHtml, 'I no el selector.');
+
+        $this->actingAs($this->makeAdminUser());
+        $adminHtml = \View::make('metawhatsapp::partials/window_banner', [
+            'conversation' => $conversation, 'account' => $account, 'phone' => '+34611222333',
+        ])->render();
+
+        $this->assertStringContainsString('/templates', $adminHtml, "L'administrador sí que el conserva.");
     }
 }

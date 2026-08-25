@@ -35,8 +35,6 @@ class WhatsAppAccount extends Model
         'verify_token',
         'auto_created_mailbox',
         'is_active',
-        'template_name',
-        'template_lang',
         'template_threshold_minutes',
         'templates',
     ];
@@ -58,32 +56,17 @@ class WhatsAppAccount extends Model
     }
 
     /**
-     * Plantilles configurades (issue #2, punts 2-4): id, language,
-     * display_name, recovery_text. Si 'templates' és buit, cau al parell
-     * template_name/template_lang (comportament pre-existent, sense
-     * recovery_text ni display_name propis) perquè les instal·lacions amb
-     * una sola plantilla configurada no perdin res en actualitzar.
+     * Plantilles configurades del compte (id, language, display_name,
+     * recovery_text). Una sola font des de la #2: el
+     * parell heretat template_name/template_lang es va plegar dins les
+     * ranures i les columnes ja no existeixen, així que aquí no hi ha cap
+     * fallback ni cap regla de precedència a documentar.
      */
     public function getTemplateList(): array
     {
-        $list = array_values(array_filter($this->templates ?: [], function ($t) {
+        return array_values(array_filter($this->templates ?: [], function ($t) {
             return is_array($t) && !empty($t['id']) && !empty($t['language']);
         }));
-
-        if (!empty($list)) {
-            return $list;
-        }
-
-        if ($this->template_name && $this->template_lang) {
-            return [[
-                'id'            => $this->template_name,
-                'language'      => $this->template_lang,
-                'display_name'  => $this->template_name,
-                'recovery_text' => null,
-            ]];
-        }
-
-        return [];
     }
 
     /**

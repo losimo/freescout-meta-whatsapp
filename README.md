@@ -61,6 +61,14 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.9.0
+
+- **One source of truth for templates.** The legacy single template (`template_name` / `template_lang`) and the five slots were a hard either/or: one valid slot made the older pair unreadable, while the form gave the pair top billing. A migration folds any surviving value into the first free slot and drops both columns. It never overwrites a slot that has content, and logs the value if all five are taken, where it was already unreachable.
+- **The static buttons and the live picker no longer appear together.** With templates configured, agents see only those buttons; with none, only the picker. Administrators keep the picker either way, since WhatsApp Manager is an awkward place to check what Meta has actually approved.
+- **The template section now explains which configuration wins** and what the agent will see, which until now could only be learned by reading the code.
+- **Fix**: nothing was sent while a channel was inactive, and only templates said so. Text replies and media, the common paths, returned silently. All outbound paths now share one check, record the failure and leave a note on the conversation, and the banner warns even while the customer window is open.
+- **Fix**: the conversation banner offered agents links to channel settings, which are admin-only, so following one produced a 403. Agents now get the same information as text naming what an administrator has to do.
+
 ## What's new in v1.8.1
 
 - **Fix**: the last log messages still written in Catalan are now in English. The original fix translated the `Log::` calls and left the exception messages, which reach `laravel-*.log` anyway, both through the queue worker logging the uncaught exception and through the module's own `failed()` handler. Because they only fire on transient errors, they went unnoticed for two months.

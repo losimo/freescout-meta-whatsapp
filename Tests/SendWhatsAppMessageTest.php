@@ -54,14 +54,41 @@ class SendWhatsAppMessageTest extends TestCase
         return $thread;
     }
 
-    public function test_compte_inactiu_no_envia_ni_crea_fila()
+    /**
+     * Fins a la #29 aquest test afirmava que amb el compte inactiu NO es
+     * creava cap fila, i era precisament el problema: l'agent veia la seva
+     * resposta com a enviada i enlloc deia el contrari. Ara no s'envia
+     * res, però queda constància a la fila i a la conversa.
+     */
+    public function test_compte_inactiu_no_envia_pero_deixa_constancia()
     {
         $account = $this->createTestAccount(['is_active' => false]);
         $thread  = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
 
         (new SendWhatsAppMessage($account->id, $thread->id, '+34611222333'))->handle();
 
-        $this->assertEquals(0, WhatsAppMessage::where('thread_id', $thread->id)->count());
+        $failed = WhatsAppMessage::where('thread_id', $thread->id)
+            ->where('status', WhatsAppMessage::STATUS_FAILED)
+            ->first();
+        $this->assertNotNull($failed, 'Ha de quedar constància que no s\'ha enviat.');
+        $this->assertEquals('account_inactive', $failed->error_code);
+
+        // Cap fila de missatge enviat: no s'ha fet cap crida a Meta.
+        $this->assertEquals(
+            0,
+            WhatsAppMessage::where('thread_id', $thread->id)
+                ->where('status', WhatsAppMessage::STATUS_SENT)
+                ->count()
+        );
+
+        // I l'agent ho ha de veure allà on mira, no només al registre.
+        $this->assertTrue(
+            Thread::where('conversation_id', $thread->conversation_id)
+                ->where('type', Thread::TYPE_NOTE)
+                ->where('body', 'like', '[WhatsApp not sent]%')
+                ->exists(),
+            'Ha de deixar una nota visible a la conversa (issue #29).'
+        );
     }
 
     public function test_thread_en_draft_no_envia()
