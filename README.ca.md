@@ -61,6 +61,12 @@ Queda fora d'abast:
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
+## Novetats a la v1.9.1
+
+- **Correcció**: cada bústia creada pel mòdul duia dues còpies de cada carpeta compartida a la barra lateral (No assignat, Esborranys, Assignat, Tancat, Suprimit, Correu brossa). El formulari del compte creava aquestes carpetes després de desar la bústia, sense saber que el `MailboxObserver` del propi FreeScout ja ho fa a l'esdeveniment `created`. Les carpetes personals (Els meus, Destacat) se'n van salvar, perquè el nucli salta els usuaris que ja en tenen, i per això la barra lateral mostrava una barreja d'entrades simples i dobles. Hi era des de la primera versió, i es veia fins ara a la captura de conversa d'aquest mateix README (#30).
+- **Migració de reparació**: s'eliminen les còpies de les bústies vinculades a un compte de WhatsApp, i qualsevol conversa que estigués a la còpia que marxa es trasllada a la que es queda, de manera que no es perd res. Les bústies que el mòdul no ha creat mai no es toquen.
+- **Traducció al neerlandès**, aportada per [@jeroenedig](https://github.com/jeroenedig) (#31). La interfície del mòdul ja està disponible en anglès, català, castellà i neerlandès.
+
 ## Novetats a la v1.9.0
 
 - **Una sola font de plantilles.** La plantilla heretada (`template_name` / `template_lang`) i les cinc ranures eren un o l'altre: amb una ranura vàlida, el parell antic no es llegia mai, mentre que el formulari li donava el lloc principal. Una migració plega el valor que quedi a la primera ranura lliure i elimina les dues columnes. Mai sobreescriu una ranura amb contingut, i deixa el valor al registre si totes cinc estan plenes, cas en què ja era inabastable.

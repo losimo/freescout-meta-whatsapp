@@ -61,6 +61,12 @@ Queda fuera de alcance:
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
+## Novedades en la v1.9.1
+
+- **Corrección**: cada buzón creado por el módulo llevaba dos copias de cada carpeta compartida en la barra lateral (No asignado, Borradores, Asignado, Cerrado, Eliminado, Spam). El formulario de la cuenta creaba esas carpetas después de guardar el buzón, sin saber que el `MailboxObserver` del propio FreeScout ya lo hace en el evento `created`. Las carpetas personales (Propio, Destacados) se salvaron, porque el núcleo salta a los usuarios que ya las tienen, y por eso la barra lateral mostraba una mezcla de entradas simples y dobles. Estaba desde la primera versión, y se veía hasta ahora en la captura de conversación de este mismo README (#30).
+- **Migración de reparación**: se eliminan las copias de los buzones vinculados a una cuenta de WhatsApp, y cualquier conversación que estuviera en la copia que desaparece se traslada a la que se queda, de modo que no se pierde nada. Los buzones que el módulo nunca ha creado no se tocan.
+- **Traducción al neerlandés**, aportada por [@jeroenedig](https://github.com/jeroenedig) (#31). La interfaz del módulo ya está disponible en inglés, catalán, castellano y neerlandés.
+
 ## Novedades en la v1.9.0
 
 - **Una sola fuente de plantillas.** La plantilla heredada (`template_name` / `template_lang`) y las cinco ranuras eran una u otra: con una ranura válida, el par antiguo no se leía nunca, mientras el formulario le daba el lugar principal. Una migración pliega el valor que quede en la primera ranura libre y elimina ambas columnas. Nunca sobrescribe una ranura con contenido, y deja el valor en el registro si las cinco están llenas, caso en que ya era inalcanzable.

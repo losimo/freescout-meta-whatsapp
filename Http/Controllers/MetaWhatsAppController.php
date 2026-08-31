@@ -40,9 +40,14 @@ class MetaWhatsAppController extends Controller
             $mailbox->out_method = Mailbox::OUT_METHOD_PHP_MAIL;
             $mailbox->in_server  = '';
             $mailbox->out_server = '';
+            // Folders are created by the core MailboxObserver on the
+            // `created` model event (createPublicFolders + syncPersonalFolders
+            // + createAdminPersonalFolders). Calling them again here produced a
+            // second copy of every public folder, because createPublicFolders()
+            // inserts unconditionally while the personal ones skip users that
+            // already have folders -- which is why only Unassigned, Drafts,
+            // Assigned, Closed, Deleted and Spam appeared twice (issue #30).
             $mailbox->save();
-            $mailbox->createPublicFolders();
-            $mailbox->createAdminPersonalFolders();
             $mailboxId   = $mailbox->id;
             $autoCreated = true;
         } else {

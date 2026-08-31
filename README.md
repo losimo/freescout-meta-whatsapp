@@ -61,6 +61,12 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.9.1
+
+- **Fix**: every mailbox created by the module carried two copies of each shared folder in the sidebar (Unassigned, Drafts, Assigned, Closed, Deleted, Spam). The account form created those folders after saving the mailbox, not knowing FreeScout's own `MailboxObserver` already does it on the `created` event. Personal folders (Mine, Starred) were spared, because core skips users that already have them, which is why the sidebar showed a mix of single and doubled entries. Present since the first release, and visible in this README's own conversation screenshot until now (#30).
+- **Repair migration**: the duplicates are removed from mailboxes linked to a WhatsApp account, and any conversation sitting in the copy that goes away is moved into the one that stays, so nothing is lost. Mailboxes the module never created are left untouched.
+- **Dutch translation**, contributed by [@jeroenedig](https://github.com/jeroenedig) (#31). The module interface is now available in English, Catalan, Castellano and Dutch.
+
 ## What's new in v1.9.0
 
 - **One source of truth for templates.** The legacy single template (`template_name` / `template_lang`) and the five slots were a hard either/or: one valid slot made the older pair unreadable, while the form gave the pair top billing. A migration folds any surviving value into the first free slot and drops both columns. It never overwrites a slot that has content, and logs the value if all five are taken, where it was already unreachable.

@@ -48,7 +48,7 @@ return [
     'template_cost_warning'        => 'Meta rekent per afgeleverd templatebericht kosten.',
     'template_lang'                => 'Taalcode van het template',
     'template_threshold'           => 'Drempel voor een verlopen venster (minuten)',
-    'template_threshold_help'      => 'Meta hanteert een venster van 24 uur na het laatste bericht van de klant. Deze instelling bepaalt alleen wanneer de module het venster als verlopen gaat behandelen, als eigen veiligheidsmarge — de regel van Meta verandert er niet door. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Bekijk de documentatie van Meta</a>.',
+    'template_threshold_help'      => 'Meta hanteert een venster van 24 uur na het laatste bericht van de klant. Deze instelling bepaalt alleen wanneer de module het venster als verlopen gaat behandelen, als eigen veiligheidsmarge - de regel van Meta verandert er niet door. <a href="https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages" target="_blank" rel="noopener">Bekijk de documentatie van Meta</a>.',
 
     'templates_multi_help'         => 'Maximaal vijf templates, bijvoorbeeld één per taal. Een regel zonder naam of zonder taalcode wordt bij het opslaan weggelaten.',
     'template_row_id'              => 'Naam van het template',
@@ -88,7 +88,7 @@ return [
 
     // Knop "verbinding testen" en het gezondheidsoverzicht van het account.
     'test_connection_button'       => 'Verbinding testen',
-    'test_connection_success'      => 'Verbinding in orde — herkend als ":name".',
+    'test_connection_success'      => 'Verbinding in orde - herkend als ":name".',
     'test_connection_failed'       => 'De verbindingstest is mislukt: :error',
     'test_connection_unknown_error' => 'Onbekende fout.',
     'health_snapshot_title'        => 'Gezondheid van het account',
@@ -99,7 +99,7 @@ return [
     'health_last_reactivation'     => 'Laatst heractiveerd',
     'health_inactive_help'         => 'Zolang het kanaal inactief is, kan er niets verzonden worden. Gebruik hieronder "Verbinding testen": lukt die, dan wordt het kanaal automatisch weer actief.',
     'health_never'                 => 'Nooit',
-    'account_reactivated'          => 'Verbinding hersteld — account automatisch weer actief (herkend als ":name").',
+    'account_reactivated'          => 'Verbinding hersteld - account automatisch weer actief (herkend als ":name").',
 
     // Melding in het gesprek als het venster verlopen is.
     'window_expired_notice'        => 'Het venster van 24 uur lijkt verlopen. Een gewoon antwoord wordt waarschijnlijk door Meta geweigerd.',
@@ -107,8 +107,8 @@ return [
     'template_sent'                => 'Het templatebericht staat klaar om verzonden te worden.',
     'template_not_configured'      => 'Voor dit WhatsApp-account is geen template ingesteld om het gesprek te heropenen.',
     'template_no_phone'            => 'Bij dit gesprek is geen telefoonnummer te vinden.',
-    'template_no_phone_notice'     => 'Van deze contactpersoon is geen telefoonnummer bekend (contacten met alleen een WhatsApp-ID kunnen nog geen template ontvangen — staat gepland voor fase 2b).',
-    'template_window_open'         => 'Het venster is weer open — stuur een gewoon antwoord in plaats van een betaald template.',
+    'template_no_phone_notice'     => 'Van deze contactpersoon is geen telefoonnummer bekend (contacten met alleen een WhatsApp-ID kunnen nog geen template ontvangen - staat gepland voor fase 2b).',
+    'template_window_open'         => 'Het venster is weer open - stuur een gewoon antwoord in plaats van een betaald template.',
     'template_already_sent'        => 'Er is zojuist al een template verstuurd voor dit gesprek.',
 
     // Keuzelijst met templates die Meta heeft goedgekeurd.
