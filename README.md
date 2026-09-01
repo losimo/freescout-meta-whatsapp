@@ -1,6 +1,6 @@
 # MetaWhatsApp — WhatsApp Business for FreeScout via Meta Cloud API
 
-[Català](README.ca.md) · [English](README.md) · [Castellano](README.es.md)
+[Català](README.ca.md) · [English](README.md) · [Castellano](README.es.md) · [Nederlands](README.nl.md)
 
 FreeScout module that integrates **WhatsApp Business directly with the Meta Cloud API**, without paid intermediaries such as 1msg.io or Twilio. Messages travel from Meta to your FreeScout installation and nowhere else, with full control over credentials, data and the operational flow.
 
