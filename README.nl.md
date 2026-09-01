@@ -19,27 +19,25 @@ Het project is openbaar en draait sinds v1.0 in echte productie. Het groeit mee 
 
 ## Schermafbeeldingen
 
-De afbeeldingen hieronder tonen de Engelstalige interface; de module zelf spreekt sinds v1.9.1 ook Nederlands.
-
 *Overzicht van ingestelde WhatsApp-kanalen:*
 
-![Overzicht van WhatsApp-accounts](docs/en/accounts-list.png)
+![Overzicht van WhatsApp-accounts](docs/nl/accounts-list.png)
 
 *Een nieuw kanaal toevoegen (het kanaal-eerst-formulier):*
 
-![Formulier om een kanaal toe te voegen](docs/en/add-channel.png)
+![Formulier om een kanaal toe te voegen](docs/nl/add-channel.png)
 
 *Een WhatsApp-gesprek zoals een medewerker het ziet, met het kanaallabel dat FreeScout zelf tekent:*
 
-![Weergave van een WhatsApp-gesprek](docs/en/conversation-view.png)
+![Weergave van een WhatsApp-gesprek](docs/nl/conversation-view.png)
 
 *De verbindingsstatus per account, met de knoppen voor een live verbindingstest en het aanmelden van de webhook:*
 
-![Paneel met de verbindingsstatus](docs/en/account-health.png)
+![Paneel met de verbindingsstatus](docs/nl/account-health.png)
 
 *De melding die in een gesprek verschijnt zodra het venster van 24 uur verlopen lijkt:*
 
-![Melding bij een verlopen venster](docs/en/expired-window-banner.png)
+![Melding bij een verlopen venster](docs/nl/expired-window-banner.png)
 
 ## Wat de module wel en niet doet
 
@@ -67,7 +65,7 @@ Wat er bewust buiten valt:
 
 ## Wat is er nieuw
 
-De release-geschiedenis staat in de [Engelse README](README.md#whats-new-in-v191) en op de [Releases-pagina](https://github.com/losimo/freescout-meta-whatsapp/releases).
+De release-geschiedenis staat in de [Engelse README](README.md) en op de [Releases-pagina](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
 Die staat bewust niet in deze vertaling. Het is het enige deel dat bij elke release groeit en het wordt in het Engels geschreven, dus een Nederlandse kopie loopt altijd achter. De rest van deze pagina verandert zelden.
 
@@ -244,7 +242,7 @@ Voordat je van testen naar productie gaat:
 | Meta kan de webhook niet verifiëren | URL niet openbaar bereikbaar, ongeldig certificaat of verkeerd verify token |
 | Meta krijgt 403 op webhook-POST's | Onbekende `phone_number_id`, inactief account of ongeldige HMAC-handtekening |
 | Berichten komen binnen, antwoorden gaan niet weg | Fout `131047` (venster van 24 uur) of fout `190` (verlopen token) |
-| Bij het account staat `⚠ Mailbox unlinked` | De gekoppelde mailbox is verwijderd of niet meer te vinden |
+| Bij het account staat `⚠ Mailbox ontkoppeld` | De gekoppelde mailbox is verwijderd of niet meer te vinden |
 | Er wordt helemaal niets verwerkt | De queue worker ligt stil (`php artisan queue:work`) |
 | Een reparatie uit een module-update lijkt niet aan te slaan | De queue worker draait door met oude code in het geheugen. Cron herstarten laadt hem niet opnieuw; draai `php artisan queue:restart` |
 
