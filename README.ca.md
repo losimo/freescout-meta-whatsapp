@@ -61,6 +61,18 @@ Queda fora d'abast:
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
+## Novetats a la v1.10.0
+
+Aquesta versió té una idea al darrere: **el mòdul us diu què no rutlla abans que us mossegui.**
+
+- **Avisa abans que caduqui el testimoni d'accés**, en comptes que ho descobriu per l'error 190 quan un missatge deixa de sortir. Un testimoni d'usuari de sistema ben configurat no caduca mai i el panell ho diu, cosa que ja val la pena saber; l'avís és per al temporal de 24 hores, que és l'error que de debò deixa una instal·lació sense poder enviar. Necessita l'**App ID**, un camp nou i opcional que és al costat de l'App Secret, a la mateixa pantalla de Meta. Els comptes creats abans d'aquesta versió diuen "sense comprovar" i no els canvia res.
+- **Diu quan el testimoni ja no és vàlid, o li falten permisos**, en el moment de desar el canal i no al primer missatge fallit.
+- **Diu quan el FreeScout és més antic del que el mòdul espera.** El nucli no comprova la versió declarada d'un mòdul de la comunitat, així que aquest avís és l'únic lloc on un administrador se n'assabentaria. No bloqueja res: el mòdul continua funcionant i torna al comportament anterior allà on les APIs noves no hi són.
+- **Una resposta que no es pot enviar deixa una nota a la conversa.** Hi havia dos camins que acabaven en silenci: un contacte sense número de telèfon i un adjunt que ja no es troba. En tots dos, l'agent escrivia la resposta, premia enviar, i el missatge es quedava allà amb l'aspecte de lliurat.
+- **Correcció**: cinc línies de registre que deien que un missatge no s'havia enviat, o que s'havia descartat, s'escrivien a nivell d'avís i desapareixien en instal·lacions que filtren els avisos. És el mateix defecte que el de la finestra de 24 hores corregit a la v1.6.2, als llocs on aquella correcció no va arribar.
+
+**Requereix FreeScout 1.8.234 o superior.** Vegeu [Compatibilitat amb FreeScout](#compatibilitat-amb-freescout) més amunt.
+
 ## Novetats a la v1.9.1
 
 - **Correcció**: cada bústia creada pel mòdul duia dues còpies de cada carpeta compartida a la barra lateral (No assignat, Esborranys, Assignat, Tancat, Suprimit, Correu brossa). El formulari del compte creava aquestes carpetes després de desar la bústia, sense saber que el `MailboxObserver` del propi FreeScout ja ho fa a l'esdeveniment `created`. Les carpetes personals (Els meus, Destacat) se'n van salvar, perquè el nucli salta els usuaris que ja en tenen, i per això la barra lateral mostrava una barreja d'entrades simples i dobles. Hi era des de la primera versió, i es veia fins ara a la captura de conversa d'aquest mateix README (#30).
@@ -132,6 +144,17 @@ Queda fora d'abast:
 - Els missatges multimèdia sense peu de foto ja no es descarten directament quan el text de marcador de posició és buit — només es descarten els missatges sense text ni multimèdia.
 - Afegida una [matriu de capacitats](docs/capability-matrix.md) que documenta exactament què és compatible, planificat o fora d'abast.
 
+## Compatibilitat amb FreeScout
+
+| Versió del mòdul | FreeScout que espera |
+|---|---|
+| 1.10.0 i posteriors | 1.8.234 o superior |
+| fins a la 1.9.1 | qualsevol 1.8.x |
+
+Des de la 1.10.0 el mòdul fa servir l'API d'estats de conversa que FreeScout va afegir a la 1.8.234, perquè un estat aportat per un altre mòdul s'entengui en comptes de quedar classificat com a desconegut. En versions anteriors torna al comportament de sempre, que allà és exactament el correcte, perquè un nucli sense aquella API tampoc pot tenir estats personalitzats. No es trenca res, i la pantalla de configuració del canal us diu què ha trobat.
+
+Anar per sobre de la 1.8.234 val la pena pel seu compte: les 1.8.235, 1.8.236 i 1.8.237 tanquen problemes de seguretat del propi FreeScout.
+
 ## Instal·lació
 
 Segueix la [guia oficial d'instal·lació de mòduls personalitzats de FreeScout](https://github.com/freescout-help-desk/freescout/wiki/FreeScout-Modules#3-installing-custom-modules):
@@ -169,6 +192,7 @@ Abans de configurar el canal a FreeScout, cal tenir preparat un entorn mínim a 
 | **WABA ID** | App Dashboard → WhatsApp → API Setup |
 | **Access Token** | Vegeu la nota sobre token permanent |
 | **App Secret** | App Dashboard → App Settings → Basic |
+| **App ID** (opcional) | La mateixa pantalla, just al costat de l'App Secret. Amb ell el mòdul us pot dir quan caduca el testimoni d'accés |
 
 > **Important sobre el token**
 >

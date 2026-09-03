@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/losimo/freescout-meta-whatsapp/security/advisories/new
+    about: Do not open a public issue. Report it privately here, or see SECURITY.md for the other channels.
+  - name: Feature request or an idea
+    url: https://github.com/losimo/freescout-meta-whatsapp/issues/new
+    about: Open a blank issue and describe it in your own words. There is no form for this on purpose.

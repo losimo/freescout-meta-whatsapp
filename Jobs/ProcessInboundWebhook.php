@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+use Modules\MetaWhatsApp\Support\CoreCompat;
 use Modules\MetaWhatsApp\Support\DeliveryFailure;
 use Modules\MetaWhatsApp\Support\Logger as MetaWhatsAppLogger;
 use Modules\MetaWhatsApp\Support\WhatsAppTextFormatter;
@@ -154,7 +155,7 @@ class ProcessInboundWebhook implements ShouldQueue
         }
 
         if (!$phone && !$userId) {
-            Log::warning('[MetaWhatsApp] Sender without valid phone or user_id, discarded', [
+            Log::error('[MetaWhatsApp] Sender without valid phone or user_id, discarded', [
                 'account_id' => $account->id,
             ]);
             return;
@@ -842,10 +843,16 @@ class ProcessInboundWebhook implements ShouldQueue
     {
         // Una conversa marcada com a spam o esborrada no s'ha de ressuscitar
         // per una fallida de lliurament, i si ja és activa no hi ha res a fer.
-        if (in_array((int) $conversation->status, [
+        //
+        // Va per CoreCompat i no per isActive()/isSpam(): des de la 1.8.234
+        // un altre mòdul pot afegir estats per hook, i hasStatus() del nucli
+        // els resol a l'estat estàndard que imiten. Amb isActive() un estat
+        // personalitzat que es comporta com a actiu no coincidiria i
+        // reobriríem una conversa que ja era oberta.
+        if (CoreCompat::conversationHasStatus($conversation, [
             Conversation::STATUS_ACTIVE,
             Conversation::STATUS_SPAM,
-        ], true)) {
+        ])) {
             return;
         }
 

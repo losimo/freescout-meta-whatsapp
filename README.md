@@ -61,6 +61,18 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.10.0
+
+This release has one idea behind it: **the module tells you what is wrong before it bites you.**
+
+- **It warns before your access token expires**, instead of you finding out through error 190 when a message stops going out. A correctly set up system user token never expires and the panel says so, which is worth knowing on its own; the warning is for the temporary 24-hour token, which is the mistake that actually leaves an installation unable to send. It needs the **App ID**, a new optional field that sits next to the App Secret on the same Meta screen. Accounts created before this release simply say "not checked" and nothing changes for them.
+- **It says when the token is no longer valid, or missing permissions**, at the moment you save the channel rather than at the first failed message.
+- **It says when FreeScout is older than this module expects.** The core does not check a community module's declared version, so this notice is the only place an administrator would find out. Nothing is blocked: the module keeps working, and falls back to the previous behaviour where the newer core APIs are missing.
+- **A reply that cannot be sent now leaves a note on the conversation.** Two paths used to end in silence: a contact with no phone number on file, and an attachment that no longer resolves. In both, the agent wrote a reply, pressed send, and the thread sat there looking delivered.
+- **Fix**: five log lines that said a message had not been sent, or had been discarded, were written at warning level and disappeared on installations whose log level filters warnings. That is the same defect as the 24-hour window one fixed in v1.6.2, in the places that fix did not reach.
+
+**Requires FreeScout 1.8.234 or newer.** See [FreeScout compatibility](#freescout-compatibility) above.
+
 ## What's new in v1.9.1
 
 - **Fix**: every mailbox created by the module carried two copies of each shared folder in the sidebar (Unassigned, Drafts, Assigned, Closed, Deleted, Spam). The account form created those folders after saving the mailbox, not knowing FreeScout's own `MailboxObserver` already does it on the `created` event. Personal folders (Mine, Starred) were spared, because core skips users that already have them, which is why the sidebar showed a mix of single and doubled entries. Present since the first release, and visible in this README's own conversation screenshot until now (#30).
@@ -133,6 +145,17 @@ Out of scope:
 - Added a [capability matrix](docs/capability-matrix.md) documenting exactly what's supported, planned or out of scope.
 - Added a lightweight [incident notes](docs/incidents.md) log for operational gotchas worth remembering.
 
+## FreeScout compatibility
+
+| Module version | FreeScout it expects |
+|---|---|
+| 1.10.0 and later | 1.8.234 or newer |
+| up to 1.9.1 | any 1.8.x |
+
+From 1.10.0 the module uses the conversation status API that FreeScout added in 1.8.234, so that a status contributed by another module is understood rather than filed as unknown. On anything older it falls back to the previous behaviour, which is exactly right there, since a core without that API cannot carry custom statuses either. Nothing breaks; the channel settings screen tells you what it found.
+
+Newer than 1.8.234 is worth having on its own: 1.8.235, 1.8.236 and 1.8.237 each closed security issues in FreeScout.
+
 ## Installation
 
 Follow FreeScout's [official custom module installation guide](https://github.com/freescout-help-desk/freescout/wiki/FreeScout-Modules#3-installing-custom-modules):
@@ -175,6 +198,7 @@ Before configuring the channel in FreeScout, prepare a minimal setup at [Meta fo
 | **WABA ID** | App Dashboard → WhatsApp → API Setup |
 | **Access Token** | See the permanent token note |
 | **App Secret** | App Dashboard → App Settings → Basic |
+| **App ID** (optional) | The same screen, right next to the App Secret. With it the module can tell you when the access token expires |
 
 > **Important note about the token**
 >

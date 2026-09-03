@@ -61,6 +61,18 @@ Queda fuera de alcance:
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
+## Novedades en la v1.10.0
+
+Esta versión tiene una idea detrás: **el módulo os dice qué no funciona antes de que os muerda.**
+
+- **Avisa antes de que caduque el token de acceso**, en lugar de que lo descubráis por el error 190 cuando un mensaje deja de salir. Un token de usuario de sistema bien configurado no caduca nunca y el panel lo dice, cosa que ya vale la pena saber; el aviso es para el temporal de 24 horas, que es el error que de verdad deja una instalación sin poder enviar. Necesita el **App ID**, un campo nuevo y opcional que está al lado del App Secret, en la misma pantalla de Meta. Las cuentas creadas antes de esta versión dicen "sin comprobar" y no les cambia nada.
+- **Dice cuándo el token ya no es válido, o le faltan permisos**, en el momento de guardar el canal y no en el primer mensaje fallido.
+- **Dice cuándo FreeScout es más antiguo de lo que el módulo espera.** El núcleo no comprueba la versión declarada de un módulo de la comunidad, así que este aviso es el único lugar donde un administrador se enteraría. No bloquea nada: el módulo sigue funcionando y vuelve al comportamiento anterior allí donde las APIs nuevas no están.
+- **Una respuesta que no se puede enviar deja una nota en la conversación.** Había dos caminos que acababan en silencio: un contacto sin número de teléfono y un adjunto que ya no se encuentra. En ambos, el agente escribía la respuesta, pulsaba enviar, y el mensaje se quedaba allí con aspecto de entregado.
+- **Corrección**: cinco líneas de registro que decían que un mensaje no se había enviado, o que se había descartado, se escribían a nivel de aviso y desaparecían en instalaciones que filtran los avisos. Es el mismo defecto que el de la ventana de 24 horas corregido en la v1.6.2, en los lugares donde aquella corrección no llegó.
+
+**Requiere FreeScout 1.8.234 o superior.** Ved [Compatibilidad con FreeScout](#compatibilidad-con-freescout) más arriba.
+
 ## Novedades en la v1.9.1
 
 - **Corrección**: cada buzón creado por el módulo llevaba dos copias de cada carpeta compartida en la barra lateral (No asignado, Borradores, Asignado, Cerrado, Eliminado, Spam). El formulario de la cuenta creaba esas carpetas después de guardar el buzón, sin saber que el `MailboxObserver` del propio FreeScout ya lo hace en el evento `created`. Las carpetas personales (Propio, Destacados) se salvaron, porque el núcleo salta a los usuarios que ya las tienen, y por eso la barra lateral mostraba una mezcla de entradas simples y dobles. Estaba desde la primera versión, y se veía hasta ahora en la captura de conversación de este mismo README (#30).
@@ -132,6 +144,17 @@ Queda fuera de alcance:
 - Los mensajes multimedia sin pie de foto ya no se descartan directamente cuando el texto de marcador de posición está vacío — solo se descartan los mensajes sin texto ni multimedia.
 - Añadida una [matriz de capacidades](docs/capability-matrix.md) que documenta exactamente qué está soportado, planificado o fuera de alcance.
 
+## Compatibilidad con FreeScout
+
+| Versión del módulo | FreeScout que espera |
+|---|---|
+| 1.10.0 y posteriores | 1.8.234 o superior |
+| hasta la 1.9.1 | cualquier 1.8.x |
+
+Desde la 1.10.0 el módulo usa la API de estados de conversación que FreeScout añadió en la 1.8.234, para que un estado aportado por otro módulo se entienda en lugar de quedar clasificado como desconocido. En versiones anteriores vuelve al comportamiento de siempre, que allí es exactamente el correcto, porque un núcleo sin esa API tampoco puede tener estados personalizados. No se rompe nada, y la pantalla de configuración del canal os dice qué ha encontrado.
+
+Ir por encima de la 1.8.234 vale la pena por su cuenta: las 1.8.235, 1.8.236 y 1.8.237 cierran problemas de seguridad del propio FreeScout.
+
 ## Instalación
 
 Sigue la [guía oficial de instalación de módulos personalizados de FreeScout](https://github.com/freescout-help-desk/freescout/wiki/FreeScout-Modules#3-installing-custom-modules):
@@ -169,6 +192,7 @@ Antes de configurar el canal en FreeScout, prepara un entorno mínimo en [Meta f
 | **WABA ID** | App Dashboard → WhatsApp → API Setup |
 | **Access Token** | Ver la nota sobre el token permanente |
 | **App Secret** | App Dashboard → App Settings → Basic |
+| **App ID** (opcional) | La misma pantalla, justo al lado del App Secret. Con él el módulo os puede decir cuándo caduca el token de acceso |
 
 > **Importante sobre el token**
 >

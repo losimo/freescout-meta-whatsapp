@@ -17,6 +17,8 @@
         <div class="col-xs-12">
             @include('partials/flash_messages')
 
+            @include('metawhatsapp::partials/core_notice')
+
             @if($accounts->isEmpty())
                 <div class="alert alert-info">
                     {{ __('metawhatsapp::metawhatsapp.no_accounts') }}

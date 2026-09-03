@@ -275,4 +275,33 @@ class SendWhatsAppMediaTest extends TestCase
         $this->assertEquals('document', SendWhatsAppMedia::mediaCategory('application/pdf'));
         $this->assertEquals('document', SendWhatsAppMedia::mediaCategory('text/plain'));
     }
+
+    /**
+     * Un adjunt que ja no es resol deixava el fitxer sense enviar i sense cap
+     * rastre: el thread es queda a la conversa amb l'aspecte de lliurat. Mateixa
+     * classe que la #28/#29, per un camí que aleshores no vam mirar.
+     */
+    public function test_missing_attachment_leaves_a_note_on_the_conversation()
+    {
+        $account = $this->createTestAccount();
+        [$thread, $attachment] = $this->makeConversationWithThreadAndAttachment(
+            $account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED
+        );
+        $this->markWindowOpen($account, $thread);
+
+        $missingAttachmentId = $attachment->id;
+        $attachment->delete();
+
+        (new SendWhatsAppMedia($account->id, $thread->id, $missingAttachmentId, '+34611222333'))->handle();
+
+        $note = Thread::where('conversation_id', $thread->conversation_id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->first();
+
+        $this->assertNotNull($note, 'no s\'ha deixat cap nota per un adjunt que no es troba');
+        $this->assertStringContainsString(
+            \Modules\MetaWhatsApp\Support\OutboundGuard::NOTE_MARKER,
+            $note->body
+        );
+    }
 }

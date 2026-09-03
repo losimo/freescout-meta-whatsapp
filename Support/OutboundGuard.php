@@ -52,23 +52,34 @@ class OutboundGuard
 
         $thread = Thread::find($threadId);
         if ($thread) {
-            self::noteOnConversation($thread, $account);
+            self::noteRefusal($thread, 'metawhatsapp::metawhatsapp.not_sent_channel_inactive');
         }
 
         return null;
     }
 
     /**
-     * Internal note explaining that nothing left the building. One per
-     * thread: a reply carrying three attachments dispatches three jobs
-     * and must not produce three identical notes.
+     * Same note, other reasons.
+     *
+     * An inactive channel was never the only way for a reply to die quietly.
+     * A contact with no phone number on file, or an attachment row that no
+     * longer resolves, end the same way: the job returns, the thread sits in
+     * FreeScout looking delivered, and nothing on screen says otherwise. The
+     * reason differs, what the agent needs to know does not, so the note is
+     * written in one place rather than copied per caller. That copying is
+     * what produced #28 and #29.
+     *
+     * @param string $translationKey full key, so the caller states its reason
      */
-    protected static function noteOnConversation(Thread $thread, ?WhatsAppAccount $account): void
+    public static function noteRefusal(?Thread $thread, string $translationKey): void
     {
-        if (!$thread->conversation_id) {
+        if (!$thread || !$thread->conversation_id) {
             return;
         }
 
+        // One note per thread, not one per reason and not one per attachment:
+        // a reply carrying three files dispatches three jobs, and three
+        // identical notes would be worse than none.
         $alreadyNoted = Thread::where('conversation_id', $thread->conversation_id)
             ->where('type', Thread::TYPE_NOTE)
             ->where('body', 'like', self::NOTE_MARKER . '%')
@@ -90,8 +101,7 @@ class OutboundGuard
         $note->type            = Thread::TYPE_NOTE;
         $note->status          = $conversation->status;
         $note->state           = Thread::STATE_PUBLISHED;
-        $note->body            = self::NOTE_MARKER . ' '
-            . __('metawhatsapp::metawhatsapp.not_sent_channel_inactive');
+        $note->body            = self::NOTE_MARKER . ' ' . __($translationKey);
         $note->source_via      = Thread::PERSON_USER;
         $note->source_type     = Thread::SOURCE_TYPE_WEB;
         $note->customer_id     = $conversation->customer_id;

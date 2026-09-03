@@ -80,6 +80,8 @@ Si el canvi altera alguna limitació o expectativa documentada, la documentació
 
 **L'anglès és l'idioma de treball d'aquest codi**: missatges de commit, comentaris, noms dels tests, logs i discussió als issues. Només es tradueix el text visible per l'usuari, que viu a `Resources/lang/` (anglès, català, castellà i neerlandès) i mai va escrit dins el codi.
 
+**L'anglès és la base i la resta pot anar endarrerida.** Les cadenes noves arriben primer en anglès, i una traducció que encara no les tingui ensenya l'anglès a la pantalla, mai la clau crua. Per tant, que un fitxer d'idioma vagi endarrerit no és cap error ni atura cap versió: és una invitació a qui manté aquell idioma.
+
 El codi anterior porta comentaris i noms de test en català, d'abans que el projecte tingués col·laboradors de fora. Es van substituint a mesura que es toquen els fitxers, no de cop, així que durant un temps hi conviuran tots dos. El codi nou ha de ser en anglès.
 
 ## Política de discussions

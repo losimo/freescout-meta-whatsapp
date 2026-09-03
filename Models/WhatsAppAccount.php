@@ -32,6 +32,7 @@ class WhatsAppAccount extends Model
         'phone_number',
         'phone_number_id',
         'waba_id',
+        'app_id',
         'verify_token',
         'auto_created_mailbox',
         'is_active',
@@ -48,7 +49,48 @@ class WhatsAppAccount extends Model
         'is_active'            => 'boolean',
         'templates'            => 'array',
         'reactivated_at'       => 'datetime',
+        'token_expires_at'     => 'datetime',
     ];
+
+    /**
+     * Quan caduca el testimoni, en tres estats i no dos.
+     *
+     * null vol dir "no ho sabem", que no és el mateix que "no caduca". Un
+     * testimoni d'usuari de sistema ben configurat és permanent, i Meta ho
+     * diu amb expires_at = 0; això es guarda com a null també, però amb la
+     * diferència que l'hem preguntat. Per distingir-ho cal mirar si hi ha
+     * app_id: sense app_id no hem pogut preguntar mai.
+     */
+    public function tokenExpiryState(): string
+    {
+        if (!$this->app_id) {
+            return 'unknown';
+        }
+
+        if (!$this->token_expires_at) {
+            return 'never';
+        }
+
+        return $this->token_expires_at->isPast() ? 'expired' : 'expires';
+    }
+
+    /**
+     * Dies que falten perquè caduqui, o null si no aplica. Serveix per decidir
+     * si val la pena avisar: amb un testimoni permanent no hi ha res a dir.
+     */
+    public function daysUntilTokenExpiry(): ?int
+    {
+        if ($this->tokenExpiryState() !== 'expires') {
+            return null;
+        }
+
+        // Arrodoniment cap amunt i a partir dels segons, no amb diffInDays():
+        // aquell trunca, i un testimoni que caduca d'aquí a deu dies menys un
+        // microsegon sortiria com a nou. En un compte enrere val més dir de
+        // més que de menys, i el que caduca d'aquí a una hora ha de dir 1 dia,
+        // no 0.
+        return (int) ceil(($this->token_expires_at->getTimestamp() - time()) / 86400);
+    }
 
     public function reactivatedBy()
     {

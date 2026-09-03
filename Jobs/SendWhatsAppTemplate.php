@@ -137,7 +137,7 @@ class SendWhatsAppTemplate implements ShouldQueue
         }
 
         if (empty($templateName) || empty($templateLang)) {
-            Log::warning('[MetaWhatsApp] Template not configured for the account', [
+            Log::error('[MetaWhatsApp] Template not configured for the account', [
                 'account_id' => $account->id,
                 'thread_id'  => $thread->id,
             ]);

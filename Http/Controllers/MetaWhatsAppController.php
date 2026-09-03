@@ -11,14 +11,30 @@ use Modules\MetaWhatsApp\Jobs\SendWhatsAppTemplate;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+use Modules\MetaWhatsApp\Support\CoreCompat;
 
 class MetaWhatsAppController extends Controller
 {
+    /**
+     * Permisos que el mòdul necessita per funcionar. Si en falta algun, els
+     * enviaments fallen d'una manera difícil de diagnosticar des de fora, i
+     * per això val la pena dir-ho en desar i no esperar al primer missatge.
+     */
+    const REQUIRED_SCOPES = ['whatsapp_business_messaging', 'whatsapp_business_management'];
+
     public function settings()
     {
         $this->requireAdmin();
         $accounts = WhatsAppAccount::with('mailbox')->orderBy('created_at', 'desc')->get();
-        return view('metawhatsapp::settings', compact('accounts'));
+
+        // FreeScout no comprova el `freescout_version` del module.json d'un
+        // mòdul de la comunitat, així que aquest és l'únic lloc on l'admin
+        // se n'assabentarà. No bloqueja res: el mòdul funciona igualment.
+        $coreOutdated   = !CoreCompat::isSupportedCore();
+        $coreVersion    = CoreCompat::coreVersion();
+        $coreMinimum    = CoreCompat::MINIMUM_FREESCOUT;
+
+        return view('metawhatsapp::settings', compact('accounts', 'coreOutdated', 'coreVersion', 'coreMinimum'));
     }
 
     public function create()
@@ -62,8 +78,8 @@ class MetaWhatsAppController extends Controller
 
         $account = new WhatsAppAccount();
         $account->fill($request->only([
-            'name', 'conversation_subject_template', 'phone_number', 'phone_number_id', 'waba_id', 'verify_token',
-            'template_threshold_minutes',
+            'name', 'conversation_subject_template', 'phone_number', 'phone_number_id', 'waba_id', 'app_id',
+            'verify_token', 'template_threshold_minutes',
         ]));
         $account->templates            = $this->cleanTemplates($request);
         $account->mailbox_id           = $mailboxId;
@@ -87,7 +103,50 @@ class MetaWhatsAppController extends Controller
             ]));
         }
 
+        $this->refreshTokenHealth($account);
+
         return redirect()->route('metawhatsapp.settings');
+    }
+
+    /**
+     * Pregunta a Meta quan caduca el testimoni i desa la data.
+     *
+     * Es fa en desar el compte i no en pintar la pantalla: una crida HTTP a
+     * cada càrrega del formulari el faria lent i el deixaria a mercè d'una
+     * caiguda de Meta. La data de caducitat, a diferència de la validesa, no
+     * es mou, així que desar-la és honest; la validesa i els permisos es
+     * diuen aquí i ara, i no es guarden enlloc.
+     *
+     * Best-effort de cap a peus: si no hi ha App ID, si Meta no respon o si
+     * el testimoni ja no és viu, el compte es desa igualment. Aquesta pantalla
+     * serveix per configurar el canal, no per barrar-lo.
+     */
+    protected function refreshTokenHealth(WhatsAppAccount $account): void
+    {
+        if (empty($account->app_id)) {
+            return;
+        }
+
+        $result = app(WhatsAppApiClient::class, ['account' => $account])->checkToken();
+
+        if (!$result['checked'] || !$result['ok']) {
+            return;
+        }
+
+        $account->token_expires_at = $result['expires_at'] ? \Carbon\Carbon::createFromTimestamp($result['expires_at']) : null;
+        $account->save();
+
+        if ($result['valid'] === false) {
+            \Session::flash('flash_warning_floating', __('metawhatsapp::metawhatsapp.token_invalid_warning'));
+            return;
+        }
+
+        $missing = array_diff(self::REQUIRED_SCOPES, $result['scopes']);
+        if ($missing) {
+            \Session::flash('flash_warning_floating', __('metawhatsapp::metawhatsapp.token_missing_scopes_warning', [
+                'scopes' => implode(', ', $missing),
+            ]));
+        }
     }
 
     public function edit($id)
@@ -119,8 +178,8 @@ class MetaWhatsAppController extends Controller
 
         // L'associació canal-bústia és immutable en edició (spec v0.3 §3.2).
         $account->fill($request->only([
-            'name', 'conversation_subject_template', 'phone_number', 'phone_number_id', 'waba_id', 'verify_token',
-            'template_threshold_minutes',
+            'name', 'conversation_subject_template', 'phone_number', 'phone_number_id', 'waba_id', 'app_id',
+            'verify_token', 'template_threshold_minutes',
         ]));
         $account->templates = $this->cleanTemplates($request);
         if ($request->filled('access_token')) {
@@ -130,6 +189,8 @@ class MetaWhatsAppController extends Controller
             $account->app_secret = encrypt($request->app_secret);
         }
         $account->save();
+
+        $this->refreshTokenHealth($account);
 
         \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.account_updated'));
         return redirect()->route('metawhatsapp.settings');

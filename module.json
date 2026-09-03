@@ -16,8 +16,8 @@
     "files": [
         "start.php"
     ],
-    "version": "1.9.1",
-    "freescout_version": "1.0.0",
+    "version": "1.10.0",
+    "freescout_version": "1.8.234",
     "author": "losimo",
     "license": "AGPL-3.0",
     "latestVersionUrl": "https://github.com/losimo/freescout-meta-whatsapp/releases/latest/download/version.txt",

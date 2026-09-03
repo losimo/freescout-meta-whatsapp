@@ -1,0 +1,88 @@
+name: Bug report
+description: Something in the module does not behave as it should
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. One thing before you start: we cannot reproduce anything on your
+        Meta account, so what you put here is most of what we have to work with.
+
+        If the module suddenly stopped sending after an update, the Troubleshooting section of the
+        README is worth two minutes first: a queue worker that keeps running old code in memory
+        explains a surprising number of reports, and `php artisan queue:restart` settles it.
+
+  - type: input
+    id: module-version
+    attributes:
+      label: Module version
+      description: Shown in Manage » Modules, or in the module.json of your install.
+      placeholder: "1.9.1"
+    validations:
+      required: true
+
+  - type: input
+    id: freescout-version
+    attributes:
+      label: FreeScout version
+      description: Shown at the bottom of any page.
+      placeholder: "1.8.238"
+    validations:
+      required: true
+
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP version
+      placeholder: "8.2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mailbox-mode
+    attributes:
+      label: How was the WhatsApp channel created?
+      description: The two paths behave differently, and more than one report has turned on this answer.
+      options:
+        - Creating a new mailbox from the channel form
+        - Linking an existing mailbox
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, and what the module did instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log lines
+      description: |
+        Every line the module writes carries the `[MetaWhatsApp]` prefix:
+
+        `grep MetaWhatsApp storage/logs/laravel-$(date +%Y-%m-%d).log`
+
+        **Please redact before pasting.** Those lines carry your customers' phone numbers, and with
+        debug logging enabled they carry the message contents as well. Replacing digits with `x` is
+        enough; we never need the real number to understand the failure.
+      render: text
+
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Before you send
+      options:
+        - label: I removed customer phone numbers and message contents from the logs above
+        - label: I am on the latest release, or I have said above which version I am on

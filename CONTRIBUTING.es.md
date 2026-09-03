@@ -80,6 +80,8 @@ Si el cambio altera alguna limitación o expectativa documentada, la documentaci
 
 **El inglés es el idioma de trabajo de este código**: mensajes de commit, comentarios, nombres de los tests, logs y discusión en los issues. Solo se traduce el texto visible para el usuario, que vive en `Resources/lang/` (inglés, catalán, castellano y neerlandés) y nunca va escrito dentro del código.
 
+**El inglés es la base y el resto puede ir con retraso.** Las cadenas nuevas llegan primero en inglés, y una traducción que todavía no las tenga muestra el inglés en pantalla, nunca la clave cruda. Así que un archivo de idioma con retraso no es un error ni detiene ninguna versión: es una invitación a quien mantiene ese idioma.
+
 El código anterior lleva comentarios y nombres de test en catalán, de antes de que el proyecto tuviera colaboradores externos. Se van sustituyendo a medida que se tocan los ficheros, no de golpe, así que durante un tiempo convivirán ambos. El código nuevo debe ser en inglés.
 
 ## Política de discusiones

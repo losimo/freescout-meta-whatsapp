@@ -345,6 +345,62 @@ class WhatsAppApiClient
     }
 
     /**
+     * Salut del testimoni d'accés: quan caduca, si encara és viu i quins
+     * permisos porta.
+     *
+     * Meta no accepta que el testimoni s'autentiqui a si mateix: `access_token`
+     * ha de ser un testimoni d'aplicació, `<APP_ID>|<APP_SECRET>`. Per això
+     * cal l'App ID, i per això aquest mètode retorna 'checked' => false quan
+     * el compte no en té, en comptes de fer una crida que sabem que fallarà.
+     *
+     * Retorn afegit al format estructurat de sempre:
+     *   checked     bool    s'ha pogut preguntar
+     *   valid       bool    Meta diu que el testimoni és viu
+     *   expires_at  ?int    unixtime, o null si no caduca mai (Meta hi posa 0)
+     *   scopes      array   permisos concedits
+     */
+    public function checkToken(): array
+    {
+        if (empty($this->account->app_id)) {
+            return [
+                'ok' => false, 'checked' => false, 'valid' => null,
+                'expires_at' => null, 'scopes' => [],
+                'error_code' => null, 'error_message' => null, 'transient' => false,
+            ];
+        }
+
+        $appToken = $this->account->app_id . '|' . decrypt($this->account->app_secret);
+
+        $url = rtrim(config('metawhatsapp.api_base', 'https://graph.facebook.com'), '/')
+            . '/' . self::API_VERSION . '/debug_token'
+            . '?input_token=' . urlencode($this->accessToken)
+            . '&access_token=' . urlencode($appToken);
+
+        $result = $this->curlGet($url, []);
+        $result['checked'] = true;
+        $result['valid']      = null;
+        $result['expires_at'] = null;
+        $result['scopes']     = [];
+
+        if (!$result['ok']) {
+            return $result;
+        }
+
+        $data = json_decode($result['body'], true)['data'] ?? [];
+
+        $result['valid']  = (bool) ($data['is_valid'] ?? false);
+        $result['scopes'] = $data['scopes'] ?? [];
+
+        // Meta escriu 0 quan el testimoni no caduca mai, que és el cas d'un
+        // usuari de sistema ben configurat. Es normalitza a null perquè qui
+        // ho llegeixi no hagi de recordar aquesta convenció.
+        $expiresAt = (int) ($data['expires_at'] ?? 0);
+        $result['expires_at'] = $expiresAt > 0 ? $expiresAt : null;
+
+        return $result;
+    }
+
+    /**
      * Subscriu l'app de Meta configurada als webhooks d'aquest WABA
      * (POST /{waba_id}/subscribed_apps) — pas d'instal·lació que sovint es
      * passa per alt manualment (issue de roadmap: "registre automàtic de

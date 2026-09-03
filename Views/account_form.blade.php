@@ -99,6 +99,17 @@
                     </div>
                 </div>
 
+                <div class="form-group{{ $errors->has('app_id') ? ' has-error' : '' }}">
+                    <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.app_id') }}</label>
+                    <div class="col-sm-8">
+                        <input type="text" name="app_id" class="form-control"
+                               value="{{ old('app_id', $account->app_id ?? '') }}"
+                               placeholder="1234567890123456">
+                        <p class="help-block">{{ __('metawhatsapp::metawhatsapp.app_id_help') }}</p>
+                        @if($errors->has('app_id'))<p class="help-block">{{ $errors->first('app_id') }}</p>@endif
+                    </div>
+                </div>
+
                 <div class="form-group{{ $errors->has('verify_token') ? ' has-error' : '' }}">
                     <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.verify_token') }}</label>
                     <div class="col-sm-8">
@@ -315,6 +326,27 @@
                                         {{ $healthSnapshot['last_inbound']->created_at->format('Y-m-d H:i') }}
                                     @else
                                         {{ __('metawhatsapp::metawhatsapp.health_never') }}
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.health_token') }}</label>
+                            <div class="col-sm-8">
+                                <p class="form-control-static">
+                                    @php($tokenState = $account->tokenExpiryState())
+                                    @php($daysLeft = $account->daysUntilTokenExpiry())
+                                    @if($tokenState === 'unknown')
+                                        {{ __('metawhatsapp::metawhatsapp.health_token_unknown') }}
+                                    @elseif($tokenState === 'never')
+                                        {{ __('metawhatsapp::metawhatsapp.health_token_never_expires') }}
+                                    @elseif($tokenState === 'expired')
+                                        <span class="text-danger">{{ __('metawhatsapp::metawhatsapp.health_token_expired', ['date' => $account->token_expires_at->format('Y-m-d H:i')]) }}</span>
+                                    @else
+                                        <span class="{{ $daysLeft !== null && $daysLeft <= 14 ? 'text-warning' : '' }}">
+                                            {{ __('metawhatsapp::metawhatsapp.health_token_expires', ['date' => $account->token_expires_at->format('Y-m-d H:i'), 'days' => $daysLeft]) }}
+                                        </span>
                                     @endif
                                 </p>
                             </div>

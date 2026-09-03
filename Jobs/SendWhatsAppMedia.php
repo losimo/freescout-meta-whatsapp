@@ -89,16 +89,19 @@ class SendWhatsAppMedia implements ShouldQueue
 
         $attachment = Attachment::find($this->attachmentId);
         if (!$attachment || (int) $attachment->thread_id !== $thread->id) {
-            Log::warning('[MetaWhatsApp] SendWhatsAppMedia: attachment missing or not linked to thread', [
+            Log::error('[MetaWhatsApp] SendWhatsAppMedia: attachment missing or not linked to thread', [
                 'account_id'    => $account->id,
                 'thread_id'     => $thread->id,
                 'attachment_id' => $this->attachmentId,
             ]);
+            // El text de la resposta pot haver sortit igualment, però el
+            // fitxer no. Sense nota, l'agent creu que el client l'ha rebut.
+            OutboundGuard::noteRefusal($thread, 'metawhatsapp::metawhatsapp.not_sent_attachment_missing');
             return;
         }
 
         if (WhatsAppMessage::windowExpired($thread->conversation_id, $account)) {
-            Log::warning('[MetaWhatsApp] Outside the 24h window: media not sent', [
+            Log::error('[MetaWhatsApp] Outside the 24h window: media not sent', [
                 'account_id'    => $account->id,
                 'thread_id'     => $thread->id,
                 'attachment_id' => $attachment->id,

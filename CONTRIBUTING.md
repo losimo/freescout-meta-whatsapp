@@ -60,7 +60,7 @@ These areas always require prior discussion, however small the modification may 
 - The jobs and the queue.
 - Anything depending on FreeScout core semantics, such as hooks, the undo window, conversation types or `customer_channel`.
 
-Direct PRs on these paths without a linked issue may be closed without merging. It is not distrust; in these areas mistakes are not always visible in the diff — they show up in production.
+Direct PRs on these paths without a linked issue may be closed without merging. It is not distrust; in these areas mistakes are not always visible in the diff, they show up in production.
 
 ## Minimum PR requirements
 
@@ -79,6 +79,8 @@ If the change alters any documented limitation or expectation, the documentation
 ## Language
 
 **English is the working language of this codebase**: commit messages, code comments, test names, log messages and issue discussion. Only user-facing strings are translated, and those live in `Resources/lang/` (English, Catalan, Castellano and Dutch), never hardcoded.
+
+**English is the base, the rest may lag.** New strings land in English first, and a translation that does not have them yet falls back to English on screen, never to a raw key. So a language file being behind is not a bug and does not block a release: it is an invitation to whoever maintains that language.
 
 Earlier code carries Catalan comments and test names, from before the project had outside contributors. Those are being replaced as files are touched rather than in one sweep, so you will find both for a while. New code should be English throughout.
 

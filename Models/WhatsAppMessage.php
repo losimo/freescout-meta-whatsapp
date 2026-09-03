@@ -47,7 +47,23 @@ class WhatsAppMessage extends Model
     /**
      * La finestra de servei s'ha de tractar com a expirada per a aquesta
      * conversa? Es basa en l'últim missatge inbound i el llindar operatiu
-     * del compte (marge intern; la regla real de Meta són 24 h).
+     * del compte.
+     *
+     * ATENCIÓ, això NO és la regla de Meta i no s'ha d'"arreglar" perquè ho
+     * sigui. Meta compta 24 hores exactes des de l'últim missatge del client;
+     * nosaltres comptem `template_threshold_minutes`, que per defecte són
+     * 1435 minuts, o sigui 23 h 55 min. Els cinc minuts de diferència són
+     * deliberats: entre que el treballador de la cua agafa la feina i Meta
+     * rep la petició hi passa temps, i enviar text lliure quan la finestra
+     * acaba de tancar-se és una entrega fallida amb 131047 en comptes d'una
+     * plantilla que sí que arriba. Val més tancar abans que Meta i no
+     * després.
+     *
+     * L'administrador pot moure el llindar de 1 a 1440 minuts des del
+     * formulari del canal, i el text d'ajuda de la interfície ja diu que
+     * només canvia quan el mòdul considera la finestra tancada, no la regla
+     * de Meta. Si algun dia es posa a 1440, tornem a coincidir amb Meta i
+     * perdem el marge.
      */
     public static function windowExpired(int $conversationId, WhatsAppAccount $account): bool
     {

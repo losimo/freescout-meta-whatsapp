@@ -21,6 +21,9 @@ class WhatsAppAccountRequest extends FormRequest
             'phone_number'    => 'required|regex:/^\+[1-9]\d{6,14}$/',
             'phone_number_id' => 'required|string|max:50|unique:meta_whatsapp_accounts,phone_number_id' . ($id ? ',' . $id : ''),
             'waba_id'         => 'required|string|max:50',
+            // Opcional: sense ell no es pot preguntar la salut del testimoni,
+            // però tota la resta del canal funciona igual.
+            'app_id'          => 'nullable|string|max:50|regex:/^\d+$/',
             'verify_token'    => 'required|string|size:64',
             'template_threshold_minutes' => 'nullable|integer|min:1|max:1440',
             // Fins a 5 plantilles (issue #2, punts 2-4): id+language obligatoris

@@ -208,6 +208,26 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
      * que és decisiu (estat del thread) es re-consulta fresc de BD aquí i
      * al job.
      */
+    /**
+     * Primer reply que de debò hauria sortit, rellegit de BD. Mateix filtre
+     * que el bucle d'enviament: notes internes i threads retirats amb undo
+     * no compten.
+     */
+    protected function firstPublishedMessage($replies): ?\App\Thread
+    {
+        foreach ($replies as $reply) {
+            $fresh = \App\Thread::find($reply->id ?? null);
+            if ($fresh
+                && $fresh->type == \App\Thread::TYPE_MESSAGE
+                && $fresh->state == \App\Thread::STATE_PUBLISHED
+            ) {
+                return $fresh;
+            }
+        }
+
+        return null;
+    }
+
     protected function handleOutboundReplies($conversation, $replies)
     {
         $account = WhatsAppAccount::where('mailbox_id', $conversation->mailbox_id)
@@ -227,9 +247,22 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 ->where('channel', WhatsAppAccount::CHANNEL)
                 ->value('channel_id');
         if (!$phone) {
-            \Log::warning('[MetaWhatsApp] Reply without recipient phone, not sent', [
+            \Log::error('[MetaWhatsApp] Reply without recipient phone, not sent', [
                 'conversation_id' => $conversation->id,
             ]);
+            // Sense telèfon no hi ha res a on enviar, però l'agent ja ha
+            // escrit i premut enviar: el thread queda a la conversa i sembla
+            // lliurat. La nota és l'única cosa que li ho desmenteix.
+            //
+            // El thread es torna a llegir de BD i no es fa servir el de
+            // $replies, que és un snapshot sense re-hidratar (vegeu la
+            // capçalera del mètode), i s'aplica el mateix filtre que el
+            // bucle de sota: si no hi ha cap missatge publicat, no hi havia
+            // res per enviar i la nota sobraria.
+            \Modules\MetaWhatsApp\Support\OutboundGuard::noteRefusal(
+                $this->firstPublishedMessage($replies),
+                'metawhatsapp::metawhatsapp.not_sent_no_phone'
+            );
             return;
         }
 
