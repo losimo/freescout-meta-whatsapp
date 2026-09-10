@@ -2,6 +2,18 @@
 
 [Català](README.ca.md) · [English](README.md) · [Castellano](README.es.md) · [Nederlands](README.nl.md)
 
+> [!IMPORTANT]
+> **A partir del 1 de octubre de 2026, Meta cobra los mensajes de servicio.**
+>
+> Hasta ahora, responder con texto libre dentro de la ventana de 24 horas no tenía coste. A partir de esa fecha, los mensajes de servicio y las plantillas de utilidad enviados dentro de esa ventana se facturan por mensaje entregado. Hay una franquicia mensual por número de teléfono, que las fuentes del sector sitúan en torno a los 1.000 mensajes.
+>
+> Consulta las tarifas en la [página de precios de Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), eligiendo tu mercado y tu moneda: cada categoría (autenticación, marketing, utilidad y servicio) tiene un precio distinto.
+>
+> Es un cambio de tarifas de Meta, no del módulo. El módulo no cobra nada ni recibe ninguna comisión, y sus guardas de idempotencia evitan que un reintento de la cola vuelva a enviar un mensaje que ya había salido.
+
+<!-- Retirar este aviso cuando la página de precios de Meta recoja el cambio con
+     normalidad y hayan pasado unas cuantas versiones desde el 1 de octubre de 2026. -->
+
 Módulo para FreeScout que integra **WhatsApp Business directamente con la Meta Cloud API**, sin intermediarios de pago como 1msg.io o Twilio. Los mensajes van de Meta a tu instalación de FreeScout, con control completo de credenciales, datos y flujo operativo.
 
 El proyecto es público y lleva en uso real de producción desde la v1.0, iterando a partir de incidencias reportadas por usuarios en lugar de un roadmap fijado: plantillas, multimedia, stickers, contactos, mensajes de ubicación y reacción, monitorización del estado de conexión y reactivación guiada de cuentas se han añadido en respuesta al uso real del día a día, no planificados de antemano. Es estable, pero sigue evolucionando activamente — ver [Limitaciones conocidas](#limitaciones-conocidas) más abajo para los huecos detectados así que aún no están resueltos.
@@ -162,6 +174,9 @@ Sigue la [guía oficial de instalación de módulos personalizados de FreeScout]
 1. Descarga el zip del módulo desde la [página de Releases](https://github.com/losimo/freescout-meta-whatsapp/releases) (o copia/enlaza el código fuente) dentro de `Modules/MetaWhatsApp` en la instalación de FreeScout.
 2. Ve a **Gestionar → Módulos** en FreeScout y activa **MetaWhatsApp**. FreeScout ejecuta las migraciones del módulo y limpia la caché automáticamente.
 3. El módulo aparecerá en **Gestionar → WhatsApp** para usuarios administradores.
+4. Comprobad que llega de verdad: abrid `https://vuestro-freescout/meta-whatsapp/webhook` en el navegador. Tenéis que ver una línea de texto plano diciendo que MetaWhatsApp está instalado y que el punto de entrada responde. Es la misma URL que después pegaréis en Meta, y contesta sin estar identificado, así que funciona aunque haya algún problema de sesiones o de permisos.
+
+> Si en el paso 4 os sale una página no encontrada, las rutas del módulo no llegan a FreeScout. Mirad la sección de resolución de problemas antes de configurar nada en Meta.
 
 Si prefieres la línea de comandos (por ejemplo, en un servidor sin acceso a la interfaz del gestor de módulos), los pasos equivalentes son:
 
@@ -285,6 +300,10 @@ El envío saliente de multimedia sigue la misma regla que el texto: solo se env�
 
 El multimedia se almacena con el almacenamiento local ya existente de FreeScout — no se introduce ningún adaptador de almacenamiento nuevo.
 
+## Datos personales
+
+[Qué guarda este módulo de vuestros clientes, dónde lo guarda, y qué se borra cuando eliminéis un cliente o una conversación](docs/personal-data.md). También dice claramente los huecos que tiene, incluido el único sitio donde el borrado no llega: el archivo de registro detallado. El documento está en inglés.
+
 ## Limitaciones conocidas
 
 Estas limitaciones son conocidas y aceptadas dentro del alcance actual de funcionalidades:
@@ -326,6 +345,7 @@ Antes de pasar de pruebas a producción:
 | Los mensajes entran pero no salen | Error `131047` por ventana de 24 horas o error `190` por token caducado |
 | La cuenta aparece como `⚠ Buzón desvinculado` | El buzón asociado se ha eliminado o ya no es resoluble |
 | No se procesa nada | El worker de colas está parado (`php artisan queue:work`) |
+| **Gestionar → WhatsApp** da "página no encontrada" | Las rutas del módulo no llegan a FreeScout. Abrid `/meta-whatsapp/webhook`: si responde, las rutas están vivas y el problema es otro; si también da 404, no llegan. Tened presente que `/meta-whatsapp` es una ruta y no una carpeta, así que no hay nada que buscar en el disco, y que un 404 no se escribe nunca en ningún registro, por lo que un registro vacío no significa nada |
 | Un fix de una actualización del módulo no parece aplicarse | El worker de colas sigue ejecutando código antiguo en memoria. Reiniciar el cron no lo recarga; hace falta `php artisan queue:restart` |
 
 Todos los logs del módulo llevan el prefijo `[MetaWhatsApp]`.

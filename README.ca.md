@@ -2,6 +2,18 @@
 
 [Català](README.ca.md) · [English](README.md) · [Castellano](README.es.md) · [Nederlands](README.nl.md)
 
+> [!IMPORTANT]
+> **A partir de l'1 d'octubre del 2026, Meta cobra els missatges de servei.**
+>
+> Fins ara, respondre en text lliure dins de la finestra de 24 hores no tenia cost. A partir d'aquesta data, els missatges de servei i les plantilles d'utilitat enviats dins d'aquesta finestra es facturen per missatge lliurat. Hi ha una franquícia mensual per número de telèfon, que les fonts del sector situen al voltant dels 1.000 missatges.
+>
+> Consulteu les tarifes a la [pàgina de preus de Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), triant-hi el vostre mercat i la vostra moneda: cada categoria (autenticació, màrqueting, utilitat i servei) té un preu diferent.
+>
+> És un canvi de tarifes de Meta, no del mòdul. El mòdul no cobra res ni rep cap comissió, i les seves guardes d'idempotència eviten que un reintent de la cua torni a enviar un missatge que ja havia sortit.
+
+<!-- Retirar aquest avís quan la pàgina de preus de Meta reculli el canvi amb
+     normalitat i hagin passat unes quantes versions des de l'1 d'octubre del 2026. -->
+
 Mòdul per a FreeScout que integra **WhatsApp Business directament amb la Meta Cloud API**, sense intermediaris de pagament com 1msg.io o Twilio. Els missatges van de Meta a la teva instal·lació de FreeScout, amb control complet de credencials, dades i flux operatiu.
 
 El projecte és públic i porta en ús real de producció des de la v1.0, iterant a partir d'incidències reportades per usuaris en lloc d'un roadmap fixat: plantilles, multimèdia, stickers, contactes, missatges de ubicació i reacció, monitoratge de l'estat de connexió i reactivació guiada de comptes s'han afegit tots en resposta a l'ús real del dia a dia, no planificats per endavant. És estable, però encara evoluciona activament — vegeu [Limitacions conegudes](#limitacions-conegudes) més avall per als buits detectats així que encara no estan resolts.
@@ -162,6 +174,9 @@ Segueix la [guia oficial d'instal·lació de mòduls personalitzats de FreeScout
 1. Descarrega el zip del mòdul des de la [pàgina de Releases](https://github.com/losimo/freescout-meta-whatsapp/releases) (o copia/enllaça el codi font) dins de `Modules/MetaWhatsApp` a la instal·lació de FreeScout.
 2. Ves a **Gestionar → Mòduls** a FreeScout i activa **MetaWhatsApp**. FreeScout executa les migracions del mòdul i neteja la memòria cau automàticament.
 3. El mòdul apareixerà a **Gestionar → WhatsApp** per a usuaris administradors.
+4. Comproveu que hi arriba de debò: obriu `https://el-vostre-freescout/meta-whatsapp/webhook` al navegador. Hi heu de veure una línia de text pla dient que el MetaWhatsApp està instal·lat i que el punt d'entrada respon. És el mateix URL que després enganxareu a Meta, i contesta sense estar identificat, així que funciona encara que hi hagi algun problema de sessions o de permisos.
+
+> Si al pas 4 us surt una pàgina no trobada, les rutes del mòdul no arriben al FreeScout. Mireu la secció de resolució de problemes abans de configurar res a Meta.
 
 Si prefereixes la línia d'ordres (per exemple, en un servidor sense accés a la interfície del gestor de mòduls), els passos equivalents són:
 
@@ -285,6 +300,10 @@ L'enviament sortint de multimèdia segueix la mateixa regla que el text: només 
 
 El multimèdia s'emmagatzema amb l'emmagatzematge local ja existent de FreeScout — no s'introdueix cap adaptador d'emmagatzematge nou.
 
+## Dades personals
+
+[Què guarda aquest mòdul dels vostres clients, on ho guarda, i què s'esborra quan elimineu un client o una conversa](docs/personal-data.md). També hi diu clarament els forats que té, inclòs l'únic lloc on l'esborrat no arriba: el fitxer de registre detallat. El document és en anglès.
+
 ## Limitacions conegudes
 
 Aquestes limitacions són conegudes i acceptades dins l'abast actual de funcionalitats:
@@ -326,6 +345,7 @@ Abans de fer el pas de proves a producció:
 | Els missatges entren però no surten | Error `131047` per finestra de 24 hores o error `190` per token caducat |
 | El compte surt com a `⚠ Bústia desvinculada` | La bústia associada s'ha eliminat o ja no és resoluble |
 | No es processa res | El worker de cues està aturat (`php artisan queue:work`) |
+| **Gestionar → WhatsApp** dona "pàgina no trobada" | Les rutes del mòdul no arriben al FreeScout. Obriu `/meta-whatsapp/webhook`: si respon, les rutes són vives i el problema és un altre; si també dona 404, no hi arriben. Tingueu present que `/meta-whatsapp` és una ruta i no una carpeta, així que no hi ha res a buscar al disc, i que un 404 no s'escriu mai a cap registre, per tant un registre buit no vol dir res |
 | Un fix d'una actualització del mòdul no sembla aplicar-se | El worker de cues continua executant codi antic en memòria. Reiniciar el cron no el recarrega; cal `php artisan queue:restart` |
 
 Tots els logs del mòdul porten el prefix `[MetaWhatsApp]`.

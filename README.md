@@ -2,6 +2,18 @@
 
 [Català](README.ca.md) · [English](README.md) · [Castellano](README.es.md) · [Nederlands](README.nl.md)
 
+> [!IMPORTANT]
+> **From 1 October 2026, Meta charges for service messages.**
+>
+> Until now, replying with free-form text inside the 24-hour window carried no cost. From that date, service messages and utility templates sent inside that window are billed per delivered message. There is a monthly allowance per business phone number, which industry sources put at around 1,000 messages.
+>
+> Check the rates on [Meta's pricing page](https://whatsappbusiness.com/products/platform-pricing/#rates), selecting your market and currency: each category (authentication, marketing, utility and service) is priced differently.
+>
+> This is a Meta pricing change, not a module change. The module charges nothing and takes no commission, and its idempotency guards stop a queue retry from re-sending a message that already went out.
+
+<!-- Remove this notice once Meta's pricing page covers the change as routine and
+     a few versions have passed since 1 October 2026. -->
+
 FreeScout module that integrates **WhatsApp Business directly with the Meta Cloud API**, without paid intermediaries such as 1msg.io or Twilio. Messages travel from Meta to your FreeScout installation and nowhere else, with full control over credentials, data and the operational flow.
 
 The project is public and has been running in real production use since v1.0, iterating through user-reported issues rather than a fixed roadmap: templates, media, stickers, contacts, location and reaction messages, connection health monitoring and guided account reactivation were all added in response to actual day-to-day use, not planned upfront. It's stable, but still actively evolving — see [Known limitations](#known-limitations) below for gaps found this way that aren't fixed yet.
@@ -168,6 +180,9 @@ Follow FreeScout's [official custom module installation guide](https://github.co
 
 2. Go to **Manage → Modules** in FreeScout and activate **MetaWhatsApp**. FreeScout runs the module's migrations and clears the cache automatically.
 3. The module appears under **Manage → WhatsApp** for administrator users.
+4. Check it is really reachable: open `https://your-freescout/meta-whatsapp/webhook` in a browser. You should see a plain-text line saying MetaWhatsApp is installed and the endpoint is reachable. That is the same URL you will paste into Meta later, and it answers without logging in, so it works even if something is wrong with sessions or permissions.
+
+> If step 4 gives you a page-not-found instead, the module's routes are not reaching FreeScout. See [Troubleshooting](#troubleshooting) before configuring anything in Meta.
 
 If you prefer the command line (e.g. on a server without UI access to the module manager), the equivalent steps are:
 
@@ -291,6 +306,10 @@ Outbound media follows the same rule as text: it is **only sent within the open 
 
 Media is stored using FreeScout's existing local attachment storage — no separate storage adapter is introduced.
 
+## Personal data
+
+[What this module stores about your customers, where, and what is removed when you delete a customer or a conversation](docs/personal-data.md). It also states the gaps plainly, including the one place erasure cannot reach: the detailed log file.
+
 ## Known limitations
 
 These limitations are known and accepted within the current feature scope:
@@ -332,6 +351,7 @@ Before moving from testing to production:
 | Messages come in but replies do not go out | Error `131047` (24-hour window) or error `190` (expired token) |
 | Account shows `⚠ Mailbox unlinked` | The linked mailbox was deleted or is no longer resolvable |
 | Nothing gets processed | Queue worker stopped (`php artisan queue:work`) |
+| **Manage → WhatsApp** gives "page could not be found" | The module's routes are not reaching FreeScout. Open `/meta-whatsapp/webhook`: if that answers, the routes are alive and the problem is elsewhere; if it also 404s, they are not. Note that `/meta-whatsapp` is a route, not a folder, so there is nothing to look for on disk, and a 404 is never written to any log, so an empty log tells you nothing |
 | A fix from a module update does not seem to apply | Queue worker keeps running with old code in memory. Restarting cron does not reload it; run `php artisan queue:restart` |
 
 All module logs carry the `[MetaWhatsApp]` prefix.
