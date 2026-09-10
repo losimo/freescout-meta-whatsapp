@@ -73,6 +73,15 @@ Queda fuera de alcance:
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
+## Novedades en la v1.11.0
+
+Esta versión sale de un solo hilo de incidencia (#33), donde una instalación correcta y una rota se veían exactamente igual desde fuera.
+
+- **Abrir la URL del webhook en el navegador ahora dice que el módulo está instalado y que el punto de entrada responde.** Hasta ahora esa dirección contestaba `403 Forbidden` tanto si el módulo iba bien como si estaba mal configurado o no estaba, así que no había manera de comprobar una instalación sin entrar en ella. La cortesía es solo para una petición sin ningún parámetro, que nunca es Meta: con parámetros a medias o con un token desconocido sigue siendo un 403 seco, sin explicaciones. Se contesta con 200 y no con 403 a propósito, porque muchos alojamientos compartidos sustituyen las páginas de error por la suya y la comprobación habría fallado justo en el tipo de alojamiento donde más falta hace.
+- **El registro detallado ahora se activa desde el panel**, con una ventana y unos días de retención, en lugar de editar `METAWHATSAPP_DEBUG` en el `.env` de FreeScout, algo que en un alojamiento compartido queda fuera del alcance. Es una ventana y no un interruptor a propósito: ese fichero guarda el texto de los mensajes y los teléfonos, y es el único sitio donde el borrado no llega, porque un fichero rotativo no se puede reescribir cuando se elimina una conversación. Cuánto rato queda encendido, incluida la opción de dejarlo sin fecha, lo decide el administrador.
+- **Dónde pone el módulo los datos personales ya está escrito**, en [docs/personal-data.md](docs/personal-data.md). Cada fila está verificada contra el código y la base de datos, no supuesta, de modo que un operador que reciba una petición de acceso o de borrado no tenga que leer el código. Dice los huecos con la misma claridad que el resto: borrar una conversación deja el teléfono y el BSUID en `meta_whatsapp_messages`, y tres líneas de error del registro normal llevan el teléfono del remitente.
+- **La invitación a traducir ahora dice que no hace falta escribir PHP.** FreeScout incluye una pantalla de traducción que lee también los módulos de la comunidad, así que cualquier idioma se puede aportar desde el navegador.
+
 ## Novedades en la v1.10.0
 
 Esta versión tiene una idea detrás: **el módulo os dice qué no funciona antes de que os muerda.**

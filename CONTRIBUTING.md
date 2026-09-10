@@ -80,7 +80,9 @@ If the change alters any documented limitation or expectation, the documentation
 
 **English is the working language of this codebase**: commit messages, code comments, test names, log messages and issue discussion. Only user-facing strings are translated, and those live in `Resources/lang/` (English, Catalan, Castellano and Dutch), never hardcoded.
 
-**English is the base, the rest may lag.** New strings land in English first, and a translation that does not have them yet falls back to English on screen, never to a raw key. So a language file being behind is not a bug and does not block a release: it is an invitation to whoever maintains that language.
+**Your language is welcome, and you do not need to write PHP for it.** FreeScout has a translation screen built in, and it reads community modules too: go to Manage » Translate, click Import Translations, pick the MetaWhatsApp group and translate in the browser. FreeScout's own [step-by-step guide](https://github.com/freescout-help-desk/freescout/wiki/Translate) walks through it. Send us the result however suits you, an issue, a pull request or an email, and it ships with the next release.
+
+New strings land in English first, and a language that does not have them yet falls back to English on screen, never to a raw key. So a translation is never blocking and never broken, only less complete than it could be.
 
 Earlier code carries Catalan comments and test names, from before the project had outside contributors. Those are being replaced as files are touched rather than in one sweep, so you will find both for a while. New code should be English throughout.
 

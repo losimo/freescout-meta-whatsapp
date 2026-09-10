@@ -16,8 +16,10 @@ class Logger
      * past that, so logging them as raw arrays silently truncates every
      * value below the limit to "Over 9 levels deep, aborting normalization".
      *
-     * When metawhatsapp.debug is enabled, also writes to a module-only log
-     * file at debug level, independent of the app-wide log level.
+     * When detailed logging is on (see DebugLog), also writes to a
+     * module-only log file at debug level, independent of the app-wide log
+     * level. That file holds message text and phone numbers, which is why
+     * DebugLog carries a window and a retention rather than a plain switch.
      */
     public static function debugData(string $message, array $context): void
     {
@@ -29,14 +31,15 @@ class Logger
 
         Log::debug($message, $context);
 
-        if (config('metawhatsapp.debug')) {
+        if (DebugLog::isEnabled()) {
             // Rotació diària (issue #10 follow-up), mateix patró que Laravel
-            // fa servir al canal 'daily': metawhatsapp-debug-YYYY-MM-DD.log,
-            // 7 dies de retenció per defecte.
+            // fa servir al canal 'daily': metawhatsapp-debug-YYYY-MM-DD.log.
+            // La retenció ja no és fixa a 7: la decideix l'administrador des
+            // del panell, perquè és el seu servidor i les seves dades.
             $logger = new Monolog('metawhatsapp');
             $logger->pushHandler(new RotatingFileHandler(
                 storage_path('logs/metawhatsapp-debug.log'),
-                7,
+                DebugLog::retentionDays(),
                 Monolog::DEBUG
             ));
             $logger->debug($message, $context);

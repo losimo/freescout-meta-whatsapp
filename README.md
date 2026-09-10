@@ -73,6 +73,15 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.11.0
+
+This release comes out of a single support thread (#33), where a working installation and a broken one looked exactly the same from the outside.
+
+- **Opening the webhook URL in a browser now says the module is installed and the entry point answers.** Until now that address replied `403 Forbidden` whether the module was healthy, misconfigured or absent, so there was no way to check an installation without logging into it. The courtesy is only for a request carrying no parameters, which is never Meta: half-filled parameters or an unknown verify token still get a bare 403, with no explanation. It answers 200 rather than 403 on purpose, because many shared hosts replace error pages with their own, which would have broken the check on exactly the kind of hosting that needs it most.
+- **The detailed log can now be turned on from the panel**, with a window and a retention in days, instead of editing `METAWHATSAPP_DEBUG` in FreeScout's `.env`, which is out of reach on shared hosting. It is a window rather than a switch on purpose: that file holds message text and phone numbers, and it is the one place deletion cannot reach, since a rotating file cannot be rewritten when a conversation is removed. How long it stays on, including leaving it on with no end date, is the administrator's call.
+- **Where the module puts personal data is now written down**, in [docs/personal-data.md](docs/personal-data.md). Every row is verified against the code and the database rather than assumed, so an operator facing an access or erasure request does not have to read the source. It names the gaps as plainly as the rest: deleting a conversation leaves the phone number and the BSUID behind in `meta_whatsapp_messages`, and three error lines in the ordinary log carry the sender's phone number.
+- **The translation invitation now says you do not need to write PHP.** FreeScout ships a translation screen that reads community modules too, so any language can be contributed from the browser.
+
 ## What's new in v1.10.0
 
 This release has one idea behind it: **the module tells you what is wrong before it bites you.**

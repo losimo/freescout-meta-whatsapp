@@ -115,4 +115,43 @@ class WebhookSecurityTest extends TestCase
             ->assertStatus(403);
         Queue::assertNotPushed(ProcessInboundWebhook::class);
     }
+
+    /**
+     * Comprovació d'instal·lació: obrir l'URL del webhook al navegador ha de
+     * dir que tot va bé, no "Forbidden". Ve del #33, on qui reportava no tenia
+     * cap manera de saber si el mòdul responia sense entrar-hi.
+     */
+    public function test_obrir_lurl_al_navegador_diu_que_el_modul_respon()
+    {
+        $response = $this->get($this->webhookUrl(''));
+
+        $response->assertStatus(200);
+        // assertSee() acaba a assertContains() sobre una cadena, que PHPUnit 9
+        // ja no accepta amb aquesta versió de Laravel.
+        $this->assertStringContainsString('MetaWhatsApp is installed', $response->getContent());
+    }
+
+    /**
+     * El 200 no és casual: molts allotjaments compartits substitueixen les
+     * pàgines d'error per la seva, i amb un 403 la comprovació fallaria
+     * justament on més falta fa.
+     */
+    public function test_la_comprovacio_no_depen_duna_pagina_derror_del_servidor()
+    {
+        $this->get($this->webhookUrl(''))->assertStatus(200);
+    }
+
+    /**
+     * La cortesia és només per a qui no envia res. Amb paràmetres a mitges
+     * torna a ser una crida mal formada i es rebutja sense dir per què.
+     */
+    public function test_amb_parametres_a_mitges_continua_sent_un_403_sec()
+    {
+        $response = $this->get($this->webhookUrl('?hub.mode=subscribe'));
+        $response->assertStatus(403);
+        $this->assertStringContainsString('Forbidden', $response->getContent());
+
+        $this->get($this->webhookUrl('?hub.challenge=x'))
+            ->assertStatus(403);
+    }
 }

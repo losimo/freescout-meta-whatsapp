@@ -9,6 +9,18 @@ use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 class WebhookController extends Controller
 {
     /**
+     * El que veu una persona que obre aquest URL al navegador.
+     *
+     * Meta mai arriba aquí sense paràmetres, així que aquesta branca és
+     * sempre algú que segueix la guia d'instal·lació. Fins ara li responíem
+     * "Forbidden", que és una manera ben estranya de dir que tot va bé.
+     */
+    const REACHABLE_MESSAGE = "MetaWhatsApp is installed and this endpoint is reachable.\n\n"
+        . "This is the webhook URL you paste into Meta. It only answers Meta's verification\n"
+        . "handshake, so there is nothing else to see here.\n\n"
+        . "If the installation guide sent you here: this is what success looks like.\n";
+
+    /**
      * GET: handshake de subscripció de Meta.
      * Fail-closed: només respon el challenge si el verify_token pertany a un compte actiu.
      */
@@ -18,6 +30,17 @@ class WebhookController extends Controller
         $token     = $request->query('hub_verify_token');
         $challenge = $request->query('hub_challenge');
 
+        // Cap dels tres paràmetres: no és Meta, és una persona comprovant que
+        // el mòdul respon. Es contesta amb 200 i no amb 403 a posta: molts
+        // allotjaments compartits substitueixen les pàgines d'error per la
+        // seva pròpia, i llavors la comprovació fallaria justament al tipus
+        // d'allotjament on més falta fa.
+        if (!$mode && !$token && !$challenge) {
+            return response(self::REACHABLE_MESSAGE, 200)->header('Content-Type', 'text/plain');
+        }
+
+        // Amb algun paràmetre però no tots, o amb un mode que no toca, sí que
+        // és una crida mal formada i es rebutja sense donar cap detall.
         if ($mode !== 'subscribe' || !$token || !$challenge) {
             return response('Forbidden', 403);
         }

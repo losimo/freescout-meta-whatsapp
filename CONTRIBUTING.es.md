@@ -80,7 +80,9 @@ Si el cambio altera alguna limitación o expectativa documentada, la documentaci
 
 **El inglés es el idioma de trabajo de este código**: mensajes de commit, comentarios, nombres de los tests, logs y discusión en los issues. Solo se traduce el texto visible para el usuario, que vive en `Resources/lang/` (inglés, catalán, castellano y neerlandés) y nunca va escrito dentro del código.
 
-**El inglés es la base y el resto puede ir con retraso.** Las cadenas nuevas llegan primero en inglés, y una traducción que todavía no las tenga muestra el inglés en pantalla, nunca la clave cruda. Así que un archivo de idioma con retraso no es un error ni detiene ninguna versión: es una invitación a quien mantiene ese idioma.
+**Vuestro idioma es bienvenido, y no hace falta que escribáis PHP.** FreeScout lleva una pantalla de traducción integrada, y lee también los módulos de la comunidad: id a Gestionar » Traducir, pulsad Importar traducciones, escoged el grupo MetaWhatsApp y traducid desde el navegador. La [guía paso a paso](https://github.com/freescout-help-desk/freescout/wiki/Translate) del propio FreeScout lo explica. Hacednos llegar el resultado como os venga mejor, por un issue, una pull request o un correo, y saldrá en la versión siguiente.
+
+Las cadenas nuevas llegan primero en inglés, y un idioma que todavía no las tenga muestra el inglés en pantalla, nunca la clave cruda. Así que una traducción nunca bloquea ni queda rota, solo menos completa de lo que podría ser.
 
 El código anterior lleva comentarios y nombres de test en catalán, de antes de que el proyecto tuviera colaboradores externos. Se van sustituyendo a medida que se tocan los ficheros, no de golpe, así que durante un tiempo convivirán ambos. El código nuevo debe ser en inglés.
 

@@ -53,11 +53,16 @@ class LoggerTest extends TestCase
 
         unlink($path);
         config(['metawhatsapp.debug' => false]);
+        \Modules\MetaWhatsApp\Support\DebugLog::disable();
     }
 
     public function test_debug_data_no_escriu_fitxer_de_log_propi_quan_el_debug_del_modul_esta_desactivat()
     {
+        // Des de la 1.11 el registre detallat també l'activa una opció desada
+        // des del panell, no només el .env. Apagar-ne una i deixar l'altra
+        // encesa faria passar aquest test per la raó equivocada.
         config(['metawhatsapp.debug' => false]);
+        \Modules\MetaWhatsApp\Support\DebugLog::disable();
         $path = $this->rotatedLogPath();
         if (file_exists($path)) {
             unlink($path);

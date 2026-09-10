@@ -12,6 +12,7 @@ use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 use Modules\MetaWhatsApp\Support\CoreCompat;
+use Modules\MetaWhatsApp\Support\DebugLog;
 
 class MetaWhatsAppController extends Controller
 {
@@ -34,7 +35,55 @@ class MetaWhatsAppController extends Controller
         $coreVersion    = CoreCompat::coreVersion();
         $coreMinimum    = CoreCompat::MINIMUM_FREESCOUT;
 
-        return view('metawhatsapp::settings', compact('accounts', 'coreOutdated', 'coreVersion', 'coreMinimum'));
+        $debug = [
+            'enabled'    => DebugLog::isEnabled(),
+            'forced_env' => DebugLog::isForcedByEnv(),
+            'always'     => DebugLog::isAlwaysOn(),
+            'expires_at' => DebugLog::expiresAt(),
+            'retention'  => DebugLog::retentionDays(),
+        ];
+
+        return view('metawhatsapp::settings', compact('accounts', 'coreOutdated', 'coreVersion', 'coreMinimum', 'debug'));
+    }
+
+    /**
+     * Finestra i retenció del registre detallat.
+     *
+     * Fins ara això només es podia tocar editant el `.env` del FreeScout, cosa
+     * que en un allotjament compartit sovint queda fora de l'abast. La durada
+     * i els dies que es conserven els decideix l'administrador: és el seu
+     * servidor i les seves dades. La pantalla explica per què una finestra
+     * curta acostuma a ser la resposta bona, i no ho imposa.
+     */
+    public function updateDiagnostics(\Illuminate\Http\Request $request)
+    {
+        $this->requireAdmin();
+
+        $request->validate([
+            'debug_window'    => 'nullable|in:off,1,3,7,30,always',
+            'debug_retention' => 'required|integer|min:1|max:90',
+        ]);
+
+        DebugLog::setRetentionDays((int) $request->debug_retention);
+
+        // Buit vol dir "no toquis la finestra". Qui ve només a canviar els
+        // dies de retenció no ha d'apagar el registre sense voler.
+        if (!$request->filled('debug_window')) {
+            \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.diagnostics_saved'));
+            return redirect()->route('metawhatsapp.settings');
+        }
+
+        if ($request->debug_window === 'off') {
+            DebugLog::disable();
+        } elseif ($request->debug_window === DebugLog::ALWAYS) {
+            DebugLog::enableFor(null);
+        } else {
+            DebugLog::enableFor((int) $request->debug_window);
+        }
+
+        \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.diagnostics_saved'));
+
+        return redirect()->route('metawhatsapp.settings');
     }
 
     public function create()

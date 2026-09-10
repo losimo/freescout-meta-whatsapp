@@ -73,6 +73,15 @@ Queda fora d'abast:
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
+## Novetats a la v1.11.0
+
+Aquesta versió surt d'un sol fil d'incidència (#33), on una instal·lació correcta i una de trencada es veien exactament igual des de fora.
+
+- **Obrir l'URL del webhook al navegador ara diu que el mòdul està instal·lat i que el punt d'entrada respon.** Fins ara aquella adreça contestava `403 Forbidden` tant si el mòdul anava bé com si estava mal configurat o no hi era, o sigui que no hi havia manera de comprovar una instal·lació sense entrar-hi. La cortesia és només per a una petició sense cap paràmetre, que mai és Meta: amb paràmetres a mitges o amb un testimoni desconegut continua sent un 403 sec, sense explicacions. Es contesta amb 200 i no amb 403 a posta, perquè molts allotjaments compartits substitueixen les pàgines d'error per la seva i la comprovació hauria fallat justament al tipus d'allotjament on més falta fa.
+- **El registre detallat ara s'activa des del panell**, amb una finestra i uns dies de retenció, en lloc d'editar `METAWHATSAPP_DEBUG` al `.env` del FreeScout, cosa que en un allotjament compartit queda fora de l'abast. És una finestra i no un interruptor a posta: aquell fitxer guarda el text dels missatges i els telèfons, i és l'únic lloc on l'esborrat no arriba, perquè un fitxer rotatiu no es pot reescriure quan s'elimina una conversa. Quanta estona queda encès, inclosa l'opció de deixar-lo sense data, ho decideix l'administrador.
+- **On posa el mòdul les dades personals ja està escrit**, a [docs/personal-data.md](docs/personal-data.md). Cada fila està verificada contra el codi i la base de dades, no suposada, de manera que un operador que rebi una petició d'accés o d'esborrat no hagi de llegir el codi. Diu els forats amb la mateixa claredat que la resta: esborrar una conversa deixa el telèfon i el BSUID a `meta_whatsapp_messages`, i tres línies d'error del registre normal porten el telèfon del remitent.
+- **La invitació a traduir ara diu que no cal escriure PHP.** El FreeScout porta una pantalla de traducció que llegeix també els mòduls de la comunitat, així que qualsevol idioma es pot aportar des del navegador.
+
 ## Novetats a la v1.10.0
 
 Aquesta versió té una idea al darrere: **el mòdul us diu què no rutlla abans que us mossegui.**

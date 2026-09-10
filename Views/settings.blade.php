@@ -67,6 +67,8 @@
                     </tbody>
                 </table>
             @endif
+
+            @include('metawhatsapp::partials/diagnostics')
         </div>
     </div>
 </div>

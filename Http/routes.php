@@ -9,6 +9,7 @@ Route::group([
     Route::get('/settings', 'MetaWhatsAppController@settings')->name('metawhatsapp.settings');
     Route::get('/settings/create', 'MetaWhatsAppController@create')->name('metawhatsapp.create');
     Route::post('/settings', 'MetaWhatsAppController@store')->name('metawhatsapp.store');
+    Route::post('/diagnostics', 'MetaWhatsAppController@updateDiagnostics')->name('metawhatsapp.diagnostics');
     Route::get('/settings/{id}/edit', 'MetaWhatsAppController@edit')->name('metawhatsapp.edit');
     Route::put('/settings/{id}', 'MetaWhatsAppController@update')->name('metawhatsapp.update');
     Route::delete('/settings/{id}', 'MetaWhatsAppController@destroy')->name('metawhatsapp.destroy');
