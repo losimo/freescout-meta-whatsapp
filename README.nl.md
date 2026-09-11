@@ -4,6 +4,18 @@
 
 > **De Engelse README is de bron.** Deze vertaling wordt bijgehouden door de gemeenschap en kan achterlopen. Wijkt deze pagina af van [README.md](README.md), dan geldt het Engels.
 
+> [!IMPORTANT]
+> **Vanaf 1 oktober 2026 brengt Meta serviceberichten in rekening.**
+>
+> Tot nu toe kostte een antwoord in vrije tekst binnen het venster van 24 uur niets. Vanaf die datum worden serviceberichten en utility-templates die binnen dat venster verstuurd worden per afgeleverd bericht gefactureerd. Per zakelijk telefoonnummer geldt een maandelijkse vrije hoeveelheid, die volgens bronnen uit de branche rond de 1.000 berichten ligt.
+>
+> De tarieven staan op de [prijspagina van Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), waar je je eigen markt en valuta kiest: elke categorie (authenticatie, marketing, utility en service) heeft een eigen prijs.
+>
+> Dit is een prijswijziging van Meta, geen wijziging in de module. De module rekent zelf niets en krijgt geen commissie, en haar idempotentiebeveiliging voorkomt dat een nieuwe poging vanuit de queue een bericht dat al verstuurd is nog een keer verstuurt.
+
+<!-- Haal deze melding weg zodra de prijspagina van Meta de wijziging als
+     vanzelfsprekend behandelt en er sinds 1 oktober 2026 een paar versies verschenen zijn. -->
+
 FreeScout-module die **WhatsApp Business rechtstreeks met de Meta Cloud API** verbindt, zonder betaalde tussenpartijen zoals 1msg.io of Twilio. Berichten gaan van Meta naar je eigen FreeScout-installatie en nergens anders heen, met volledige zeggenschap over inloggegevens, data en de manier van werken.
 
 Het project is openbaar en draait sinds v1.0 in echte productie. Het groeit mee met wat gebruikers melden in plaats van met een vooraf uitgestippelde routekaart: templates, media, stickers, contacten, locatie- en reactieberichten, bewaking van de verbinding en begeleid heractiveren van een account zijn allemaal ontstaan uit dagelijks gebruik, niet uit een plan vooraf. De module is stabiel, maar nog volop in ontwikkeling — zie [Bekende beperkingen](#bekende-beperkingen) verderop voor de gaten die zo aan het licht kwamen en nog openstaan.
