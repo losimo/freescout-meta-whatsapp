@@ -81,6 +81,17 @@ De release-geschiedenis staat in de [Engelse README](README.md) en op de [Releas
 
 Die staat bewust niet in deze vertaling. Het is het enige deel dat bij elke release groeit en het wordt in het Engels geschreven, dus een Nederlandse kopie loopt altijd achter. De rest van deze pagina verandert zelden.
 
+## Compatibiliteit met FreeScout
+
+| Moduleversie | Verwachte FreeScout-versie |
+|---|---|
+| 1.10.0 en later | 1.8.234 of nieuwer |
+| tot en met 1.9.1 | elke 1.8.x |
+
+Vanaf 1.10.0 gebruikt de module de API voor gespreksstatussen die FreeScout in 1.8.234 heeft toegevoegd, zodat een status die een andere module aanlevert herkend wordt in plaats van als onbekend te worden weggezet. Op een oudere versie valt de module terug op het vorige gedrag, en dat is daar precies goed, want een core zonder die API kan ook geen eigen statussen hebben. Er gaat niets stuk; het scherm met de kanaalinstellingen vertelt je wat de module aantrof.
+
+Nieuwer dan 1.8.234 is ook om een andere reden de moeite waard: 1.8.235, 1.8.236 en 1.8.237 dichtten elk een beveiligingslek in FreeScout.
+
 ## Installatie
 
 Volg de [officiële handleiding van FreeScout voor het installeren van eigen modules](https://github.com/freescout-help-desk/freescout/wiki/FreeScout-Modules#3-installing-custom-modules):
@@ -93,6 +104,9 @@ Volg de [officiële handleiding van FreeScout voor het installeren van eigen mod
 
 2. Ga in FreeScout naar **Beheer → Modules** en activeer **MetaWhatsApp**. FreeScout draait de migraties van de module en wist de cache vanzelf.
 3. De module verschijnt onder **Beheer → WhatsApp** voor beheerders.
+4. Controleer of hij echt bereikbaar is: open `https://jouw-freescout/meta-whatsapp/webhook` in een browser. Je hoort een regel platte tekst te zien die zegt dat MetaWhatsApp geïnstalleerd is en dat het eindpunt bereikbaar is. Dat is dezelfde URL die je straks bij Meta invult, en hij antwoordt zonder dat je ingelogd bent, dus het werkt ook als er iets mis is met sessies of rechten.
+
+> Krijg je bij stap 4 een pagina-niet-gevonden, dan komen de routes van de module niet bij FreeScout aan. Kijk eerst bij [Problemen oplossen](#problemen-oplossen) voordat je iets bij Meta instelt.
 
 Werk je liever vanaf de opdrachtregel (bijvoorbeeld op een server zonder toegang tot het modulebeheer), dan zijn dit de gelijkwaardige stappen:
 
@@ -123,6 +137,7 @@ Voordat je het kanaal in FreeScout instelt, zet je bij [Meta for Developers](htt
 | **WABA ID** | App Dashboard → WhatsApp → API Setup |
 | **Access Token** | Zie de opmerking over het permanente token |
 | **App Secret** | App Dashboard → App Settings → Basic |
+| **App ID** (optioneel) | Hetzelfde scherm, direct naast het App Secret. Hiermee kan de module je laten weten wanneer het access token verloopt |
 
 > **Belangrijk over het token**
 >
@@ -215,6 +230,10 @@ Voor uitgaande media geldt dezelfde regel als voor tekst: het gaat **alleen weg 
 
 Media wordt opgeslagen met de bestaande lokale bijlage-opslag van FreeScout; er komt geen aparte opslagadapter bij.
 
+## Persoonsgegevens
+
+[Wat deze module over je klanten opslaat, waar, en wat er verdwijnt als je een klant of een gesprek verwijdert](docs/personal-data.md). Het noemt ook onomwonden de gaten, waaronder de enige plek waar verwijderen niet bij kan: het bestand van de uitgebreide logging. Het document is in het Engels.
+
 ## Bekende beperkingen
 
 Deze beperkingen zijn bekend en horen bij de huidige omvang van de module:
@@ -256,6 +275,7 @@ Voordat je van testen naar productie gaat:
 | Berichten komen binnen, antwoorden gaan niet weg | Fout `131047` (venster van 24 uur) of fout `190` (verlopen token) |
 | Bij het account staat `⚠ Mailbox ontkoppeld` | De gekoppelde mailbox is verwijderd of niet meer te vinden |
 | Er wordt helemaal niets verwerkt | De queue worker ligt stil (`php artisan queue:work`) |
+| **Beheer → WhatsApp** geeft "pagina niet gevonden" | De routes van de module komen niet bij FreeScout aan. Open `/meta-whatsapp/webhook`: antwoordt die, dan leven de routes en zit het probleem ergens anders; geeft die ook een 404, dan komen ze niet aan. `/meta-whatsapp` is een route en geen map, dus op de schijf valt er niets te zoeken, en een 404 komt nooit in een log terecht, dus een leeg log zegt niets |
 | Een reparatie uit een module-update lijkt niet aan te slaan | De queue worker draait door met oude code in het geheugen. Cron herstarten laadt hem niet opnieuw; draai `php artisan queue:restart` |
 
 Alle logregels van de module beginnen met `[MetaWhatsApp]`.
