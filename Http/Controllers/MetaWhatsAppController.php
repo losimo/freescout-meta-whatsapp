@@ -10,6 +10,7 @@ use Modules\MetaWhatsApp\Http\Requests\WhatsAppAccountRequest;
 use Modules\MetaWhatsApp\Jobs\SendWhatsAppTemplate;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
+use Modules\MetaWhatsApp\Support\ServiceUsage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 use Modules\MetaWhatsApp\Support\CoreCompat;
 use Modules\MetaWhatsApp\Support\DebugLog;
@@ -218,7 +219,20 @@ class MetaWhatsAppController extends Controller
                 ->latest('id')->first(),
         ];
 
-        return view('metawhatsapp::account_form', compact('account', 'webhookUrl', 'healthSnapshot'));
+        // Només es calcula si l'administrador ha engegat el comptador: qui no
+        // el vol no paga la consulta a cada visita al formulari.
+        $serviceMessagesThisMonth = $account->usage_counter_enabled
+            ? ServiceUsage::sentThisMonth($account)
+            : 0;
+        $serviceUsageSince = ServiceUsage::monthStart()->format('Y-m-d');
+
+        return view('metawhatsapp::account_form', compact(
+            'account',
+            'webhookUrl',
+            'healthSnapshot',
+            'serviceMessagesThisMonth',
+            'serviceUsageSince'
+        ));
     }
 
     public function update(WhatsAppAccountRequest $request, $id)
@@ -231,6 +245,9 @@ class MetaWhatsAppController extends Controller
             'verify_token', 'template_threshold_minutes',
         ]));
         $account->templates = $this->cleanTemplates($request);
+        // Una casella desmarcada no viatja al request, així que s'ha de
+        // decidir explícitament i no deixar-la al que hi hagués abans.
+        $account->usage_counter_enabled = $request->boolean('usage_counter_enabled');
         if ($request->filled('access_token')) {
             $account->access_token = encrypt($request->access_token);
         }
@@ -278,9 +295,21 @@ class MetaWhatsAppController extends Controller
         $this->requireAdmin();
         $account = WhatsAppAccount::findOrFail($id);
 
-        $result = app(WhatsAppApiClient::class, ['account' => $account])->testConnection();
+        $client = app(WhatsAppApiClient::class, ['account' => $account]);
+        $result = $client->testConnection();
 
         if ($result['ok']) {
+            // El test de connexió ja és una comprovació en viu deliberada, o
+            // sigui que és el lloc on preguntar pels grups sense encarir cada
+            // càrrega del formulari. Si falla, no s'escriu res: val més "no
+            // comprovat" que una xifra vella presentada com si fos d'ara.
+            $groups = $client->listGroups();
+            if ($groups['ok']) {
+                $account->groups_count      = $groups['count'];
+                $account->groups_checked_at = now();
+                $account->save();
+            }
+
             // Reactivació guiada (issue #9): un test de connexió amb èxit
             // sobre un compte desactivat (p. ex. per un error 190 anterior)
             // el reactiva automàticament, amb audit trail (qui/quan).

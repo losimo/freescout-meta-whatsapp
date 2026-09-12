@@ -167,6 +167,22 @@
                     </div>
                 </div>
 
+                @if($account ?? false)
+                <div class="form-group">
+                    <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.usage_title') }}</label>
+                    <div class="col-sm-8">
+                        <div class="checkbox">
+                            <label>
+                                <input type="checkbox" name="usage_counter_enabled" value="1"
+                                       {{ old('usage_counter_enabled', $account->usage_counter_enabled ?? false) ? 'checked' : '' }}>
+                                {{ __('metawhatsapp::metawhatsapp.usage_enable') }}
+                            </label>
+                        </div>
+                        <p class="help-block">{{ __('metawhatsapp::metawhatsapp.usage_enable_help') }}</p>
+                    </div>
+                </div>
+                @endif
+
                 {{-- Fins a 5 files estàtiques. Una fila sense id o sense
                      idioma es descarta en desar (issue #2). --}}
                 <div class="form-group">
@@ -365,6 +381,34 @@
                                 </p>
                             </div>
                         </div>
+
+                        @if($account->usage_counter_enabled)
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.usage_title') }}</label>
+                                <div class="col-sm-8">
+                                    <p class="form-control-static">
+                                        {{ __('metawhatsapp::metawhatsapp.usage_sent_since', ['count' => $serviceMessagesThisMonth, 'date' => $serviceUsageSince]) }}
+                                        <span class="help-block" style="margin-top:4px; margin-bottom:0">{{ __('metawhatsapp::metawhatsapp.usage_scope_help') }}</span>
+                                    </p>
+                                </div>
+                            </div>
+                        @endif
+
+                        @if($account->groups_checked_at)
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.groups_title') }}</label>
+                                <div class="col-sm-8">
+                                    <p class="form-control-static">
+                                        @if($account->groups_count)
+                                            {{ __('metawhatsapp::metawhatsapp.groups_found', ['count' => $account->groups_count, 'date' => $account->groups_checked_at->format('Y-m-d')]) }}
+                                            <span class="help-block" style="margin-top:4px; margin-bottom:0">{{ __('metawhatsapp::metawhatsapp.groups_warning') }}</span>
+                                        @else
+                                            {{ __('metawhatsapp::metawhatsapp.groups_none', ['date' => $account->groups_checked_at->format('Y-m-d')]) }}
+                                        @endif
+                                    </p>
+                                </div>
+                            </div>
+                        @endif
 
                         <div class="form-group">
                             <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.health_last_error') }}</label>

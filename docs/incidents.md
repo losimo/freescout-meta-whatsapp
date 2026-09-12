@@ -41,3 +41,11 @@ Add an entry whenever something takes more than a few minutes to figure out and 
 **Resolution:** `old('mailbox_name', '')` with an explicit empty-string default. One-line fix.
 
 **Follow-up:** None needed, but a reminder that untested routes in this module can hide real breakage indefinitely — worth periodically checking for other unguarded `old()`/`$account->field` calls without a `??` fallback in Blade views.
+
+## 2026-09-12 — FreeScout 1.8.240 renames a wrongly named module folder by itself
+
+**What happened:** Not an incident of ours, a note on something the core now does for us. The module has to sit in a folder named `MetaWhatsApp`. Downloading the repository with GitHub's "Code → Download ZIP" button produces `freescout-meta-whatsapp-main` instead, and the module then fails to load with `MetaWhatsAppServiceProvider not found` — the same symptom as issue #13 but a different cause, since #13 turned out to be the missing committed `vendor/`. From FreeScout 1.8.240, activating a module renames an incorrectly named folder automatically.
+
+**Why it is worth writing down:** that symptom now has two possible causes and the core version tells them apart. On 1.8.240 or newer the folder cannot be it, so look at `vendor/`. Below it, ask which button they downloaded from before anything else.
+
+**Follow-up:** none, and deliberately no bump of our minimum FreeScout version. Anyone who installs from the release asset never hits this, and the module keeps working on older cores. The same release also closed another security issue (GHSA-5vw8-4wxh-6mpr, medium), which is why the outdated-core notice no longer names specific versions: a list inside a translated string goes stale every time FreeScout ships a fix, in four languages, one of them a contributor's.

@@ -24,18 +24,6 @@ class MailboxFoldersTest extends TestCase
 {
     use DatabaseTransactions;
 
-    protected function makeAdminUser(): User
-    {
-        $admin = new User();
-        $admin->first_name = 'Admin';
-        $admin->last_name  = 'Test';
-        $admin->email      = 'admin-' . uniqid() . '@example.com';
-        $admin->password   = bcrypt('secret');
-        $admin->role       = User::ROLE_ADMIN;
-        $admin->save();
-
-        return $admin;
-    }
 
     /**
      * The webhook subscription is a real HTTP call in store(); the folder

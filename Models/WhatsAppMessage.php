@@ -15,6 +15,13 @@ class WhatsAppMessage extends Model
     const STATUS_READ      = 'read';
     const STATUS_FAILED    = 'failed';
 
+    // Meta's billing categories. From 1 October 2026 the monthly free
+    // allowance covers service messages only, so the record has to tell
+    // them apart. Kept as strings so Meta's finer categories (utility,
+    // marketing, authentication) fit here without a migration.
+    const CATEGORY_SERVICE  = 'service';
+    const CATEGORY_TEMPLATE = 'template';
+
     protected $table = 'meta_whatsapp_messages';
 
     protected $fillable = [
@@ -26,6 +33,7 @@ class WhatsAppMessage extends Model
         'contact_phone',
         'contact_user_id',
         'direction',
+        'category',
         'status',
         'error_code',
         'delivered_at',

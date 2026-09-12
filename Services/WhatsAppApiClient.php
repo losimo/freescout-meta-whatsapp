@@ -345,6 +345,31 @@ class WhatsAppApiClient
     }
 
     /**
+     * Groups this business number belongs to (GET /{phone_number_id}/groups).
+     *
+     * The module never creates one, so a non-empty list means the number was
+     * put in a group through the API from elsewhere, and the webhook is
+     * refusing those messages. Only the count is kept: the group ids and their
+     * participants are not ours to store.
+     */
+    public function listGroups(): array
+    {
+        $url = rtrim(config('metawhatsapp.api_base', 'https://graph.facebook.com'), '/')
+            . '/' . self::API_VERSION . '/' . $this->account->phone_number_id . '/groups';
+
+        $result = $this->curlGet($url, [
+            'Authorization: Bearer ' . $this->accessToken,
+        ]);
+
+        if ($result['ok']) {
+            $data = json_decode($result['body'], true) ?: [];
+            $result['count'] = count($data['data'] ?? []);
+        }
+
+        return $result;
+    }
+
+    /**
      * Salut del testimoni d'accés: quan caduca, si encara és viu i quins
      * permisos porta.
      *

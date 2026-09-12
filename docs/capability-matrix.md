@@ -1,6 +1,6 @@
 # Capability matrix
 
-**Last updated:** v1.9.0
+**Last updated:** v1.12.0
 
 A live map of what this module supports against the Meta WhatsApp Cloud API, kept up to date at every release. Update this file whenever a capability's status changes — it's the reference to check before triaging a new issue, not a one-off spec.
 
@@ -19,6 +19,7 @@ Effort legend (planned items only): S / M / L
 | Sticker | ✅ | Reuses the existing media/image pipeline (WEBP, static or animated). Shipped v1.6.0. | #11, #14 | – |
 | Contacts | ✅ | Name + first phone number of each shared contact, one per line. Shipped v1.6.0. | #14 | – |
 | Order (`type:order`) | ❌ | Not yet supported. | | S |
+| Group messages (`group_id`) | ❌ | Refused and logged, never filed. A group message carries a `from` that is the participant, not the group, so processing it would create a private conversation with that person and send any reply to them alone. Cloud API groups only exist if the business creates them through the API, which this module never does, so a number in one was put there from elsewhere; the account health panel reports how many, after a connection test. Group management is a chapter of its own, not yet planned. | | L |
 | BSUID-only messages (no phone number) | ✅ | Resolves/creates a placeholder customer; merges into the real customer once the phone is revealed. Shipped v1.0.1 / v1.1.0. | #1 | – |
 
 ## Outbound message types

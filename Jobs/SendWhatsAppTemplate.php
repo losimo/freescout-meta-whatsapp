@@ -160,6 +160,7 @@ class SendWhatsAppTemplate implements ShouldQueue
                 'thread_id'       => $thread->id,
                 'contact_phone'   => $this->toPhone,
                 'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+                'category'        => WhatsAppMessage::CATEGORY_TEMPLATE,
                 'status'          => WhatsAppMessage::STATUS_SENT,
             ]);
             return;

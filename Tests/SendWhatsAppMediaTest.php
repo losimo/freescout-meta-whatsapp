@@ -197,6 +197,34 @@ class SendWhatsAppMediaTest extends TestCase
         $this->assertEquals('wamid.sent-media-1', $sent->wamid);
     }
 
+    /**
+     * An attachment leaves as a free-form message inside the customer
+     * window, so Meta bills it as a service message like any reply.
+     */
+    public function test_an_outbound_attachment_is_recorded_as_a_service_message()
+    {
+        $account = $this->createTestAccount();
+        [$thread, $attachment] = $this->makeConversationWithThreadAndAttachment($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
+        $this->markWindowOpen($account, $thread);
+
+        $fakeClient = \Mockery::mock(WhatsAppApiClient::class);
+        $fakeClient->shouldReceive('uploadMedia')
+            ->andReturn(['ok' => true, 'media_id' => 'meta-media-cat', 'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false]);
+        $fakeClient->shouldReceive('sendMedia')
+            ->andReturn(['ok' => true, 'wamid' => 'wamid.media-category', 'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false]);
+        $fakeClient->shouldReceive('markAsRead')->andReturn(['ok' => true, 'http_status' => 200]);
+
+        $job = \Mockery::mock(SendWhatsAppMedia::class, [$account->id, $thread->id, '+34611222333', $attachment->id, 'hola'])->makePartial();
+        $job->shouldAllowMockingProtectedMethods();
+        $job->shouldReceive('apiClient')->andReturn($fakeClient);
+        $job->handle();
+
+        $this->assertEquals(
+            WhatsAppMessage::CATEGORY_SERVICE,
+            WhatsAppMessage::where('wamid', 'wamid.media-category')->value('category')
+        );
+    }
+
     public function test_marca_com_a_llegit_lultim_missatge_entrant_despres_denviar_media()
     {
         $account = $this->createTestAccount();

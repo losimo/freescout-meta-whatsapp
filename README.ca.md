@@ -5,7 +5,7 @@
 > [!IMPORTANT]
 > **A partir de l'1 d'octubre del 2026, Meta cobra els missatges de servei.**
 >
-> Fins ara, respondre en text lliure dins de la finestra de 24 hores no tenia cost. A partir d'aquesta data, els missatges de servei i les plantilles d'utilitat enviats dins d'aquesta finestra es facturen per missatge lliurat. Hi ha una franquícia mensual per número de telèfon, que les fonts del sector situen al voltant dels 1.000 missatges.
+> Fins ara, respondre en text lliure dins de la finestra de 24 hores no tenia cost. A partir d'aquesta data es factura per missatge lliurat, amb una franquícia de **1.000 missatges de servei per número de telèfon i mes**, que es reinicia cada mes i no s'acumula. Les plantilles d'utilitat enviades dins de la finestra també passen a ser de pagament, i aquestes sense franquícia. La xifra de 1.000 la donen coincidint les fonts del sector; no surt de cap pàgina de Meta.
 >
 > Consulteu les tarifes a la [pàgina de preus de Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), triant-hi el vostre mercat i la vostra moneda: cada categoria (autenticació, màrqueting, utilitat i servei) té un preu diferent.
 >
@@ -45,6 +45,10 @@ El projecte és públic i porta en ús real de producció des de la v1.0, iteran
 
 ![Panell de salut del compte](docs/ca/account-health.png)
 
+*Registre detallat, que s'encén durant una finestra i es conserva uns dies, des de la pantalla de configuració:*
+
+![Panell del registre detallat](docs/ca/detailed-log.png)
+
 *Avís a la conversa quan la finestra de 24 hores del client sembla caducada:*
 
 ![Avís de finestra caducada](docs/ca/expired-window-banner.png)
@@ -72,6 +76,20 @@ Queda fora d'abast:
 - Un adaptador d'emmagatzematge al núvol (S3, etc.) per a multimèdia — els adjunts usen l'emmagatzematge local ja existent de FreeScout.
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
+
+## Novetats a la v1.12.0
+
+Aquesta versió va del que Meta comença a cobrar l'1 d'octubre del 2026, i d'una mena de missatge que el mòdul arxivava com una altra cosa.
+
+- **Un recompte mensual dels missatges de servei enviats des d'aquest canal**, al panell de salut del compte i apagat per defecte. A partir de l'1 d'octubre Meta factura les respostes en text lliure enviades dins de la finestra de 24 hores, amb una franquícia mensual per número de telèfon, i fins ara res d'aquí no us podia dir quants n'havíeu enviat. Compta el que ha sortit del FreeScout, que és l'únic que pot veure honestament, i ho diu a la pantalla: si aquest número també s'usa des d'una altra banda, el total a Meta és més alt. Un enviament fallit no es compta, perquè Meta cobra pel missatge lliurat.
+- **Els missatges de sortida ara desen amb quina categoria els factura Meta**, servei o plantilla. Aquesta és la part que sobreviu a la versió: el registre no sabia distingir una resposta d'una plantilla, o sigui que no s'hi podia construir cap número honest, i el rellotge de finestra previst per a la 2.0 necessita la mateixa distinció. No es reomple res del passat, així que els missatges anteriors a aquesta versió es queden sense categoria i no es compten mai.
+- **Un missatge enviat en un grup de WhatsApp es refusa i es registra** en lloc d'arxivar-se com una conversa privada amb qui l'ha escrit. Un missatge de grup identifica el participant, no el grup, així que un agent que respongués el que s'ha dit davant d'altres hauria contestat a aquella persona sola, sense res a la pantalla que ho digués. Al registre hi va l'identificador del grup i mai el telèfon del participant, perquè un grup porta números de gent que no us ha escrit mai.
+- **El panell de salut diu a quants grups pertany el número**, comprovat durant el test de connexió i no a cada càrrega de pàgina. El mòdul no crea mai grups, així que qualsevol cosa per sobre de zero s'ha fet per l'API des d'una altra banda.
+- **Correcció**: tots els esdeveniments de webhook que no són missatges es registraven com un desajust de `phone_number_id`, que és el nom d'un problema greu entre canals, per una cosa que només és un tipus d'esdeveniment que aquest mòdul no tracta. Subscriure un número als webhooks de Meta el subscriu a tots els camps, o sigui que els canvis d'estat de plantilles, les valoracions de qualitat i els avisos de compte també arriben aquí. Ara diuen què són, pel seu nom.
+- L'avís de nucli antic ja no enumera quines versions del FreeScout van tancar problemes de seguretat. Aquella llista es desactualitza cada vegada que el FreeScout publica un pedaç, i ja ho havia fet.
+- **Neerlandès posat al dia**, aportat per [@jeroenedig](https://github.com/jeroenedig): l'avís de preus al README neerlandès, les 28 cadenes que havien quedat endarrerides des de la v1.10.0, i les seccions del README que havien canviat des que va entrar aquella pàgina (#34, #35).
+
+Vegeu l'avís de dalt de tot d'aquesta pàgina per saber què canvia l'1 d'octubre i on consultar les tarifes.
 
 ## Novetats a la v1.11.0
 

@@ -103,7 +103,7 @@ return [
 
     'account_inactive_notice'          => 'Este canal de WhatsApp está inactivo, así que no se puede enviar nada. Abre la configuración del canal para comprobar la conexión y reactivarlo.',
     'not_sent_channel_inactive'   => 'No se ha enviado nada a WhatsApp: este canal está inactivo. Cuando un administrador restablezca la conexión, habrá que enviar el mensaje de nuevo.',
-    'core_outdated'               => 'Este módulo se desarrolla y se prueba con FreeScout :minimum o superior, y aquí tenéis la versión :current. Sigue funcionando, pero no se ha probado en esta versión, y las 1.8.235, 1.8.236 y 1.8.237 cierran problemas de seguridad. Vale la pena actualizar FreeScout.',
+    'core_outdated'               => 'Este módulo se desarrolla y se prueba con FreeScout :minimum o superior, y aquí tenéis la versión :current. Sigue funcionando, pero no se ha probado en esta versión, y las versiones posteriores han ido cerrando problemas de seguridad. Vale la pena actualizar FreeScout.',
     'diagnostics_title'           => 'Registro detallado',
     'diagnostics_help'            => 'Registra las cargas completas de WhatsApp, es decir el texto de los mensajes de vuestros clientes y sus teléfonos. Es una segunda copia de esas conversaciones, en un archivo que borrar un cliente o una conversación no puede reescribir. Mantened la ventana el tiempo que necesitéis para diagnosticar y ni un día más. Solo los administradores pueden leerla.',
     'diagnostics_forced_env'      => 'El registro detallado también lo activa METAWHATSAPP_DEBUG en el .env de FreeScout, que manda por encima de lo que pongáis aquí.',
@@ -158,4 +158,17 @@ return [
     'reaction_removed_quoted'      => 'Eliminó una reacción a: ":excerpt"',
     'contacts_shared'              => 'Contacto(s) compartido(s):',
     'contacts_shared_empty'        => 'Compartió una tarjeta de contacto (sin nombre ni teléfono).',
+
+    // Contador mensual de mensajes de servicio (cambio de precios de Meta del 1 de octubre de 2026).
+    'usage_title'            => 'Mensajes de servicio',
+    'usage_enable'           => 'Cuenta los mensajes de servicio enviados desde FreeScout',
+    'usage_enable_help'      => 'A partir del 1 de octubre de 2026 Meta factura los mensajes de servicio enviados dentro de la ventana de 24 horas, con una franquicia mensual por número de teléfono. Este contador solo ve lo que ha salido de FreeScout, así que si este número también se usa desde otro sitio, el total real en Meta es más alto.',
+    'usage_sent_since'       => ':count enviados desde FreeScout desde el :date',
+    'usage_scope_help'       => 'Solo los mensajes enviados desde FreeScout. Si este número también se usa desde la app de WhatsApp Business o desde otra herramienta, el total real en Meta es más alto.',
+
+    // Grupos: no soportados, pero se avisa por si el número está en alguno sin saberlo.
+    'groups_title'           => 'Grupos',
+    'groups_none'            => 'Ninguno. Comprobado el :date.',
+    'groups_found'           => ':count. Comprobado el :date.',
+    'groups_warning'         => 'Este módulo no crea nunca grupos ni procesa los mensajes que se envían en ellos: los rechaza y los deja en el registro. Un número que pertenece a un grupo ha entrado ahí por la API desde otro sitio.',
 ];

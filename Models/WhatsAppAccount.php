@@ -38,6 +38,7 @@ class WhatsAppAccount extends Model
         'is_active',
         'template_threshold_minutes',
         'templates',
+        'usage_counter_enabled',
     ];
 
     // access_token i app_secret mai fillable: s'assignen explícitament amb encrypt().
@@ -45,10 +46,12 @@ class WhatsAppAccount extends Model
     // en reactivar (issue #9), mai des d'un request de l'usuari.
 
     protected $casts = [
-        'auto_created_mailbox' => 'boolean',
-        'is_active'            => 'boolean',
+        'auto_created_mailbox'  => 'boolean',
+        'is_active'             => 'boolean',
+        'usage_counter_enabled' => 'boolean',
         'templates'            => 'array',
         'reactivated_at'       => 'datetime',
+        'groups_checked_at'    => 'datetime',
         'token_expires_at'     => 'datetime',
     ];
 

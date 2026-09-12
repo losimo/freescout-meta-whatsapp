@@ -63,6 +63,23 @@ class ProcessInboundWebhook implements ShouldQueue
                 // d'un altre número no s'ha d'atribuir mai a aquest compte
                 // (evita misatribució entre canals i injecció creuada).
                 $changePhoneId = $value['metadata']['phone_number_id'] ?? null;
+
+                // Subscribing a WABA subscribes it to every webhook field Meta
+                // offers, not only messages: template status and category
+                // changes, quality ratings, account alerts and the rest all
+                // arrive here too. None of them carry `metadata`, so without
+                // this they would fall through to the misattribution guard
+                // below and be reported as a phone_number_id mismatch, which
+                // is a different problem entirely and sends whoever reads the
+                // log hunting for a channel misconfiguration that is not there.
+                if ($changePhoneId === null) {
+                    Log::info('[MetaWhatsApp] Webhook event not handled by this module', [
+                        'account_id' => $account->id,
+                        'field'      => $change['field'] ?? null,
+                    ]);
+                    continue;
+                }
+
                 if ($changePhoneId !== $account->phone_number_id) {
                     Log::warning('[MetaWhatsApp] Change with phone_number_id not matching the account, discarded', [
                         'account_id' => $account->id,
@@ -85,6 +102,27 @@ class ProcessInboundWebhook implements ShouldQueue
     {
         $wamid = $message['id'] ?? null;
         if (!$wamid) {
+            return;
+        }
+
+        // Groups are not supported. A group message carries `group_id`, and a
+        // `from` that is the participant who wrote rather than the group, so
+        // processing it would file it as a private conversation with that
+        // person and send any agent reply to them alone instead of to the
+        // group. Refused loudly rather than filed as something it is not.
+        //
+        // The group id identifies it well enough. The participant's phone stays
+        // out of this line on purpose: a group brings in the numbers of people
+        // who never wrote to us, and the log is the one place deletion cannot
+        // reach. Error level because, from the customer's side, a message they
+        // sent has vanished.
+        $groupId = $message['group_id'] ?? null;
+        if ($groupId) {
+            Log::error('[MetaWhatsApp] Message from a group discarded: this module does not support groups', [
+                'account_id' => $account->id,
+                'group_id'   => $groupId,
+                'wamid'      => $wamid,
+            ]);
             return;
         }
 

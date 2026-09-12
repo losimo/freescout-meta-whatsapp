@@ -5,7 +5,7 @@
 > [!IMPORTANT]
 > **From 1 October 2026, Meta charges for service messages.**
 >
-> Until now, replying with free-form text inside the 24-hour window carried no cost. From that date, service messages and utility templates sent inside that window are billed per delivered message. There is a monthly allowance per business phone number, which industry sources put at around 1,000 messages.
+> Until now, replying with free-form text inside the 24-hour window carried no cost. From that date it is billed per delivered message, with an allowance of **1,000 service messages per business phone number per month**, which resets monthly and does not roll over. Utility templates sent inside the window become chargeable too, and those have no allowance. The figure of 1,000 comes from industry sources agreeing on it; it is not published on any Meta page.
 >
 > Check the rates on [Meta's pricing page](https://whatsappbusiness.com/products/platform-pricing/#rates), selecting your market and currency: each category (authentication, marketing, utility and service) is priced differently.
 >
@@ -45,6 +45,10 @@ The project is public and has been running in real production use since v1.0, it
 
 ![Account health panel](docs/en/account-health.png)
 
+*Detailed logging, switched on for a window and kept for a number of days, from the settings page:*
+
+![Detailed logging panel](docs/en/detailed-log.png)
+
 *Expired-window banner shown in a conversation when the 24h customer window looks closed:*
 
 ![Expired window banner](docs/en/expired-window-banner.png)
@@ -72,6 +76,20 @@ Out of scope:
 - A cloud storage adapter (S3, etc.) for media — attachments use FreeScout's existing local storage only.
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
+
+## What's new in v1.12.0
+
+This release is about what Meta starts charging for on 1 October 2026, and about a kind of message the module was filing as something it is not.
+
+- **A monthly count of the service messages sent from this channel**, in the account health panel, off by default. From 1 October Meta bills the free-form replies sent inside the 24-hour customer window, with a monthly allowance per business phone number, and until now nothing here could tell you how many had gone out. It counts what left through FreeScout, which is all it can honestly see, and says so on screen: if the same number is also used elsewhere, Meta's total is higher. A failed send is not counted, because Meta bills per delivered message.
+- **Outbound messages now record the category Meta bills them under**, service or template. This is the part that outlasts the release: the record could not tell a reply from a template, so no honest number could be built on it, and the window clock planned for 2.0 needs the same distinction. Nothing is backfilled, so messages sent before this release stay unknown and are never counted.
+- **A message sent in a WhatsApp group is refused and logged** instead of being filed as a private conversation with whoever wrote it. A group message names the participant, not the group, so an agent answering what was said in front of others would have replied to that one person, with nothing on screen to say so. The log records the group id and never the participant's phone number, because a group brings in the numbers of people who never wrote to you.
+- **The health panel says how many groups the number belongs to**, checked during a connection test rather than on every page load. The module never creates groups, so anything above zero was done through the API from somewhere else.
+- **Fix**: every webhook event that is not a message was logged as a `phone_number_id` mismatch, which names a serious cross-channel problem, for what is simply an event kind this module does not handle. Subscribing a number to Meta's webhooks subscribes it to every field, so template status changes, quality ratings and account alerts all arrive here too. They now say what they are, by name.
+- The outdated-core notice no longer lists which FreeScout versions closed security issues. That list goes stale every time FreeScout ships a fix, and it had.
+- **Dutch brought up to date**, contributed by [@jeroenedig](https://github.com/jeroenedig): the pricing notice on the Dutch README, the 28 strings that had fallen behind since v1.10.0, and the README sections that changed since that page went in (#34, #35).
+
+See the notice at the top of this page for what changes on 1 October and where to check the rates.
 
 ## What's new in v1.11.0
 

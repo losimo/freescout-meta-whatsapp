@@ -104,7 +104,7 @@ return [
     // Picker dinàmic de plantilles (issue #2, punt 2 complet).
     'account_inactive_notice'          => 'This WhatsApp channel is currently inactive, so nothing can be sent. Open the channel settings to check the connection and reactivate it.',
     'not_sent_channel_inactive'   => 'Nothing was sent to WhatsApp: this channel is inactive. Once an administrator restores the connection, the message has to be sent again.',
-    'core_outdated'               => 'This module is built and tested against FreeScout :minimum and newer, and you are running :current. It keeps working here, but it is not tested on this version, and FreeScout 1.8.235 to 1.8.237 each closed security issues. Updating FreeScout is worth doing.',
+    'core_outdated'               => 'This module is built and tested against FreeScout :minimum and newer, and you are running :current. It keeps working here, but it is not tested on this version, and later FreeScout versions have closed security issues. Updating FreeScout is worth doing.',
     'diagnostics_title'           => 'Detailed logging',
     'diagnostics_help'            => 'Records complete WhatsApp payloads, which means the text of your customers\' messages and their phone numbers. It is a second copy of those conversations, in a file that deleting a customer or a conversation cannot rewrite. Keep the window as long as your diagnosis needs and no longer. Only administrators can read it.',
     'diagnostics_forced_env'      => 'Detailed logging is also switched on by METAWHATSAPP_DEBUG in FreeScout\'s .env, which overrides whatever you set here.',
@@ -161,4 +161,17 @@ return [
     'reaction_removed_quoted'      => 'Removed a reaction from: ":excerpt"',
     'contacts_shared'              => 'Shared contact(s):',
     'contacts_shared_empty'        => 'Shared a contact card (no name or phone number in it).',
+
+    // Monthly service message counter (Meta's 1 October 2026 pricing change).
+    'usage_title'            => 'Service messages',
+    'usage_enable'           => 'Count the service messages sent from FreeScout',
+    'usage_enable_help'      => 'From 1 October 2026 Meta bills the service messages sent inside the 24-hour customer window, with a monthly allowance per business phone number. This counter only sees what left through FreeScout, so if this number is also used elsewhere, the real total at Meta is higher.',
+    'usage_sent_since'       => ':count sent from FreeScout since :date',
+    'usage_scope_help'       => 'Only messages sent from FreeScout. If this number is also used from the WhatsApp Business app or another tool, the real total at Meta is higher.',
+
+    // Groups: not supported, surfaced so a number that is in one does not go unnoticed.
+    'groups_title'           => 'Groups',
+    'groups_none'            => 'None. Checked :date.',
+    'groups_found'           => ':count. Checked :date.',
+    'groups_warning'         => 'This module never creates groups and does not process the messages sent in them: they are refused and recorded in the log. A number that belongs to a group was put there through the API from somewhere else.',
 ];

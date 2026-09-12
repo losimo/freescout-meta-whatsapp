@@ -5,7 +5,7 @@
 > [!IMPORTANT]
 > **A partir del 1 de octubre de 2026, Meta cobra los mensajes de servicio.**
 >
-> Hasta ahora, responder con texto libre dentro de la ventana de 24 horas no tenía coste. A partir de esa fecha, los mensajes de servicio y las plantillas de utilidad enviados dentro de esa ventana se facturan por mensaje entregado. Hay una franquicia mensual por número de teléfono, que las fuentes del sector sitúan en torno a los 1.000 mensajes.
+> Hasta ahora, responder con texto libre dentro de la ventana de 24 horas no tenía coste. A partir de esa fecha se factura por mensaje entregado, con una franquicia de **1.000 mensajes de servicio por número de teléfono y mes**, que se reinicia cada mes y no se acumula. Las plantillas de utilidad enviadas dentro de la ventana también pasan a ser de pago, y estas sin franquicia. La cifra de 1.000 la dan coincidiendo las fuentes del sector; no aparece en ninguna página de Meta.
 >
 > Consulta las tarifas en la [página de precios de Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), eligiendo tu mercado y tu moneda: cada categoría (autenticación, marketing, utilidad y servicio) tiene un precio distinto.
 >
@@ -45,6 +45,10 @@ El proyecto es público y lleva en uso real de producción desde la v1.0, iteran
 
 ![Panel de salud de la cuenta](docs/es/account-health.png)
 
+*Registro detallado, que se enciende durante una ventana y se conserva unos días, desde la pantalla de configuración:*
+
+![Panel del registro detallado](docs/es/detailed-log.png)
+
 *Aviso en la conversación cuando la ventana de 24 horas del cliente parece caducada:*
 
 ![Aviso de ventana caducada](docs/es/expired-window-banner.png)
@@ -72,6 +76,20 @@ Queda fuera de alcance:
 - Un adaptador de almacenamiento en la nube (S3, etc.) para multimedia — los adjuntos usan el almacenamiento local ya existente de FreeScout.
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
+
+## Novedades en la v1.12.0
+
+Esta versión va de lo que Meta empieza a cobrar el 1 de octubre de 2026, y de un tipo de mensaje que el módulo archivaba como otra cosa.
+
+- **Un recuento mensual de los mensajes de servicio enviados desde este canal**, en el panel de salud de la cuenta y apagado por defecto. A partir del 1 de octubre Meta factura las respuestas en texto libre enviadas dentro de la ventana de 24 horas, con una franquicia mensual por número de teléfono, y hasta ahora nada aquí os podía decir cuántos habíais enviado. Cuenta lo que ha salido de FreeScout, que es lo único que puede ver honestamente, y lo dice en pantalla: si ese número también se usa desde otro sitio, el total en Meta es más alto. Un envío fallido no se cuenta, porque Meta cobra por mensaje entregado.
+- **Los mensajes de salida ahora guardan con qué categoría los factura Meta**, servicio o plantilla. Esta es la parte que sobrevive a la versión: el registro no sabía distinguir una respuesta de una plantilla, así que no se podía construir ningún número honesto sobre él, y el reloj de ventana previsto para la 2.0 necesita la misma distinción. No se rellena nada del pasado, así que los mensajes anteriores a esta versión se quedan sin categoría y no se cuentan nunca.
+- **Un mensaje enviado en un grupo de WhatsApp se rechaza y se registra** en lugar de archivarse como una conversación privada con quien lo ha escrito. Un mensaje de grupo identifica al participante, no al grupo, así que un agente que respondiera lo dicho delante de otros habría contestado a esa persona sola, sin nada en pantalla que lo dijera. En el registro va el identificador del grupo y nunca el teléfono del participante, porque un grupo trae números de gente que no os ha escrito nunca.
+- **El panel de salud dice a cuántos grupos pertenece el número**, comprobado durante el test de conexión y no en cada carga de página. El módulo no crea nunca grupos, así que cualquier cosa por encima de cero se ha hecho por la API desde otro sitio.
+- **Corrección**: todos los eventos de webhook que no son mensajes se registraban como un desajuste de `phone_number_id`, que es el nombre de un problema grave entre canales, por algo que solo es un tipo de evento que este módulo no trata. Suscribir un número a los webhooks de Meta lo suscribe a todos los campos, así que los cambios de estado de plantillas, las valoraciones de calidad y los avisos de cuenta también llegan aquí. Ahora dicen qué son, por su nombre.
+- El aviso de núcleo antiguo ya no enumera qué versiones de FreeScout cerraron problemas de seguridad. Esa lista se desactualiza cada vez que FreeScout publica un parche, y ya lo había hecho.
+- **Neerlandés puesto al día**, aportado por [@jeroenedig](https://github.com/jeroenedig): el aviso de precios en el README neerlandés, las 28 cadenas que habían quedado atrasadas desde la v1.10.0, y las secciones del README que habían cambiado desde que entró esa página (#34, #35).
+
+Ved el aviso de arriba del todo de esta página para saber qué cambia el 1 de octubre y dónde consultar las tarifas.
 
 ## Novedades en la v1.11.0
 

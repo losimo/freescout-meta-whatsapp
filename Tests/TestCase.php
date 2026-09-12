@@ -132,4 +132,20 @@ abstract class TestCase extends BaseTestCase
             'CONTENT_TYPE'             => 'application/json',
         ];
     }
+
+    /**
+     * An admin user, which is what the module's settings pages require.
+     */
+    protected function makeAdminUser(): \App\User
+    {
+        $admin = new \App\User();
+        $admin->first_name = 'Admin';
+        $admin->last_name  = 'Test';
+        $admin->email      = 'admin-' . uniqid() . '@example.com';
+        $admin->password   = bcrypt('secret');
+        $admin->role       = \App\User::ROLE_ADMIN;
+        $admin->save();
+
+        return $admin;
+    }
 }

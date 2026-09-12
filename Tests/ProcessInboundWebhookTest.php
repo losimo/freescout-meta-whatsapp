@@ -27,6 +27,97 @@ class ProcessInboundWebhookTest extends TestCase
         (new ProcessInboundWebhook($account->id, $payload))->handle();
     }
 
+    /**
+     * Subscribing a WABA subscribes it to every webhook field Meta offers,
+     * not just messages. Those other events carry no `metadata`, so they
+     * used to trip the cross-channel misattribution guard and were logged
+     * as a phone_number_id mismatch, which is a different problem entirely
+     * and sends whoever reads the log looking for a channel misconfiguration
+     * that is not there.
+     */
+    public function test_an_event_we_do_not_handle_says_so_and_names_the_field()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+
+        $this->runJob($account, ['entry' => [[
+            'id'      => 'waba-id',
+            'changes' => [[
+                'field' => 'message_template_status_update',
+                'value' => [
+                    'event'                 => 'REJECTED',
+                    'message_template_name' => 'order_update',
+                ],
+            ]],
+        ]]]);
+
+        Log::shouldHaveReceived('info')->withArgs(function ($message, $context = []) {
+            return strpos($message, 'not handled') !== false
+                && ($context['field'] ?? null) === 'message_template_status_update';
+        })->once();
+
+        Log::shouldNotHaveReceived('warning', [
+            \Mockery::on(function ($message) {
+                return strpos($message, 'phone_number_id not matching') !== false;
+            }),
+            \Mockery::any(),
+        ]);
+    }
+
+    /**
+     * The signature of the POST is verified with the secret of the account
+     * resolved from the FIRST phone_number_id in the payload. A change whose
+     * metadata names a different number must never be attributed to this
+     * account, or one channel's secret would authorise another channel's
+     * messages. This guard had no test until now.
+     */
+    public function test_a_message_for_another_phone_number_is_never_attributed_to_this_account()
+    {
+        $account = $this->createTestAccount();
+        $payload = $this->inboundPayload($account, 'wamid.foreign', '34611222333', 'Hola');
+        $payload['entry'][0]['changes'][0]['value']['metadata']['phone_number_id'] = 'some-other-number';
+
+        $this->runJob($account, $payload);
+
+        $this->assertFalse(
+            WhatsAppMessage::where('wamid', 'wamid.foreign')->exists(),
+            'A change carrying another number\'s metadata must not create anything on this account.'
+        );
+    }
+
+    /**
+     * A group message carries `group_id` and a `from` that is the participant
+     * who wrote, not the group. Processed as an ordinary message it would
+     * become a private conversation with that person, and an agent's reply
+     * would go to them alone rather than to the group. We do not support
+     * groups, so the message is refused loudly instead of being filed as
+     * something it is not.
+     *
+     * The log carries the group id and never the participant's phone: a group
+     * brings in the numbers of people who never wrote to us, and the log is
+     * the one place deletion cannot reach.
+     */
+    public function test_a_group_message_is_refused_instead_of_filed_as_a_private_conversation()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+        $payload = $this->inboundPayload($account, 'wamid.group', '34611222333', 'Hola a tothom');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['group_id'] = '120363000000000000@g.us';
+
+        $this->runJob($account, $payload);
+
+        $this->assertFalse(
+            WhatsAppMessage::where('wamid', 'wamid.group')->exists(),
+            'A group message must not be recorded as an ordinary message.'
+        );
+
+        Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
+            return strpos($message, 'group') !== false
+                && ($context['group_id'] ?? null) === '120363000000000000@g.us'
+                && !array_key_exists('from', $context);
+        })->once();
+    }
+
     public function test_missatge_nou_crea_customer_conversa_i_thread()
     {
         $account = $this->createTestAccount();

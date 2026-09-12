@@ -11,18 +11,6 @@ class ConnectionPanelTest extends TestCase
 {
     use DatabaseTransactions;
 
-    protected function makeAdminUser(): User
-    {
-        $admin = new User();
-        $admin->first_name = 'Admin';
-        $admin->last_name  = 'Test';
-        $admin->email      = 'admin-' . uniqid() . '@example.com';
-        $admin->password   = bcrypt('secret');
-        $admin->role       = User::ROLE_ADMIN;
-        $admin->save();
-
-        return $admin;
-    }
 
     // ------------------------------------------------------------------
     // WhatsAppApiClient::testConnection()
@@ -98,6 +86,76 @@ class ConnectionPanelTest extends TestCase
         $response->assertStatus(302);
         $response->assertRedirect($this->url('/meta-whatsapp/settings/' . $account->id . '/edit'));
         $response->assertSessionHas('flash_success_floating');
+    }
+
+    /**
+     * The module never creates a group, so a number that belongs to one got
+     * there through the API from somewhere else, and its messages are being
+     * refused by the webhook. Counting them during the connection test, which
+     * is already a deliberate live check, keeps it off every page load.
+     */
+    public function test_test_connection_records_how_many_groups_the_number_is_in()
+    {
+        $account = $this->createTestAccount();
+
+        $this->app->bind(WhatsAppApiClient::class, function ($app, $params) {
+            return new class ($params['account']) extends WhatsAppApiClient {
+                protected function curlGet(string $url, array $headers): array
+                {
+                    if (strpos($url, '/groups') !== false) {
+                        return [
+                            'ok' => true,
+                            'body' => json_encode(['data' => [['id' => 'g1'], ['id' => 'g2']]]),
+                            'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false,
+                        ];
+                    }
+
+                    return [
+                        'ok' => true, 'body' => json_encode(['verified_name' => 'Suport Test']),
+                        'http_status' => 200, 'error_code' => null, 'error_message' => null, 'transient' => false,
+                    ];
+                }
+            };
+        });
+
+        $this->actingAs($this->makeAdminUser())
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/settings/' . $account->id . '/test-connection'));
+
+        $this->assertEquals(2, $account->fresh()->groups_count);
+    }
+
+    public function test_the_panel_warns_when_the_number_belongs_to_a_group()
+    {
+        $account = $this->createTestAccount();
+        $account->groups_count      = 2;
+        $account->groups_checked_at = now();
+        $account->save();
+
+        $html = $this->actingAs($this->makeAdminUser())
+            ->get($this->url('/meta-whatsapp/settings/' . $account->id . '/edit'))
+            ->getContent();
+
+        $this->assertStringContainsString(__('metawhatsapp::metawhatsapp.groups_warning'), $html);
+    }
+
+    /**
+     * Before anyone has pressed Test connection there is nothing to say, and
+     * a permanent "not checked" row would be noise on every account for a
+     * feature almost nobody uses.
+     */
+    public function test_the_panel_says_nothing_about_groups_before_it_has_been_checked()
+    {
+        $account = $this->createTestAccount();
+
+        $response = $this->actingAs($this->makeAdminUser())
+            ->get($this->url('/meta-whatsapp/settings/' . $account->id . '/edit'));
+
+        // The status assertion is what gives the next one meaning: an error
+        // page does not mention groups either, so without it this passes for
+        // the wrong reason.
+        $response->assertStatus(200);
+        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.groups_title'), $response->getContent());
     }
 
     public function test_post_test_connection_fallit_marca_flash_error_floating()

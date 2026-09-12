@@ -157,6 +157,7 @@ class SendWhatsAppMedia implements ShouldQueue
                 'attachment_id'   => $attachment->id,
                 'contact_phone'   => $this->toPhone,
                 'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+                'category'        => WhatsAppMessage::CATEGORY_SERVICE,
                 'status'          => WhatsAppMessage::STATUS_SENT,
             ]);
             $this->markLastInboundAsRead($account, $thread);

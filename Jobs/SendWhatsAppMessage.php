@@ -89,6 +89,7 @@ class SendWhatsAppMessage implements ShouldQueue
                 'thread_id'       => $thread->id,
                 'contact_phone'   => $this->toPhone,
                 'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+                'category'        => WhatsAppMessage::CATEGORY_SERVICE,
                 'status'          => WhatsAppMessage::STATUS_SENT,
             ]);
             $this->markLastInboundAsRead($account, $thread);
