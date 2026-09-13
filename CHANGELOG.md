@@ -4,6 +4,10 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 1.12.1 (2026-09-13)
+
+- **Critical fix**: saving a WhatsApp channel from its form returned a 500 and lost the edit. 1.12.0 called `Request::boolean()`, which does not exist on the Laravel this runs on. If you installed 1.12.0, update. No test covered that route, which is how it went out; two now go through the form.
+
 ## 1.12.0 (2026-09-12)
 
 - Outbound messages now record Meta's billing **category** (`service` or `template`). Nothing is backfilled: rows written before this stay unknown and are never counted.

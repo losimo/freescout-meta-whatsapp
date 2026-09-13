@@ -77,6 +77,10 @@ Queda fora d'abast:
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
+## Novetats a la v1.12.1
+
+- **Correcció crítica**: desar un canal de WhatsApp des del seu formulari tornava un error 500 i l'edició es perdia. La v1.12.0 cridava un mètode que no existeix a la versió de Laravel sobre la qual corre el FreeScout, o sigui que fallava qualsevol desat d'un canal existent. **Si teniu la v1.12.0 instal·lada, actualitzeu.** No canvia res més. Cap test passava per aquella ruta, i per això va sortir; ara n'hi passen dos.
+
 ## Novetats a la v1.12.0
 
 Aquesta versió va del que Meta comença a cobrar l'1 d'octubre del 2026, i d'una mena de missatge que el mòdul arxivava com una altra cosa.

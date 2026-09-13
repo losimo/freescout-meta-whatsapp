@@ -77,6 +77,10 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.12.1
+
+- **Critical fix**: saving a WhatsApp channel from its settings form returned a 500 and the edit was lost. v1.12.0 called a method that does not exist on the Laravel version FreeScout runs, so every save of an existing channel failed. **If you installed v1.12.0, update.** Nothing else changes. No test went through that route, which is why it shipped; two do now.
+
 ## What's new in v1.12.0
 
 This release is about what Meta starts charging for on 1 October 2026, and about a kind of message the module was filing as something it is not.

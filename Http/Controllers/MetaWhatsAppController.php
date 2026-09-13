@@ -247,7 +247,12 @@ class MetaWhatsAppController extends Controller
         $account->templates = $this->cleanTemplates($request);
         // Una casella desmarcada no viatja al request, així que s'ha de
         // decidir explícitament i no deixar-la al que hi hagués abans.
-        $account->usage_counter_enabled = $request->boolean('usage_counter_enabled');
+        //
+        // Sense `Request::boolean()`: no existeix en aquesta versió de Laravel
+        // (el contenidor corre la 5.5.40) i cridar-la llançava una
+        // BadMethodCallException, o sigui un 500 en desar qualsevol canal i
+        // l'edició perduda.
+        $account->usage_counter_enabled = (bool) $request->input('usage_counter_enabled');
         if ($request->filled('access_token')) {
             $account->access_token = encrypt($request->access_token);
         }

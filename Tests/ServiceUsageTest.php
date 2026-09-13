@@ -99,6 +99,54 @@ class ServiceUsageTest extends TestCase
         $this->assertStringContainsString(__('metawhatsapp::metawhatsapp.usage_scope_help'), $on->getContent());
     }
 
+    /**
+     * Saving a channel from the form was reaching Request::boolean(), which
+     * does not exist on this Laravel, so every save of an existing channel
+     * returned a 500 and lost the edit. No test covered this route at all:
+     * the counter's own tests set the column on the model directly, which is
+     * why the suite stayed green over a broken save path.
+     */
+    public function test_saving_a_channel_from_the_form_keeps_working()
+    {
+        $account = $this->createTestAccount();
+
+        $response = $this->actingAs($this->makeAdminUser())
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->put($this->url('/meta-whatsapp/settings/' . $account->id), [
+                'name'                       => 'Renamed channel',
+                'phone_number'               => '+34600123999',
+                'phone_number_id'            => $account->phone_number_id,
+                'waba_id'                    => $account->waba_id ?: 'waba-test',
+                'verify_token'               => str_repeat('a', 64),
+                'template_threshold_minutes' => 1435,
+                'usage_counter_enabled'      => '1',
+            ]);
+
+        $response->assertStatus(302);
+        $this->assertEquals('Renamed channel', $account->fresh()->name, 'The edit must actually be saved.');
+        $this->assertTrue((bool) $account->fresh()->usage_counter_enabled);
+    }
+
+    public function test_leaving_the_counter_box_unticked_switches_it_off()
+    {
+        $account = $this->createTestAccount();
+        $account->usage_counter_enabled = true;
+        $account->save();
+
+        $this->actingAs($this->makeAdminUser())
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->put($this->url('/meta-whatsapp/settings/' . $account->id), [
+                'name'                       => $account->name,
+                'phone_number'               => '+34600123999',
+                'phone_number_id'            => $account->phone_number_id,
+                'waba_id'                    => $account->waba_id ?: 'waba-test',
+                'verify_token'               => str_repeat('a', 64),
+                'template_threshold_minutes' => 1435,
+            ]);
+
+        $this->assertFalse((bool) $account->fresh()->usage_counter_enabled);
+    }
+
     protected function message(
         WhatsAppAccount $account,
         string $direction,
