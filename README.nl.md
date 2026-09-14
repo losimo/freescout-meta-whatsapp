@@ -7,7 +7,7 @@
 > [!IMPORTANT]
 > **Vanaf 1 oktober 2026 brengt Meta serviceberichten in rekening.**
 >
-> Tot nu toe kostte een antwoord in vrije tekst binnen het venster van 24 uur niets. Vanaf die datum worden serviceberichten en utility-templates die binnen dat venster verstuurd worden per afgeleverd bericht gefactureerd. Per zakelijk telefoonnummer geldt een maandelijkse vrije hoeveelheid, die volgens bronnen uit de branche rond de 1.000 berichten ligt.
+> Tot nu toe kostte een antwoord in vrije tekst binnen het venster van 24 uur niets. Vanaf die datum wordt het per afgeleverd bericht gefactureerd, met een vrije hoeveelheid van **1.000 serviceberichten per zakelijk telefoonnummer per maand**, die elke maand opnieuw begint en niet doorschuift naar de volgende. Utility-templates die binnen het venster verstuurd worden, gaan ook geld kosten, en daarvoor geldt geen vrije hoeveelheid. Het getal van 1.000 komt van bronnen uit de branche die het daarover eens zijn; het staat op geen enkele pagina van Meta.
 >
 > De tarieven staan op de [prijspagina van Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), waar je je eigen markt en valuta kiest: elke categorie (authenticatie, marketing, utility en service) heeft een eigen prijs.
 >

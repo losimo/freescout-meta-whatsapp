@@ -114,7 +114,7 @@ return [
     // Keuzelijst met templates die Meta heeft goedgekeurd.
     'account_inactive_notice'          => 'Dit WhatsApp-kanaal is op dit moment inactief, er kan dus niets verzonden worden. Open de kanaalinstellingen om de verbinding te controleren en het weer aan te zetten.',
     'not_sent_channel_inactive'   => 'Er is niets naar WhatsApp verzonden: dit kanaal is inactief. Zodra een beheerder de verbinding herstelt, moet het bericht opnieuw verstuurd worden.',
-    'core_outdated'               => 'Deze module is gebouwd en getest voor FreeScout :minimum en nieuwer, en je draait :current. Hij blijft hier werken, maar is op deze versie niet getest, en FreeScout 1.8.235 tot en met 1.8.237 dichtten elk een beveiligingslek. FreeScout bijwerken is de moeite waard.',
+    'core_outdated'               => 'Deze module is gebouwd en getest voor FreeScout :minimum en nieuwer, en je draait :current. Hij blijft hier werken, maar is op deze versie niet getest, en latere versies van FreeScout hebben beveiligingslekken gedicht. FreeScout bijwerken is de moeite waard.',
     'diagnostics_title'           => 'Uitgebreide logging',
     'diagnostics_help'            => 'Slaat de volledige WhatsApp-payloads op, en daarmee de tekst van de berichten van je klanten en hun telefoonnummers. Dat is een tweede kopie van die gesprekken, in een bestand dat niet bijgewerkt wordt als je een klant of een gesprek verwijdert. Laat het niet langer aanstaan dan je diagnose nodig heeft. Alleen beheerders kunnen het lezen.',
     'diagnostics_forced_env'      => 'De uitgebreide logging staat ook aan via METAWHATSAPP_DEBUG in de .env van FreeScout, en die gaat voor wat je hier instelt.',
@@ -171,4 +171,17 @@ return [
     'reaction_removed_quoted'      => 'Heeft een reactie weggehaald bij: ":excerpt"',
     'contacts_shared'              => 'Gedeelde contactgegevens:',
     'contacts_shared_empty'        => 'Heeft een contactkaart gedeeld (zonder naam of telefoonnummer erin).',
+
+    // Maandteller van serviceberichten (prijswijziging van Meta per 1 oktober 2026).
+    'usage_title'            => 'Serviceberichten',
+    'usage_enable'           => 'Tel de serviceberichten die vanuit FreeScout verstuurd worden',
+    'usage_enable_help'      => 'Vanaf 1 oktober 2026 brengt Meta de serviceberichten in rekening die binnen het klantvenster van 24 uur verstuurd worden, met een maandelijkse vrije hoeveelheid per zakelijk telefoonnummer. Deze teller ziet alleen wat via FreeScout de deur uit ging, dus wordt dit nummer ook ergens anders gebruikt, dan ligt het echte totaal bij Meta hoger.',
+    'usage_sent_since'       => ':count verstuurd vanuit FreeScout sinds :date',
+    'usage_scope_help'       => 'Alleen berichten die vanuit FreeScout verstuurd zijn. Wordt dit nummer ook vanuit de WhatsApp Business-app of een ander programma gebruikt, dan ligt het echte totaal bij Meta hoger.',
+
+    // Groepen: niet ondersteund, maar wel getoond zodat een nummer dat in een groep zit niet onopgemerkt blijft.
+    'groups_title'           => 'Groepen',
+    'groups_none'            => 'Geen. Gecontroleerd op :date.',
+    'groups_found'           => ':count. Gecontroleerd op :date.',
+    'groups_warning'         => 'Deze module maakt nooit groepen aan en verwerkt de berichten die daarin verstuurd worden niet: ze worden geweigerd en in het log vastgelegd. Zit een nummer in een groep, dan is het daar via de API vanaf een andere plek in gezet.',
 ];
