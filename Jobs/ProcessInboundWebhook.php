@@ -20,13 +20,14 @@ use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 use Modules\MetaWhatsApp\Support\CoreCompat;
 use Modules\MetaWhatsApp\Support\DeliveryFailure;
 use Modules\MetaWhatsApp\Support\Logger as MetaWhatsAppLogger;
+use Modules\MetaWhatsApp\Support\WebhookEventRouter;
 use Modules\MetaWhatsApp\Support\WhatsAppTextFormatter;
 
 class ProcessInboundWebhook implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;
 
-    // El backoff entre reintents el gestiona el worker (Laravel 5.8).
+    // El backoff entre reintents el gestiona el worker (Laravel 5.5).
     public $tries = 3;
 
     /** @var int */
@@ -44,8 +45,8 @@ class ProcessInboundWebhook implements ShouldQueue
     public function handle()
     {
         $account = WhatsAppAccount::with('mailbox')->find($this->accountId);
-        if (!$account || !$account->is_active || !$account->mailbox) {
-            Log::warning('[MetaWhatsApp] ProcessInboundWebhook: account missing, inactive, or without mailbox', [
+        if (!$account || !$account->is_active) {
+            Log::warning('[MetaWhatsApp] ProcessInboundWebhook: account missing or inactive', [
                 'account_id' => $this->accountId,
             ]);
             return;
@@ -64,18 +65,45 @@ class ProcessInboundWebhook implements ShouldQueue
                 // (evita misatribució entre canals i injecció creuada).
                 $changePhoneId = $value['metadata']['phone_number_id'] ?? null;
 
-                // Subscribing a WABA subscribes it to every webhook field Meta
-                // offers, not only messages: template status and category
-                // changes, quality ratings, account alerts and the rest all
-                // arrive here too. None of them carry `metadata`, so without
-                // this they would fall through to the misattribution guard
-                // below and be reported as a phone_number_id mismatch, which
-                // is a different problem entirely and sends whoever reads the
-                // log hunting for a channel misconfiguration that is not there.
-                if ($changePhoneId === null) {
-                    Log::info('[MetaWhatsApp] Webhook event not handled by this module', [
+                // Messages and statuses are identified by phone_number_id and
+                // handled here; everything else goes to the router, which
+                // decides by field. This used to be decided by the absence of
+                // `metadata`, which was a stand-in for "not a message" and
+                // worked by luck: `message_echoes` carries metadata too, and
+                // would have sailed past this check into the message path,
+                // found nothing to read and done nothing at all, without even
+                // logging that it had arrived.
+                if (!in_array($change['field'] ?? null, ['messages'], true)) {
+                    // Same reason as the phone_number_id guard below: the
+                    // account was resolved from the first entry, and a batch
+                    // carrying a second entry from another WABA must never be
+                    // attributed to this account. This only logged before;
+                    // now it writes state, so the guard has to exist.
+                    if (($entry['id'] ?? null) !== $account->waba_id) {
+                        Log::warning('[MetaWhatsApp] Account level event from another WABA, discarded', [
+                            'account_id' => $account->id,
+                        ]);
+                        continue;
+                    }
+
+                    WebhookEventRouter::route($account, $change);
+                    continue;
+                }
+
+                // A message needs somewhere to be filed; an account level fact
+                // does not, so the mailbox check only guards this path. A
+                // channel whose mailbox has been deleted must still hear
+                // about its own broken templates.
+                if (!$account->mailbox) {
+                    Log::warning('[MetaWhatsApp] Message event discarded: account has no mailbox', [
                         'account_id' => $account->id,
-                        'field'      => $change['field'] ?? null,
+                    ]);
+                    continue;
+                }
+
+                if ($changePhoneId === null) {
+                    Log::warning('[MetaWhatsApp] Message event without phone_number_id, discarded', [
+                        'account_id' => $account->id,
                     ]);
                     continue;
                 }
@@ -179,7 +207,13 @@ class ProcessInboundWebhook implements ShouldQueue
         // de ser un telèfon usable.
         $contact     = $this->selectContact($contacts, $from);
         $userId      = $this->extractContactUserId($account, $contact);
-        $profileName = $this->extractProfileName($contact);
+        // El nom visible, i si no n'hi ha, el nom d'usuari. Tot el que ve
+        // després (nom del client, assumpte de la conversa) vol el mateix: una
+        // manera humana d'anomenar qui hi ha a l'altra banda. Un BSUID en cru
+        // no ho és, i amb els usernames de WhatsApp hi ha gent que escriu
+        // sense revelar mai el telèfon.
+        $profileName = $this->extractProfileName($contact)
+            ?: $this->extractProfileUsername($contact);
 
         // Telèfon usable: E.164 sense '+' (format de Meta). Valors estranys
         // reventarien contact_phone (VARCHAR 20) i embrutarien customer_channel.
@@ -500,8 +534,12 @@ class ProcessInboundWebhook implements ShouldQueue
             return null;
         }
 
-        // Sanejament: cap a VARCHAR(100); només ASCII imprimible sense espais.
-        if (!preg_match('/^[\x21-\x7E]{1,100}$/', $userId)) {
+        // Sanejament: cap a la columna (VARCHAR 191); només ASCII imprimible
+        // sense espais. El sostre real de Meta és de 131 (codi de país, punt i
+        // fins a 128 alfanumèrics); la columna en deixa més perquè rebutjar
+        // una cosa que hi cabria no ens aporta res, i abans el límit de 100
+        // feia perdre el missatge sencer quan no venia telèfon.
+        if (!preg_match('/^[\x21-\x7E]{1,191}$/', $userId)) {
             Log::warning('[MetaWhatsApp] contacts[].user_id has unexpected format, ignored', [
                 'account_id' => $account->id,
             ]);
@@ -523,6 +561,21 @@ class ProcessInboundWebhook implements ShouldQueue
         $name = trim($name);
 
         return $name === '' ? null : $name;
+    }
+
+    /**
+     * Nom d'usuari de WhatsApp del contacte (contacts[].profile.username),
+     * prefixat amb @ perquè es llegeixi com el que és i no com un nom propi.
+     */
+    protected function extractProfileUsername(?array $contact): ?string
+    {
+        $username = is_array($contact) ? ($contact['profile']['username'] ?? null) : null;
+        if (!is_string($username)) {
+            return null;
+        }
+        $username = trim($username);
+
+        return $username === '' ? null : '@' . $username;
     }
 
     /**

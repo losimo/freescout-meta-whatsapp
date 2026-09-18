@@ -22,7 +22,7 @@ Este proyecto quiere una comunidad abierta y exigente a la vez. La regla general
 
 Este código se aplica a issues, PRs, discussions y cualquier otra comunicación vinculada al proyecto.
 
-Los incumplimientos se pueden reportar de manera privada al mantenedor: losimo@gmail.com. Las denuncias se tratan de manera confidencial: tu nombre no se comparte con la persona denunciada, ni con nadie más, sin preguntártelo antes.
+Los incumplimientos se pueden reportar de manera privada al mantenedor: albert@losimo.cat. Las denuncias se tratan de manera confidencial: tu nombre no se comparte con la persona denunciada, ni con nadie más, sin preguntártelo antes.
 
 Este proyecto lo mantiene una sola persona, así que si tu queja es sobre el mantenedor no hay ninguna instancia interna a la que recurrir. En ese caso puedes reportarlo directamente a GitHub: https://docs.github.com/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam
 

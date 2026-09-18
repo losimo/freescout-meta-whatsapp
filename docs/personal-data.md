@@ -4,13 +4,14 @@ Where this module puts personal data, how long it stays, and what is removed whe
 
 This is a factual description, not legal advice. **You are the one answering for this data**, not us: the module runs on your server, with your Meta credentials, and no copy of anything reaches the authors. What follows is meant to let you answer a request about a person without having to read the source.
 
-Every claim here was checked against the code and the database on 7 September 2026, for module version 1.10.0.
+Every claim here was checked against the code and the database on 14 September 2026, for module version 1.13.0, the next release, not yet published.
 
 ## What the module stores, and where
 
 | Where | What is in it |
 |---|---|
 | `meta_whatsapp_messages` | The customer's phone number (`contact_phone`) and their business-scoped WhatsApp ID (`contact_user_id`), plus Meta's message id, delivery status and timestamps. **No message text.** |
+| `meta_whatsapp_account_events` | **Nothing about any customer.** Only what Meta reports about the account itself: which template changed status, in which language, and why. Off by default, kept 90 days. It is listed here precisely because it holds nothing: otherwise the next person reading this inventory would wonder whether somebody forgot to check it. |
 | `customer_channel` | The phone number as the channel identifier, and the business-scoped ID on a second channel row. This is a core table; the module writes to it. |
 | `meta_whatsapp_accounts` | Your own credentials, not the customer's. Access token and app secret are stored encrypted. |
 | `customers`, `conversations`, `threads` | Name, phone number and the message text itself. These are core tables and the module writes through the same paths any FreeScout channel does. |

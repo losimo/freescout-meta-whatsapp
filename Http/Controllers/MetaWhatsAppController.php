@@ -12,6 +12,7 @@ use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Support\ServiceUsage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+use Modules\MetaWhatsApp\Support\AccountEventLog;
 use Modules\MetaWhatsApp\Support\CoreCompat;
 use Modules\MetaWhatsApp\Support\DebugLog;
 
@@ -67,6 +68,11 @@ class MetaWhatsAppController extends Controller
 
         DebugLog::setRetentionDays((int) $request->debug_retention);
 
+        // Una casella desmarcada no viatja al request, així que s'ha de decidir
+        // explícitament. Va abans del retorn primerenc de la finestra: qui ve
+        // només a canviar això també ho ha de poder desar.
+        \Option::set(AccountEventLog::OPTION_ENABLED, $request->input('account_events') ? '1' : '');
+
         // Buit vol dir "no toquis la finestra". Qui ve només a canviar els
         // dies de retenció no ha d'apagar el registre sense voler.
         if (!$request->filled('debug_window')) {
@@ -85,6 +91,29 @@ class MetaWhatsAppController extends Controller
         \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.diagnostics_saved'));
 
         return redirect()->route('metawhatsapp.settings');
+    }
+
+    /**
+     * The optional record of what Meta has reported about the account.
+     *
+     * It exists from the first day and not "later, via SQL", because the
+     * people who most need it are on shared hosting with no shell. That is the
+     * same reason the detailed log moved out of the .env in v1.11.0.
+     */
+    public function accountEvents()
+    {
+        $this->requireAdmin();
+
+        $events = \Modules\MetaWhatsApp\Models\AccountEvent::orderByDesc('id')->limit(200)->get();
+
+        // There is no Eloquent relation here because the table has no
+        // foreign key, deliberately, like meta_whatsapp_messages: an event
+        // outlives the account it belongs to. A lookup loses a deleted
+        // channel's name just as much as a relation would; what keeps the
+        // row readable is the view's fallback to '#' . $event->account_id.
+        $accountNames = \Modules\MetaWhatsApp\Models\WhatsAppAccount::pluck('name', 'id');
+
+        return view('metawhatsapp::account_events', compact('events', 'accountNames'));
     }
 
     public function create()
@@ -249,9 +278,9 @@ class MetaWhatsAppController extends Controller
         // decidir explícitament i no deixar-la al que hi hagués abans.
         //
         // Sense `Request::boolean()`: no existeix en aquesta versió de Laravel
-        // (el contenidor corre la 5.5.40) i cridar-la llançava una
-        // BadMethodCallException, o sigui un 500 en desar qualsevol canal i
-        // l'edició perduda.
+        // (el contenidor corre la 5.5.40, no la 5.8 que dèiem) i cridar-la
+        // llançava una BadMethodCallException, o sigui un 500 en desar
+        // qualsevol canal i l'edició perduda.
         $account->usage_counter_enabled = (bool) $request->input('usage_counter_enabled');
         if ($request->filled('access_token')) {
             $account->access_token = encrypt($request->access_token);

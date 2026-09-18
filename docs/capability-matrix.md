@@ -20,7 +20,7 @@ Effort legend (planned items only): S / M / L
 | Contacts | ✅ | Name + first phone number of each shared contact, one per line. Shipped v1.6.0. | #14 | – |
 | Order (`type:order`) | ❌ | Not yet supported. | | S |
 | Group messages (`group_id`) | ❌ | Refused and logged, never filed. A group message carries a `from` that is the participant, not the group, so processing it would create a private conversation with that person and send any reply to them alone. Cloud API groups only exist if the business creates them through the API, which this module never does, so a number in one was put there from elsewhere; the account health panel reports how many, after a connection test. Group management is a chapter of its own, not yet planned. | | L |
-| BSUID-only messages (no phone number) | ✅ | Resolves/creates a placeholder customer; merges into the real customer once the phone is revealed. Shipped v1.0.1 / v1.1.0. | #1 | – |
+| BSUID-only messages (no phone number) | ✅ | Named after `profile.name`, falling back to `profile.username` prefixed with `@`, and only then the raw ID. Resolves/creates a placeholder customer; merges into the real customer once the phone is revealed. Shipped v1.0.1 / v1.1.0. | #1 | – |
 
 ## Outbound message types
 
@@ -57,6 +57,20 @@ Effort legend (planned items only): S / M / L
 | Auto-deactivation on invalid token (error 190) | ✅ | Account is marked inactive so no further calls are burned. | | – |
 | Guided reactivation flow (UI, revalidation, audit trail) | ✅ | Test connection success on an inactive account reactivates it automatically; `reactivated_at`/`reactivated_by` shown on the health snapshot. Shipped v1.6.1. | #9 | – |
 | Automatic webhook subscription | ✅ | `POST /{waba_id}/subscribed_apps` called automatically on account creation (best-effort), with a manual "Subscribe webhook" retry button. Shipped v1.6.0. | | – |
+
+## Webhook events other than messages
+
+Subscribing a number to Meta's webhooks subscribes it to every field, so all of these arrive whether or not the module reads them.
+
+| Capability | Status | Note | Issue(s) | Effort |
+|---|---|---|---|---|
+| Template status changes (`message_template_status_update`) | ✅ | Meta rejecting, pausing or disabling an approved template shows on the account health panel, naming the template, the language and the state. Cleared when Meta approves the same template again. | | – |
+| Template quality changes | 🕒 | Arrives on the same field as the status change, with `previous_quality_score`/`new_quality_score` and no `event`, and is told apart by that. Logged, not acted on. | | S |
+| Template category changes (`template_category_update`) | ✅ | Meta recategorises a template on its own and the category decides its price. Nothing breaks, so it is recorded in the account event log (both the 24-hour warning and the change itself) and never put on the panel, which is where faults go. | | – |
+| Phone number quality (`phone_number_quality_update`) | 🕒 | Quality drops and messaging tier changes. | | S |
+| Account alerts, updates, security, capabilities | 🕒 | Restrictions, bans, security events and limit changes, which today reach an agent only as sends that fail for no visible reason. | | M |
+| Message echoes (`message_echoes`) | 🕒 | Messages sent over the API by another app on the same WABA. Not a notice: it belongs in the conversations, not the panel. | | M |
+| Optional record of account events | ✅ | `meta_whatsapp_account_events`, off by default, one switch per instance, kept 90 days, readable from a screen. Account-level facts only, never anything identifying a customer. | | – |
 
 ## Admin / diagnostics
 

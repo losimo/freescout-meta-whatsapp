@@ -167,11 +167,29 @@ return [
     'usage_enable'           => 'Count the service messages sent from FreeScout',
     'usage_enable_help'      => 'From 1 October 2026 Meta bills the service messages sent inside the 24-hour customer window, with a monthly allowance per business phone number. This counter only sees what left through FreeScout, so if this number is also used elsewhere, the real total at Meta is higher.',
     'usage_sent_since'       => ':count sent from FreeScout since :date',
-    'usage_scope_help'       => 'Only messages sent from FreeScout. If this number is also used from the WhatsApp Business app or another tool, the real total at Meta is higher.',
+    'usage_scope_help'       => 'Only messages sent from FreeScout. If this number sends from anywhere else, the real total at Meta is higher.',
 
     // Groups: not supported, surfaced so a number that is in one does not go unnoticed.
     'groups_title'           => 'Groups',
     'groups_none'            => 'None. Checked :date.',
     'groups_found'           => ':count. Checked :date.',
     'groups_warning'         => 'This module never creates groups and does not process the messages sent in them: they are refused and recorded in the log. A number that belongs to a group was put there through the API from somewhere else.',
+
+    // Template status changes reported by Meta over the webhook.
+    'templates_issue_title'  => 'Templates',
+    'templates_issue_value'  => ':summary, since :date',
+    'templates_issue_help'   => 'Meta changed the status of this template, so it cannot be sent until it is sorted out in WhatsApp Manager. Nothing here can change it.',
+
+    // Account events: the optional record of what Meta has reported about the account.
+    'account_events_title'    => 'Account events',
+    'account_events_help'     => 'What Meta has reported about your account: template status changes, quality ratings, restrictions. Nothing here identifies a customer. Records older than 90 days are removed.',
+    'account_events_empty'    => 'Nothing recorded. Either nothing has happened or the record is switched off.',
+    'account_events_when'     => 'When',
+    'account_events_type'     => 'Event',
+    'account_events_severity' => 'Severity',
+    'account_events_details'  => 'Details',
+    'account_events_link'     => 'Account events',
+    'account_events_channel'  => 'Channel',
+    'account_events_enable'      => 'Record what Meta reports about the account',
+    'account_events_enable_help' => 'Template status changes, category changes (which set a template\'s price), quality ratings and restrictions, kept for 90 days and readable from the link below. Account facts only: nothing about any customer is recorded here. Off unless you want it.',
 ];

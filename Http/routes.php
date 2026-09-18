@@ -1,13 +1,22 @@
 <?php
 
+// FreeScout registra les seves rutes dins de Route::prefix(Helper::getSubdirectory())
+// al RouteServiceProvider, però el routes.php d'un mòdul es carrega des de
+// start.php, fora d'aquell grup. Sense afegir-hi el subdirectori nosaltres, una
+// instal·lació sota /tickets deixa el mòdul sencer inabastable: la pantalla de
+// configuració fa 404 i el webhook també, o sigui que Meta tampoc hi entrega.
+// En una instal·lació a l'arrel getSubdirectory() torna una cadena buida i no
+// canvia res, que és per què això va passar desapercebut. Issue #33.
+
 // Administració (sessió + autenticació; el controlador comprova isAdmin()).
 Route::group([
     'middleware' => ['web', 'auth'],
-    'prefix'     => 'meta-whatsapp',
+    'prefix'     => \Helper::getSubdirectory() . '/meta-whatsapp',
     'namespace'  => 'Modules\MetaWhatsApp\Http\Controllers',
 ], function () {
     Route::get('/settings', 'MetaWhatsAppController@settings')->name('metawhatsapp.settings');
     Route::get('/settings/create', 'MetaWhatsAppController@create')->name('metawhatsapp.create');
+    Route::get('/settings/events', 'MetaWhatsAppController@accountEvents')->name('metawhatsapp.account_events');
     Route::post('/settings', 'MetaWhatsAppController@store')->name('metawhatsapp.store');
     Route::post('/diagnostics', 'MetaWhatsAppController@updateDiagnostics')->name('metawhatsapp.diagnostics');
     Route::get('/settings/{id}/edit', 'MetaWhatsAppController@edit')->name('metawhatsapp.edit');
@@ -26,7 +35,7 @@ Route::group([
 
 // Webhook de Meta: stateless, SENSE el grup 'web' (sense sessió ni CSRF — spike H5/A7).
 Route::group([
-    'prefix'    => 'meta-whatsapp',
+    'prefix'    => \Helper::getSubdirectory() . '/meta-whatsapp',
     'namespace' => 'Modules\MetaWhatsApp\Http\Controllers',
 ], function () {
     Route::get('/webhook', 'WebhookController@verify')->name('metawhatsapp.webhook.verify');

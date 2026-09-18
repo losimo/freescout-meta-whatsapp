@@ -164,11 +164,29 @@ return [
     'usage_enable'           => 'Compta els missatges de servei enviats des del FreeScout',
     'usage_enable_help'      => 'A partir de l\'1 d\'octubre del 2026 Meta factura els missatges de servei enviats dins de la finestra de 24 hores, amb una franquícia mensual per número de telèfon. Aquest comptador només veu el que ha sortit del FreeScout, o sigui que si aquest número també s\'usa des d\'una altra banda, el total real a Meta és més alt.',
     'usage_sent_since'       => ':count enviats des del FreeScout des del :date',
-    'usage_scope_help'       => 'Només els missatges enviats des del FreeScout. Si aquest número també s\'usa des de l\'app de WhatsApp Business o des d\'una altra eina, el total real a Meta és més alt.',
+    'usage_scope_help'       => 'Només els missatges enviats des del FreeScout. Si aquest número envia des de qualsevol altre lloc, el total real a Meta és més alt.',
 
     // Grups: no suportats, però es diu per si el número és en algun sense saber-ho.
     'groups_title'           => 'Grups',
     'groups_none'            => 'Cap. Comprovat el :date.',
     'groups_found'           => ':count. Comprovat el :date.',
     'groups_warning'         => 'Aquest mòdul no crea mai grups ni processa els missatges que s\'hi envien: els refusa i els deixa al registre. Un número que pertany a un grup hi ha entrat per l\'API des d\'una altra banda.',
+
+    // Canvis d'estat de plantilles que Meta reporta pel webhook.
+    'templates_issue_title'  => 'Plantilles',
+    'templates_issue_value'  => ':summary, des del :date',
+    'templates_issue_help'   => 'Meta ha canviat l\'estat d\'aquesta plantilla, o sigui que no es pot enviar fins que no es resolgui al WhatsApp Manager. Des d\'aquí no s\'hi pot fer res.',
+
+    // Esdeveniments del compte: el registre opcional del que Meta ha reportat sobre el compte.
+    'account_events_title'    => 'Esdeveniments del compte',
+    'account_events_help'     => 'El que Meta ha reportat sobre el vostre compte: canvis d\'estat de plantilles, valoracions de qualitat, restriccions. Aquí no hi ha res que identifiqui cap client. Els registres de més de 90 dies s\'esborren.',
+    'account_events_empty'    => 'No hi ha res registrat. O no ha passat res, o el registre està apagat.',
+    'account_events_when'     => 'Quan',
+    'account_events_type'     => 'Esdeveniment',
+    'account_events_severity' => 'Gravetat',
+    'account_events_details'  => 'Detall',
+    'account_events_link'     => 'Esdeveniments del compte',
+    'account_events_channel'  => 'Canal',
+    'account_events_enable'      => 'Registra el que Meta reporta sobre el compte',
+    'account_events_enable_help' => 'Canvis d\'estat de plantilles, canvis de categoria (que en decideixen el preu), valoracions de qualitat i restriccions, conservats 90 dies i llegibles des de l\'enllaç de sota. Només fets del compte: aquí no s\'hi registra res de cap client. Apagat si no el voleu.',
 ];

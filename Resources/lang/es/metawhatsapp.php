@@ -164,11 +164,29 @@ return [
     'usage_enable'           => 'Cuenta los mensajes de servicio enviados desde FreeScout',
     'usage_enable_help'      => 'A partir del 1 de octubre de 2026 Meta factura los mensajes de servicio enviados dentro de la ventana de 24 horas, con una franquicia mensual por número de teléfono. Este contador solo ve lo que ha salido de FreeScout, así que si este número también se usa desde otro sitio, el total real en Meta es más alto.',
     'usage_sent_since'       => ':count enviados desde FreeScout desde el :date',
-    'usage_scope_help'       => 'Solo los mensajes enviados desde FreeScout. Si este número también se usa desde la app de WhatsApp Business o desde otra herramienta, el total real en Meta es más alto.',
+    'usage_scope_help'       => 'Solo los mensajes enviados desde FreeScout. Si este número envía desde cualquier otro sitio, el total real en Meta es más alto.',
 
     // Grupos: no soportados, pero se avisa por si el número está en alguno sin saberlo.
     'groups_title'           => 'Grupos',
     'groups_none'            => 'Ninguno. Comprobado el :date.',
     'groups_found'           => ':count. Comprobado el :date.',
     'groups_warning'         => 'Este módulo no crea nunca grupos ni procesa los mensajes que se envían en ellos: los rechaza y los deja en el registro. Un número que pertenece a un grupo ha entrado ahí por la API desde otro sitio.',
+
+    // Cambios de estado de plantillas que Meta reporta por el webhook.
+    'templates_issue_title'  => 'Plantillas',
+    'templates_issue_value'  => ':summary, desde el :date',
+    'templates_issue_help'   => 'Meta ha cambiado el estado de esta plantilla, así que no se puede enviar hasta que se resuelva en WhatsApp Manager. Desde aquí no se puede hacer nada.',
+
+    // Eventos de la cuenta: el registro opcional de lo que Meta ha reportado sobre la cuenta.
+    'account_events_title'    => 'Eventos de la cuenta',
+    'account_events_help'     => 'Lo que Meta ha reportado sobre vuestra cuenta: cambios de estado de plantillas, valoraciones de calidad, restricciones. Aquí no hay nada que identifique a ningún cliente. Los registros de más de 90 días se borran.',
+    'account_events_empty'    => 'No hay nada registrado. O no ha pasado nada, o el registro está apagado.',
+    'account_events_when'     => 'Cuándo',
+    'account_events_type'     => 'Evento',
+    'account_events_severity' => 'Gravedad',
+    'account_events_details'  => 'Detalle',
+    'account_events_link'     => 'Eventos de la cuenta',
+    'account_events_channel'  => 'Canal',
+    'account_events_enable'      => 'Registra lo que Meta reporta sobre la cuenta',
+    'account_events_enable_help' => 'Cambios de estado de plantillas, cambios de categoría (que deciden su precio), valoraciones de calidad y restricciones, conservados 90 días y legibles desde el enlace de abajo. Solo hechos de la cuenta: aquí no se registra nada de ningún cliente. Apagado si no lo queréis.',
 ];

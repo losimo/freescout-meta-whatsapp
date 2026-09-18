@@ -20,7 +20,7 @@ No obris issues ni pull requests públiques per a vulnerabilitats de seguretat. 
 Canals privats, per ordre de preferència:
 
 1. GitHub → Security → Report a vulnerability, en aquest repositori.
-2. Correu electrònic: losimo@gmail.com
+2. Correu electrònic: albert@losimo.cat
 
 ## Què ha d'incloure el report
 

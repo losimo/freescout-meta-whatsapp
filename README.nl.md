@@ -27,7 +27,7 @@ Het project is openbaar en draait sinds v1.0 in echte productie. Het groeit mee 
 - **Fail-closed**: de webhook weigert elk verzoek zonder geldige HMAC-handtekening.
 - **Rechtstreeks naar Meta**: geen gateways van derden.
 - **Interface zonder e-mailresten**: op kanaalpagina's verbergt de module de e-mailelementen van de core (de Cc/Bcc-schakelaar, het interne technische adres) zonder gewone e-mailmailboxen te raken.
-- **Werkt met FreeScout 1.8.x** op Laravel 5.8 en PHP 8.x.
+- **Werkt met FreeScout 1.8.x** op Laravel 5.5 en PHP 8.x.
 
 ## Schermafbeeldingen
 

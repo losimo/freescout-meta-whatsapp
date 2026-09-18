@@ -7,11 +7,18 @@
 >
 > Fins ara, respondre en text lliure dins de la finestra de 24 hores no tenia cost. A partir d'aquesta data es factura per missatge lliurat, amb una franquícia de **1.000 missatges de servei per número de telèfon i mes**, que es reinicia cada mes i no s'acumula. Les plantilles d'utilitat enviades dins de la finestra també passen a ser de pagament, i aquestes sense franquícia. La xifra de 1.000 la donen coincidint les fonts del sector; no surt de cap pàgina de Meta.
 >
-> Consulteu les tarifes a la [pàgina de preus de Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), triant-hi el vostre mercat i la vostra moneda: cada categoria (autenticació, màrqueting, utilitat i servei) té un preu diferent.
+> Consulteu les tarifes a la [pàgina de preus de Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), triant-hi el vostre mercat i la vostra moneda: cada categoria (autenticació, màrqueting, utilitat i servei) té un preu diferent. La taula ja porta la fila de servei, però el text que l'acompanya encara descriu la política d'ara i no diu cap data, o sigui que no us estranyi llegir-hi que és gratis.
+>
+> Venen setmanes de canvis per part de Meta. Aquí hi anirem traslladant el que afecti aquest mòdul, dit com ho digui Meta, i sense afegir-hi res que no puguem sostenir.
 >
 > És un canvi de tarifes de Meta, no del mòdul. El mòdul no cobra res ni rep cap comissió, i les seves guardes d'idempotència eviten que un reintent de la cua torni a enviar un missatge que ja havia sortit.
 
-<!-- Retirar aquest avís quan la pàgina de preus de Meta reculli el canvi amb
+> [!NOTE]
+> **Val la pena comprovar-ho abans del 30 de setembre: el vostre compte de WhatsApp Business té un mètode de pagament donat d'alta?**
+>
+> Fonts del sector diuen que els comptes que no en tinguin deixaran de tenir els missatges de servei **entregats** a partir de l'1 d'octubre, en comptes de rebre'n la factura després. Com la xifra de mil de més amunt, això no surt a cap pàgina de Meta, i no és una cosa que aquest mòdul us pugui comprovar. Ho esmentem aquí perquè la fallada seria silenciosa: els clients continuen escrivint i les respostes deixen d'arribar.
+
+<!-- Retirar tots dos avisos quan la pàgina de preus de Meta reculli el canvi amb
      normalitat i hagin passat unes quantes versions des de l'1 d'octubre del 2026. -->
 
 Mòdul per a FreeScout que integra **WhatsApp Business directament amb la Meta Cloud API**, sense intermediaris de pagament com 1msg.io o Twilio. Els missatges van de Meta a la teva instal·lació de FreeScout, amb control complet de credencials, dades i flux operatiu.
@@ -25,7 +32,7 @@ El projecte és públic i porta en ús real de producció des de la v1.0, iteran
 - **Fail-closed**: el webhook rebutja qualsevol petició sense signatura HMAC vàlida.
 - **Integració directa amb Meta**: sense passarel·les de tercers.
 - **Interfície neta de correu**: a les vistes del canal, el mòdul amaga els artefactes d'email del core (toggle Cc/Bcc, adreça tècnica interna), sense afectar les bústies de correu normals.
-- **Compatible amb FreeScout 1.8.x** sobre Laravel 5.8 i PHP 8.x.
+- **Compatible amb FreeScout 1.8.x**, que corre sobre Laravel 5.5 i PHP 7.1 o superior.
 
 ## Captures de pantalla
 
@@ -77,6 +84,20 @@ Queda fora d'abast:
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
+## Novetats a la v1.13.0
+
+Dos fils en aquesta versió: el que Meta diu del vostre compte ara us arriba en comptes de perdre's, i un client que escriu sense número de telèfon ja no és un desconegut ni, en un cas, un missatge perdut.
+
+- **Correcció**: en un FreeScout instal·lat sota l'arrel del domini, per exemple a `/tickets`, no es podia arribar a res del mòdul. El FreeScout registra les seves rutes dins del prefix de la subcarpeta i les d'un mòdul es carreguen fora, així que totes les d'aquí feien 404: la pantalla de configuració, i el webhook també, o sigui que les entregues de Meta tampoc arribaven. Trobat per [@SenseiFreak](https://github.com/SenseiFreak) (#33).
+- **Correcció**: un identificador de negoci (BSUID) de més de 100 caràcters es llençava, i si aquell missatge no portava número de telèfon, el missatge se n'anava amb ell. El client escrivia i no apareixia res enlloc. El sostre de Meta és de 131 i la columna ara n'admet 191. **Si heu tingut missatges que no van arribar mai, aquest és un candidat.**
+- **Un client que escriu sense número de telèfon ara es mostra amb el seu nom d'usuari de WhatsApp**, en comptes de l'identificador cru, que no deia res a l'agent sobre qui hi havia a l'altra banda. Meta envia el nom d'usuari al mateix missatge i no es llegia.
+- **Que Meta rebutgi, pausi o desactivi una plantilla aprovada ara surt al panell de salut del compte**, dient quina plantilla, en quin idioma i què li ha passat, en comptes d'aparèixer per primer cop com un enviament fallit. La fila desapareix quan Meta torna a aprovar la mateixa plantilla.
+- **Els canvis de categoria de les plantilles queden registrats**, tant l'avís que Meta envia 24 hores abans com el canvi mateix: la categoria és el que fixa el preu d'una plantilla. Quan passa no es trenca res, així que això va al registre d'esdeveniments del compte i no al panell, que és on van les avaries.
+- **Un registre opcional del que Meta explica del compte**, desactivat per defecte i que s'activa un sol cop per a tota la instal·lació, amb una pantalla per llegir-lo. Es conserva 90 dies. Només hi ha dades del compte i mai res que identifiqui un client.
+- Tots els camps de webhook que no són missatges passen ara per un sol encaminador, en comptes de registrar-se i descartar-se, que és d'on penjaran les famílies que queden.
+- La nota del comptador de missatges de servei ja no llista des d'on més podria estar enviant un número. Dir l'aplicació de WhatsApp Business i "una altra eina" era alhora massa estret i massa ampli: sense la Coexistència de Meta, que demana ser proveïdor, un número a la Cloud API no es pot fer servir des de l'aplicació. Ara diu des de qualsevol altre lloc.
+- **Neerlandès posat al dia** per a la v1.12.0, aportat per [@jeroenedig](https://github.com/jeroenedig) (#36).
+
 ## Novetats a la v1.12.1
 
 - **Correcció crítica**: desar un canal de WhatsApp des del seu formulari tornava un error 500 i l'edició es perdia. La v1.12.0 cridava un mètode que no existeix a la versió de Laravel sobre la qual corre el FreeScout, o sigui que fallava qualsevol desat d'un canal existent. **Si teniu la v1.12.0 instal·lada, actualitzeu.** No canvia res més. Cap test passava per aquella ruta, i per això va sortir; ara n'hi passen dos.
@@ -95,97 +116,7 @@ Aquesta versió va del que Meta comença a cobrar l'1 d'octubre del 2026, i d'un
 
 Vegeu l'avís de dalt de tot d'aquesta pàgina per saber què canvia l'1 d'octubre i on consultar les tarifes.
 
-## Novetats a la v1.11.0
-
-Aquesta versió surt d'un sol fil d'incidència (#33), on una instal·lació correcta i una de trencada es veien exactament igual des de fora.
-
-- **Obrir l'URL del webhook al navegador ara diu que el mòdul està instal·lat i que el punt d'entrada respon.** Fins ara aquella adreça contestava `403 Forbidden` tant si el mòdul anava bé com si estava mal configurat o no hi era, o sigui que no hi havia manera de comprovar una instal·lació sense entrar-hi. La cortesia és només per a una petició sense cap paràmetre, que mai és Meta: amb paràmetres a mitges o amb un testimoni desconegut continua sent un 403 sec, sense explicacions. Es contesta amb 200 i no amb 403 a posta, perquè molts allotjaments compartits substitueixen les pàgines d'error per la seva i la comprovació hauria fallat justament al tipus d'allotjament on més falta fa.
-- **El registre detallat ara s'activa des del panell**, amb una finestra i uns dies de retenció, en lloc d'editar `METAWHATSAPP_DEBUG` al `.env` del FreeScout, cosa que en un allotjament compartit queda fora de l'abast. És una finestra i no un interruptor a posta: aquell fitxer guarda el text dels missatges i els telèfons, i és l'únic lloc on l'esborrat no arriba, perquè un fitxer rotatiu no es pot reescriure quan s'elimina una conversa. Quanta estona queda encès, inclosa l'opció de deixar-lo sense data, ho decideix l'administrador.
-- **On posa el mòdul les dades personals ja està escrit**, a [docs/personal-data.md](docs/personal-data.md). Cada fila està verificada contra el codi i la base de dades, no suposada, de manera que un operador que rebi una petició d'accés o d'esborrat no hagi de llegir el codi. Diu els forats amb la mateixa claredat que la resta: esborrar una conversa deixa el telèfon i el BSUID a `meta_whatsapp_messages`, i tres línies d'error del registre normal porten el telèfon del remitent.
-- **La invitació a traduir ara diu que no cal escriure PHP.** El FreeScout porta una pantalla de traducció que llegeix també els mòduls de la comunitat, així que qualsevol idioma es pot aportar des del navegador.
-
-## Novetats a la v1.10.0
-
-Aquesta versió té una idea al darrere: **el mòdul us diu què no rutlla abans que us mossegui.**
-
-- **Avisa abans que caduqui el testimoni d'accés**, en comptes que ho descobriu per l'error 190 quan un missatge deixa de sortir. Un testimoni d'usuari de sistema ben configurat no caduca mai i el panell ho diu, cosa que ja val la pena saber; l'avís és per al temporal de 24 hores, que és l'error que de debò deixa una instal·lació sense poder enviar. Necessita l'**App ID**, un camp nou i opcional que és al costat de l'App Secret, a la mateixa pantalla de Meta. Els comptes creats abans d'aquesta versió diuen "sense comprovar" i no els canvia res.
-- **Diu quan el testimoni ja no és vàlid, o li falten permisos**, en el moment de desar el canal i no al primer missatge fallit.
-- **Diu quan el FreeScout és més antic del que el mòdul espera.** El nucli no comprova la versió declarada d'un mòdul de la comunitat, així que aquest avís és l'únic lloc on un administrador se n'assabentaria. No bloqueja res: el mòdul continua funcionant i torna al comportament anterior allà on les APIs noves no hi són.
-- **Una resposta que no es pot enviar deixa una nota a la conversa.** Hi havia dos camins que acabaven en silenci: un contacte sense número de telèfon i un adjunt que ja no es troba. En tots dos, l'agent escrivia la resposta, premia enviar, i el missatge es quedava allà amb l'aspecte de lliurat.
-- **Correcció**: cinc línies de registre que deien que un missatge no s'havia enviat, o que s'havia descartat, s'escrivien a nivell d'avís i desapareixien en instal·lacions que filtren els avisos. És el mateix defecte que el de la finestra de 24 hores corregit a la v1.6.2, als llocs on aquella correcció no va arribar.
-
-**Requereix FreeScout 1.8.234 o superior.** Vegeu [Compatibilitat amb FreeScout](#compatibilitat-amb-freescout) més amunt.
-
-## Novetats a la v1.9.1
-
-- **Correcció**: cada bústia creada pel mòdul duia dues còpies de cada carpeta compartida a la barra lateral (No assignat, Esborranys, Assignat, Tancat, Suprimit, Correu brossa). El formulari del compte creava aquestes carpetes després de desar la bústia, sense saber que el `MailboxObserver` del propi FreeScout ja ho fa a l'esdeveniment `created`. Les carpetes personals (Els meus, Destacat) se'n van salvar, perquè el nucli salta els usuaris que ja en tenen, i per això la barra lateral mostrava una barreja d'entrades simples i dobles. Hi era des de la primera versió, i es veia fins ara a la captura de conversa d'aquest mateix README (#30).
-- **Migració de reparació**: s'eliminen les còpies de les bústies vinculades a un compte de WhatsApp, i qualsevol conversa que estigués a la còpia que marxa es trasllada a la que es queda, de manera que no es perd res. Les bústies que el mòdul no ha creat mai no es toquen.
-- **Traducció al neerlandès**, aportada per [@jeroenedig](https://github.com/jeroenedig) (#31). La interfície del mòdul ja està disponible en anglès, català, castellà i neerlandès.
-
-## Novetats a la v1.9.0
-
-- **Una sola font de plantilles.** La plantilla heretada (`template_name` / `template_lang`) i les cinc ranures eren un o l'altre: amb una ranura vàlida, el parell antic no es llegia mai, mentre que el formulari li donava el lloc principal. Una migració plega el valor que quedi a la primera ranura lliure i elimina les dues columnes. Mai sobreescriu una ranura amb contingut, i deixa el valor al registre si totes cinc estan plenes, cas en què ja era inabastable.
-- **Els botons i el selector en viu ja no surten alhora.** Amb plantilles configurades, l'agent veu només aquells botons; sense cap, només el selector. Els administradors conserven el selector en tots dos casos, perquè el WhatsApp Manager és incòmode per consultar què té Meta aprovat.
-- **La secció de plantilles explica quina configuració guanya** i què veurà l'agent, cosa que fins ara només se sabia llegint el codi.
-- **Correcció**: amb el canal inactiu no s'enviava res i només les plantilles ho deien. Les respostes de text i el multimèdia, que són el cas habitual, sortien en silenci. Ara tots els camins comparteixen una sola comprovació, registren la fallida i deixen nota a la conversa, i el banner avisa encara que la finestra del client sigui oberta.
-- **Correcció**: el banner oferia als agents enllaços a la configuració del canal, que és només d'administrador, i seguir-los donava un 403. Ara reben la mateixa informació com a text dient què ha de fer un administrador.
-
-## Novetats a la v1.8.1
-
-- **Correcció**: els últims missatges de registre que encara sortien en català ara són en anglès. La correcció original va traduir les crides a `Log::` i es va deixar els missatges de les excepcions, que arriben igualment al `laravel-*.log`, tant perquè el worker registra l'excepció no capturada com pel `failed()` del propi mòdul. Com que només salten en errors transitoris, van passar desapercebuts dos mesos.
-- **Correcció**: enviar una plantilla amb el compte inactiu no deixava cap rastre, mentre que la conversa continuava aparentant que el missatge havia sortit. Ara l'intent es registra com a fallida i es loguetja, el banner de la conversa ja no ofereix botons d'enviament amb el canal aturat, i el panell de salut per fi diu si el canal està actiu.
-
-## Novetats a la v1.8.0
-
-- **Les fallides de lliurament es registren vingui com vingui l'error de Meta.** Meta retorna els errors de la Cloud API o bé a la resposta de l'enviament, o bé més tard pel webhook d'estats, i el canal documentat no és fiable: el `131047` figura com a síncron però arriba pel webhook. El mòdul només tenia la semàntica d'errors al camí de la resposta, així que per als missatges de text la branca del `131047` no s'executava mai, i el camí del webhook, que sí que s'executa, no escrivia res al registre. Per això la correcció de registre de la v1.6.2 semblava no canviar res. Ara tots els jobs de sortida i el webhook comparteixen un únic gestor de fallides.
-- **Un segon codi d'error diferent per al mateix missatge es reporta** en lloc de substituir el primer en silenci, i un estat posterior sense clau `errors` ja no pot buidar un codi ja registrat.
-- **S'aprofita l'`error_data.details` de Meta** per al text de la fallida quan hi és, que és on hi ha la informació accionable; abans només es llegia el `title` curt.
-- **Correcció**: un compte amb el token rebutjat per Meta pel webhook ja no es desactiva. Això només passa quan el rebuig arriba a la nostra pròpia crida, que és inequívoc. La fallida es continua registrant i el codi es continua desant.
-- **Correcció**: les targetes del tauler de les bústies de WhatsApp ja no conserven el fons gris d'inactiu. Ensenyar els comptadors damunt d'una targeta amb aspecte d'inactiva era mitja correcció.
-- **Documentació**: si tens més d'un número, han de ser del mateix portfolio de negoci, o una mateixa persona rep un identificador diferent per número i no es pot reconèixer com un únic client. Documentat com a requisit previ.
-
-## Novetats a la v1.7.0
-
-- **Format de WhatsApp als missatges entrants**: `*negreta*`, `_cursiva_`, `~ratllat~` i `` ```monoespaiat``` `` ara es renderitzen en lloc de mostrar-se literalment. Se segueixen les regles de WhatsApp, no les de CommonMark, així que un delimitador només val dins d'una mateixa línia.
-- **Distintiu de canal i botó de Chat Mode natius**: les converses ara porten el canal informat, que era l'únic que li faltava a FreeScout per mostrar la seva pròpia etiqueta de WhatsApp i el botó de Chat Mode, tant a la vista de conversa com al llistat. Les converses creades abans d'aquesta versió no reben el distintiu de manera retroactiva.
-- **Marcar com a llegits els missatges del client**: quan surt la resposta d'un agent, l'últim missatge del client es marca com a llegit (els tics blaus de WhatsApp). Si no hi ha cap missatge entrant per marcar, no es fa res.
-- **Les fallides de lliurament reobren la conversa**: un missatge que WhatsApp reporta com a fallit torna a posar la conversa en estat `Activa`, de manera que reapareix en lloc de passar desapercebuda la nota. Les converses marcades com a correu brossa o esborrades no es toquen, i mai es canvia l'agent assignat.
-- **Les notes de fallida citen el missatge**: la nota de lliurament fallit ara cita un extracte de 60 caràcters del missatge que no ha arribat, en lloc del `wamid` cru. El multimèdia enviat sense caption manté el `wamid`, perquè no hi ha text per citar.
-- **Correcció**: els comptadors de bústia del tauler (No assignat/Els meus/Destacat) quedaven amagats a les bústies de WhatsApp, perquè el core les pinta com a inactives quan no tenen servidor de correu entrant. Tornen a ser visibles, sense tocar la guarda de recollida de correu del core.
-- **Correcció**: els camps Cc/Bcc podien aparèixer un instant abans de quedar amagats a les bústies de WhatsApp. El CSS del mòdul s'injectava al final de la pàgina en lloc de dins el `<head>`.
-
-## Novetats a la v1.6.2
-
-- **Fix**: la nota de "missatge no lliurat" per a l'error `131047` (finestra de 24h) es registrava al log amb nivell `warning` en lloc de `error`, per la qual cosa podia desaparèixer silenciosament de `laravel-*.log` en instal·lacions amb `log_level` per sobre de warning, encara que la nota a la conversa sí que apareixia. Ara es registra com a `error`, igual que la resta de fallades de lliurament (text i multimèdia).
-- **Cosmètic**: eliminats guions llargs erronis de cadenes visibles per l'usuari (traduccions i vistes de compte/plantilla); substituïts per guions normals.
-
-## Novetats a la v1.6.1
-
-- **Reactivació guiada de compte**: si un compte s'havia desactivat automàticament (p. ex. després d'un error de token invàlid), un "Test connection" amb èxit ara el reactiva automàticament, amb traçabilitat (qui i quan) mostrada al panell d'estat del compte — ja no cal editar la base de dades manualment per recuperar-lo.
-
-## Novetats a la v1.6.0
-
-- **Plantilles de missatge, multi-plantilla**: el banner de finestra caducada ara admet fins a 5 plantilles configurades (nom, idioma, text del botó, text de recuperació) en lloc d'una de sola — útil per a comptes multiidioma. Les configuracions d'una sola plantilla existents continuen funcionant sense canvis.
-- **Plantilles de missatge, selector dinàmic**: una nova opció "Veure totes les plantilles aprovades…" obté en viu les plantilles APPROVED reals del vostre WhatsApp Business Account des de Meta, mostra el text del cos i permet omplir variables `{{n}}` — sense configuració estàtica necessària. Complementa la llista estàtica anterior, no la substitueix.
-- **Stickers**: els missatges `type:sticker` ara són compatibles, es mostren com qualsevol altre adjunt multimèdia.
-- **Targetes de contacte**: els missatges `type:contacts` ara mostren el nom i el(s) número(s) de telèfon del contacte compartit.
-- **Les reaccions ara citen a què han reaccionat**: en lloc d'un simple "Reacted: 👍", el mòdul busca i cita un extracte curt del missatge original.
-- **Visibilitat de fallades de lliurament**: si Meta accepta un missatge i després l'informa com a fallat de forma asíncrona, ara es mostra com una nota visible a la conversa en lloc d'un canvi d'estat silenciós.
-- **Registre automàtic de webhook**: afegir un compte de WhatsApp ara el subscriu automàticament als webhooks de Meta (amb un botó manual "Subscribe webhook" de reintent a la pàgina del compte).
-- **Fix de log de depuració**: els payloads inbound/outbound ja no es truncaven a "Over 9 levels deep..." als logs de debug (un problema de límit de profunditat de Monolog). El log de depuració també es pot limitar només a aquest mòdul (`METAWHATSAPP_DEBUG=true` a l'`.env` de FreeScout), escrivint al seu propi fitxer de log amb rotació diària, independent del nivell de log global de l'aplicació.
-- **Fix**: la pàgina "Add new WhatsApp account" podia donar un 500 a PHP 8.1+ per un `null` passat a `htmlspecialchars()`.
-
-## Novetats a la v1.5.1
-
-- **IDs de canal oficials**: el mòdul ara usa els IDs de canal assignats oficialment per l'equip de FreeScout (`103`/`104`) en lloc dels provisionals `100`/`101`. Les instal·lacions existents es migren automàticament i de forma transparent — no cal fer res.
-- **Fix crític**: la v1.5.0 va publicar un `require_once` col·locat abans de la declaració `namespace` del fitxer, cosa que és PHP invàlid i feia que el mòdul no carregués. Corregit; si vau instal·lar la v1.5.0, actualitzeu a la v1.5.1 immediatament.
-
-## Novetats a la v1.5
-
-- **Missatges d'ubicació i reacció**: els missatges d'ubicació entrants ara es mostren com un enllaç de Google Maps, i les reaccions (incloent-hi eliminar-ne una) es mostren com a text.
-- **Test de connexió i panell d'estat**: panell per compte amb un test de connexió en viu i informació de l'última activitat.
-- Els missatges multimèdia sense peu de foto ja no es descarten directament quan el text de marcador de posició és buit — només es descarten els missatges sense text ni multimèdia.
-- Afegida una [matriu de capacitats](docs/capability-matrix.md) que documenta exactament què és compatible, planificat o fora d'abast.
+Les versions anteriors són a la [pàgina de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
 ## Compatibilitat amb FreeScout
 
@@ -345,7 +276,7 @@ Aquestes limitacions són conegudes i acceptades dins l'abast actual de funciona
 - Fins a 5 plantilles configurades estàticament per compte, o qualsevol plantilla APPROVED obtinguda en viu via el selector dinàmic (amb variables `{{n}}`); sense sincronització/cache automàtica de la llista estàtica des del catàleg de Meta.
 - L'enviament de la plantilla de recuperació és sempre **manual**, iniciat per un agent des del banner de la conversa; no hi ha reintent automàtic fora de finestra.
 - Els estats `delivered` i `read` s'actualitzen a la base de dades del mòdul; només el `read` es mostra visualment (via l'indicador natiu "obert" del thread) — el `delivered` no es mostra a la conversa.
-- Si Meta agrupa en un sol enviament de webhook esdeveniments de **números diferents**, només es processen els del compte corresponent al primer; la resta es descarta amb un avís al log. En la pràctica Meta sol enviar webhooks separats per número, però amb diversos números sota la mateixa App convé tenir-ho present.
+- Si Meta agrupa diversos esdeveniments en un sol enviament de webhook, cadascun s'encamina segons què és realment: un missatge s'atribueix pel seu propi número de telèfon i es descarta si en porta un altre; un fet de nivell de compte (estat de plantilla, qualitat, restriccions) arriba a tots els canals actius de la WABA a què pertany, i es descarta si porta una altra WABA. En la pràctica Meta sol enviar webhooks separats per número, però amb diversos números sota la mateixa App convé tenir-ho present.
 - En mode xat, el core de FreeScout pot generar **esborranys buits** a la conversa per l'autodesat de l'editor; són innocus i es poden descartar manualment.
 - La **bústia tècnica** del canal continua sent visible a **Gestionar → Bústies**.
 - El webhook no implementa rate limiting propi; la barrera principal és la signatura HMAC.
@@ -372,7 +303,7 @@ Abans de fer el pas de proves a producció:
 | Símptoma | Causa probable |
 |---|---|
 | Meta no verifica el webhook | URL no accessible públicament, certificat invàlid o verify token incorrecte |
-| Meta retorna 403 als POST del webhook | `phone_number_id` desconegut, compte inactiu o signatura HMAC invàlida |
+| Meta retorna 403 als POST del webhook | `phone_number_id` o WABA desconegut, compte inactiu o signatura HMAC invàlida |
 | Els missatges entren però no surten | Error `131047` per finestra de 24 hores o error `190` per token caducat |
 | El compte surt com a `⚠ Bústia desvinculada` | La bústia associada s'ha eliminat o ja no és resoluble |
 | No es processa res | El worker de cues està aturat (`php artisan queue:work`) |

@@ -73,9 +73,24 @@
             </div>
 
             <div class="form-group">
+                <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.account_events_title') }}</label>
+                <div class="col-sm-8">
+                    <div class="checkbox">
+                        <label>
+                            <input type="checkbox" name="account_events" value="1"
+                                   {{ \Modules\MetaWhatsApp\Support\AccountEventLog::isEnabled() ? 'checked' : '' }}>
+                            {{ __('metawhatsapp::metawhatsapp.account_events_enable') }}
+                        </label>
+                    </div>
+                    <p class="help-block">{{ __('metawhatsapp::metawhatsapp.account_events_enable_help') }}</p>
+                </div>
+            </div>
+
+            <div class="form-group">
                 <div class="col-sm-offset-4 col-sm-8">
                     <button type="submit" class="btn btn-primary">{{ __('metawhatsapp::metawhatsapp.save') }}</button>
                     <a href="{{ route('logs.app') }}" class="btn btn-link">{{ __('metawhatsapp::metawhatsapp.diagnostics_view_log') }}</a>
+                    <a href="{{ route('metawhatsapp.account_events') }}" class="btn btn-link">{{ __('metawhatsapp::metawhatsapp.account_events_link') }}</a>
                 </div>
             </div>
         </form>

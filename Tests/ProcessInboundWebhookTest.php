@@ -34,6 +34,12 @@ class ProcessInboundWebhookTest extends TestCase
      * as a phone_number_id mismatch, which is a different problem entirely
      * and sends whoever reads the log looking for a channel misconfiguration
      * that is not there.
+     *
+     * This proves the wiring, not the routing: that a change with no
+     * `metadata` reaches WebhookEventRouter at all, and that the field named
+     * in the log is the one that actually arrived. The router's own
+     * behaviour for each field it knows about is covered separately in
+     * WebhookEventRouterTest.
      */
     public function test_an_event_we_do_not_handle_says_so_and_names_the_field()
     {
@@ -41,19 +47,18 @@ class ProcessInboundWebhookTest extends TestCase
         $account = $this->createTestAccount();
 
         $this->runJob($account, ['entry' => [[
-            'id'      => 'waba-id',
+            'id'      => $account->waba_id,
             'changes' => [[
-                'field' => 'message_template_status_update',
+                'field' => 'account_alerts',
                 'value' => [
-                    'event'                 => 'REJECTED',
-                    'message_template_name' => 'order_update',
+                    'entity_type' => 'WABA',
                 ],
             ]],
         ]]]);
 
         Log::shouldHaveReceived('info')->withArgs(function ($message, $context = []) {
             return strpos($message, 'not handled') !== false
-                && ($context['field'] ?? null) === 'message_template_status_update';
+                && ($context['field'] ?? null) === 'account_alerts';
         })->once();
 
         Log::shouldNotHaveReceived('warning', [
@@ -62,6 +67,103 @@ class ProcessInboundWebhookTest extends TestCase
             }),
             \Mockery::any(),
         ]);
+    }
+
+    /**
+     * Routing used to be decided by the absence of `metadata`, which was a
+     * stand-in for "not a message" and worked by luck. `message_echoes`
+     * carries metadata, so it would have sailed past the router into the
+     * message path, found no `messages` key and done nothing at all, without
+     * even a line saying so.
+     */
+    public function test_an_event_that_carries_metadata_still_reaches_the_router()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+
+        $this->runJob($account, ['entry' => [[
+            'id'      => $account->waba_id,
+            'changes' => [[
+                'field' => 'message_echoes',
+                'value' => [
+                    'metadata'       => ['phone_number_id' => $account->phone_number_id],
+                    'message_echoes' => [],
+                ],
+            ]],
+        ]]]);
+
+        Log::shouldHaveReceived('info')->withArgs(function ($message, $context = []) {
+            return strpos($message, 'not handled') !== false
+                && ($context['field'] ?? null) === 'message_echoes';
+        })->once();
+    }
+
+    /**
+     * The account is resolved from the first entry. A batch carrying a second
+     * entry for another WABA must not write that WABA's broken template onto
+     * this account, which is what the phone_number_id guard does for messages
+     * and what nothing did for account level events.
+     */
+    public function test_an_account_level_event_from_another_waba_is_discarded()
+    {
+        $account = $this->createTestAccount();
+
+        $this->runJob($account, ['entry' => [[
+            'id'      => 'somebody-elses-waba',
+            'changes' => [[
+                'field' => 'message_template_status_update',
+                'value' => [
+                    'event'                     => 'REJECTED',
+                    'message_template_id'       => 1,
+                    'message_template_name'     => 'not_ours',
+                    'message_template_language' => 'en_US',
+                ],
+            ]],
+        ]]]);
+
+        $this->assertNull($account->fresh()->templates_issue);
+    }
+
+    /**
+     * A message has nowhere to go without a mailbox, but an account level
+     * fact like a template rejection has nothing to do with any mailbox. The
+     * job used to give up before either, so such a channel heard nothing and
+     * its panel stayed silently clean.
+     *
+     * Be honest about what this test is. `mailbox_id` carries an ON DELETE
+     * RESTRICT foreign key, so the database refuses to remove a mailbox while
+     * a channel points at it, and we know of no path that produces this state
+     * on a real installation. The guard being tested is defensive and predates
+     * this change; the test exists so its behaviour is pinned rather than
+     * assumed, which is why it has to suspend the constraint to build a state
+     * the schema forbids. If that ever stops being possible, delete the test
+     * rather than weakening the constraint.
+     */
+    public function test_an_account_level_event_arrives_even_with_no_mailbox()
+    {
+        $account = $this->createTestAccount();
+
+        // Suspended for this one delete only, to build a state the schema
+        // does not allow. See the docblock: this is pinning defensive
+        // behaviour, not reproducing something that happens.
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        \App\Mailbox::where('id', $account->mailbox_id)->delete();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+
+        $this->runJob($account->fresh(), ['entry' => [[
+            'id'      => $account->waba_id,
+            'changes' => [[
+                'field' => 'message_template_status_update',
+                'value' => [
+                    'event'                     => 'REJECTED',
+                    'message_template_id'       => 1,
+                    'message_template_name'     => 'order_update',
+                    'message_template_language' => 'en_US',
+                ],
+            ]],
+        ]]]);
+
+        $this->assertCount(1, $account->fresh()->templates_issue);
     }
 
     /**
@@ -116,6 +218,52 @@ class ProcessInboundWebhookTest extends TestCase
                 && ($context['group_id'] ?? null) === '120363000000000000@g.us'
                 && !array_key_exists('from', $context);
         })->once();
+    }
+
+    /**
+     * Meta's spec allows a business-scoped user ID of a two-letter country
+     * code, a period, and up to 128 alphanumeric characters. Ours capped it
+     * at 100 and threw away anything longer, and with no phone number in the
+     * payload the message went with it: the customer wrote and nothing
+     * appeared anywhere.
+     */
+    public function test_a_business_scoped_id_longer_than_a_hundred_characters_is_kept()
+    {
+        $bsuid   = 'US.' . str_repeat('a', 128);
+        $payload = $this->inboundPayload($account = $this->createTestAccount(), 'wamid.longid', $bsuid, 'Hola', [[
+            'profile' => ['name' => 'Pablo M.'],
+            'user_id' => $bsuid,
+        ]]);
+
+        $this->runJob($account, $payload);
+
+        $this->assertEquals(
+            $bsuid,
+            WhatsAppMessage::where('wamid', 'wamid.longid')->value('contact_user_id')
+        );
+    }
+
+    /**
+     * With WhatsApp usernames, someone can write without ever revealing a
+     * phone number. When they also have no display name, the customer record
+     * was named after the raw business-scoped ID, which is a wall of digits
+     * that tells the agent nothing about who is on the other side. Meta sends
+     * the username in the same payload and we were not reading it.
+     */
+    public function test_a_customer_with_no_phone_is_named_after_their_username()
+    {
+        $bsuid   = 'US.13491208655302741918';
+        $account = $this->createTestAccount();
+        $payload = $this->inboundPayload($account, 'wamid.username', $bsuid, 'Hola', [[
+            'profile' => ['username' => 'pablomorales'],
+            'user_id' => $bsuid,
+        ]]);
+
+        $this->runJob($account, $payload);
+
+        $customer = \App\Customer::getCustomerByChannel(WhatsAppAccount::CHANNEL_BSUID, $bsuid);
+        $this->assertNotNull($customer, 'The message should have created a customer.');
+        $this->assertEquals('@pablomorales', $customer->first_name);
     }
 
     public function test_missatge_nou_crea_customer_conversa_i_thread()

@@ -73,22 +73,43 @@ class WebhookController extends Controller
             return response('Forbidden', 403);
         }
 
-        // Tots els esdeveniments d'un POST pertanyen a la mateixa App (doc. Meta):
-        // el primer phone_number_id identifica el compte i, per tant, l'app_secret.
+        // Tots els esdeveniments d'un POST pertanyen a la mateixa App (doc. Meta).
+        // Els de missatges i estats identifiquen el compte pel phone_number_id.
+        // Els de nivell WABA (estat i categoria de plantilles, qualitat del
+        // número, avisos i restriccions del compte) no porten `metadata` en
+        // absolut, i fins ara es rebutjaven aquí amb un 403: la conseqüència
+        // era que res del que no fos un missatge arribava mai al mòdul.
         $phoneNumberId = $payload['entry'][0]['changes'][0]['value']['metadata']['phone_number_id'] ?? null;
-        if (!$phoneNumberId) {
-            \Log::warning('[MetaWhatsApp] Webhook rejected: missing phone_number_id', ['ip' => $request->ip()]);
+        $wabaId        = $payload['entry'][0]['id'] ?? null;
+
+        if (is_string($phoneNumberId) && $phoneNumberId !== '') {
+            $account = WhatsAppAccount::where('phone_number_id', $phoneNumberId)
+                ->where('is_active', true)
+                ->first();
+        } elseif (is_string($wabaId) && $wabaId !== '') {
+            // An account level event belongs to every channel on that WABA.
+            // Any one of them is enough to verify the signature here, because
+            // channels sharing a WABA share Meta's app and therefore its
+            // secret; the fan-out to every channel happens in the router.
+            // Ordered by `id` so the same account is picked every time,
+            // rather than whichever row the database happens to return.
+            $account = WhatsAppAccount::where('waba_id', $wabaId)
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->first();
+        } else {
+            \Log::warning('[MetaWhatsApp] Webhook rejected: no phone_number_id and no WABA id', ['ip' => $request->ip()]);
+
             return response('Forbidden', 403);
         }
 
-        $account = WhatsAppAccount::where('phone_number_id', $phoneNumberId)
-            ->where('is_active', true)
-            ->first();
         if (!$account) {
             \Log::warning('[MetaWhatsApp] Webhook rejected: unknown or inactive account', [
                 'phone_number_id' => $phoneNumberId,
+                'waba_id'         => $wabaId,
                 'ip'              => $request->ip(),
             ]);
+
             return response('Forbidden', 403);
         }
 

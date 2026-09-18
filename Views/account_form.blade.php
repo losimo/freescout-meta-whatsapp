@@ -394,6 +394,20 @@
                             </div>
                         @endif
 
+                        @if($account->templates_issue)
+                            <div class="form-group">
+                                <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.templates_issue_title') }}</label>
+                                <div class="col-sm-8">
+                                    <p class="form-control-static">
+                                        @foreach($account->templates_issue as $issue)
+                                            {{ __('metawhatsapp::metawhatsapp.templates_issue_value', ['summary' => $issue['summary'], 'date' => $issue['at']]) }}<br>
+                                        @endforeach
+                                        <span class="help-block" style="margin-top:4px; margin-bottom:0">{{ __('metawhatsapp::metawhatsapp.templates_issue_help') }}</span>
+                                    </p>
+                                </div>
+                            </div>
+                        @endif
+
                         @if($account->groups_checked_at)
                             <div class="form-group">
                                 <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.groups_title') }}</label>

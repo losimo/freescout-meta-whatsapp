@@ -7,11 +7,18 @@
 >
 > Until now, replying with free-form text inside the 24-hour window carried no cost. From that date it is billed per delivered message, with an allowance of **1,000 service messages per business phone number per month**, which resets monthly and does not roll over. Utility templates sent inside the window become chargeable too, and those have no allowance. The figure of 1,000 comes from industry sources agreeing on it; it is not published on any Meta page.
 >
-> Check the rates on [Meta's pricing page](https://whatsappbusiness.com/products/platform-pricing/#rates), selecting your market and currency: each category (authentication, marketing, utility and service) is priced differently.
+> Check the rates on [Meta's pricing page](https://whatsappbusiness.com/products/platform-pricing/#rates), selecting your market and currency: each category (authentication, marketing, utility and service) is priced differently. The rate table already carries a service row, but the text around it still describes today's policy and gives no date, so do not be surprised to read there that it is free.
+>
+> More changes are coming from Meta over the next weeks. We will pass on here whatever affects this module, worded as Meta words it, and we will not add anything we cannot stand behind.
 >
 > This is a Meta pricing change, not a module change. The module charges nothing and takes no commission, and its idempotency guards stop a queue retry from re-sending a message that already went out.
 
-<!-- Remove this notice once Meta's pricing page covers the change as routine and
+> [!NOTE]
+> **Worth checking before 30 September: does your WhatsApp Business Account have a payment method on file?**
+>
+> Industry sources report that accounts without one stop having their service messages delivered from 1 October, rather than being billed afterwards. Like the figure of 1,000 above, this is on no Meta page, and it is not something this module can check for you. It is mentioned here because the failure would be a quiet one: customers keep writing and replies stop arriving.
+
+<!-- Remove both notices once Meta's pricing page covers the change as routine and
      a few versions have passed since 1 October 2026. -->
 
 FreeScout module that integrates **WhatsApp Business directly with the Meta Cloud API**, without paid intermediaries such as 1msg.io or Twilio. Messages travel from Meta to your FreeScout installation and nowhere else, with full control over credentials, data and the operational flow.
@@ -25,7 +32,7 @@ The project is public and has been running in real production use since v1.0, it
 - **Fail-closed**: the webhook rejects any request without a valid HMAC signature.
 - **Direct Meta integration**: no third-party gateways.
 - **Email-free interface**: on channel pages the module hides the core's email artifacts (Cc/Bcc toggle, internal technical address) without affecting regular email mailboxes.
-- **Compatible with FreeScout 1.8.x** on Laravel 5.8 and PHP 8.x.
+- **Compatible with FreeScout 1.8.x**, which runs on Laravel 5.5 and PHP 7.1 or newer.
 
 ## Screenshots
 
@@ -77,6 +84,20 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.13.0
+
+Two threads in this release: what Meta says about your account now reaches you instead of being dropped, and a customer who writes without a phone number is no longer a stranger or, in one case, lost.
+
+- **Fix**: on a FreeScout installed below the domain root, at `/tickets` for example, nothing in this module could be reached. FreeScout registers its own routes inside the subdirectory prefix and a module's routes are loaded outside it, so every route here answered 404: the settings screen, and the webhook too, which means Meta's deliveries never arrived either. Found by [@SenseiFreak](https://github.com/SenseiFreak) (#33).
+- **Fix**: a business-scoped ID longer than 100 characters was thrown away, and when that message carried no phone number the message went with it. The customer wrote and nothing appeared anywhere. Meta's ceiling is 131 and the column now holds 191. **If you have had messages that never arrived, this is a candidate.**
+- **A customer who writes without a phone number is now named after their WhatsApp username**, instead of the raw business-scoped ID that told the agent nothing about who was on the other side. Meta sends the username in the same payload and it was not being read.
+- **Meta rejecting, pausing or disabling an approved template now shows on the account health panel**, naming the template, the language and what happened to it, instead of first appearing as a send that failed. The row goes away when Meta approves the same template again.
+- **Template category changes are now recorded**, both the warning Meta sends 24 hours ahead and the change itself: the category is what sets a template's price. Nothing breaks when it happens, so this goes to the account event log rather than the panel, which is where faults go.
+- **An optional record of what Meta reports about the account**, off by default and switched on once for the whole instance, with a screen to read it. Kept 90 days. It holds account-level facts only and never anything that identifies a customer.
+- Every webhook field other than messages now goes through one router instead of being logged and dropped, which is what the remaining kinds will hang off.
+- The service message counter's note no longer lists where else a number might be sending from. Naming the WhatsApp Business app and "another tool" was both too narrow and too wide: without Meta's Coexistence, which needs a provider, a number on the Cloud API cannot be used from the app at all. It now says anywhere else.
+- **Dutch brought up to date** for v1.12.0, contributed by [@jeroenedig](https://github.com/jeroenedig) (#36).
+
 ## What's new in v1.12.1
 
 - **Critical fix**: saving a WhatsApp channel from its settings form returned a 500 and the edit was lost. v1.12.0 called a method that does not exist on the Laravel version FreeScout runs, so every save of an existing channel failed. **If you installed v1.12.0, update.** Nothing else changes. No test went through that route, which is why it shipped; two do now.
@@ -95,98 +116,7 @@ This release is about what Meta starts charging for on 1 October 2026, and about
 
 See the notice at the top of this page for what changes on 1 October and where to check the rates.
 
-## What's new in v1.11.0
-
-This release comes out of a single support thread (#33), where a working installation and a broken one looked exactly the same from the outside.
-
-- **Opening the webhook URL in a browser now says the module is installed and the entry point answers.** Until now that address replied `403 Forbidden` whether the module was healthy, misconfigured or absent, so there was no way to check an installation without logging into it. The courtesy is only for a request carrying no parameters, which is never Meta: half-filled parameters or an unknown verify token still get a bare 403, with no explanation. It answers 200 rather than 403 on purpose, because many shared hosts replace error pages with their own, which would have broken the check on exactly the kind of hosting that needs it most.
-- **The detailed log can now be turned on from the panel**, with a window and a retention in days, instead of editing `METAWHATSAPP_DEBUG` in FreeScout's `.env`, which is out of reach on shared hosting. It is a window rather than a switch on purpose: that file holds message text and phone numbers, and it is the one place deletion cannot reach, since a rotating file cannot be rewritten when a conversation is removed. How long it stays on, including leaving it on with no end date, is the administrator's call.
-- **Where the module puts personal data is now written down**, in [docs/personal-data.md](docs/personal-data.md). Every row is verified against the code and the database rather than assumed, so an operator facing an access or erasure request does not have to read the source. It names the gaps as plainly as the rest: deleting a conversation leaves the phone number and the BSUID behind in `meta_whatsapp_messages`, and three error lines in the ordinary log carry the sender's phone number.
-- **The translation invitation now says you do not need to write PHP.** FreeScout ships a translation screen that reads community modules too, so any language can be contributed from the browser.
-
-## What's new in v1.10.0
-
-This release has one idea behind it: **the module tells you what is wrong before it bites you.**
-
-- **It warns before your access token expires**, instead of you finding out through error 190 when a message stops going out. A correctly set up system user token never expires and the panel says so, which is worth knowing on its own; the warning is for the temporary 24-hour token, which is the mistake that actually leaves an installation unable to send. It needs the **App ID**, a new optional field that sits next to the App Secret on the same Meta screen. Accounts created before this release simply say "not checked" and nothing changes for them.
-- **It says when the token is no longer valid, or missing permissions**, at the moment you save the channel rather than at the first failed message.
-- **It says when FreeScout is older than this module expects.** The core does not check a community module's declared version, so this notice is the only place an administrator would find out. Nothing is blocked: the module keeps working, and falls back to the previous behaviour where the newer core APIs are missing.
-- **A reply that cannot be sent now leaves a note on the conversation.** Two paths used to end in silence: a contact with no phone number on file, and an attachment that no longer resolves. In both, the agent wrote a reply, pressed send, and the thread sat there looking delivered.
-- **Fix**: five log lines that said a message had not been sent, or had been discarded, were written at warning level and disappeared on installations whose log level filters warnings. That is the same defect as the 24-hour window one fixed in v1.6.2, in the places that fix did not reach.
-
-**Requires FreeScout 1.8.234 or newer.** See [FreeScout compatibility](#freescout-compatibility) above.
-
-## What's new in v1.9.1
-
-- **Fix**: every mailbox created by the module carried two copies of each shared folder in the sidebar (Unassigned, Drafts, Assigned, Closed, Deleted, Spam). The account form created those folders after saving the mailbox, not knowing FreeScout's own `MailboxObserver` already does it on the `created` event. Personal folders (Mine, Starred) were spared, because core skips users that already have them, which is why the sidebar showed a mix of single and doubled entries. Present since the first release, and visible in this README's own conversation screenshot until now (#30).
-- **Repair migration**: the duplicates are removed from mailboxes linked to a WhatsApp account, and any conversation sitting in the copy that goes away is moved into the one that stays, so nothing is lost. Mailboxes the module never created are left untouched.
-- **Dutch translation**, contributed by [@jeroenedig](https://github.com/jeroenedig) (#31). The module interface is now available in English, Catalan, Castellano and Dutch.
-
-## What's new in v1.9.0
-
-- **One source of truth for templates.** The legacy single template (`template_name` / `template_lang`) and the five slots were a hard either/or: one valid slot made the older pair unreadable, while the form gave the pair top billing. A migration folds any surviving value into the first free slot and drops both columns. It never overwrites a slot that has content, and logs the value if all five are taken, where it was already unreachable.
-- **The static buttons and the live picker no longer appear together.** With templates configured, agents see only those buttons; with none, only the picker. Administrators keep the picker either way, since WhatsApp Manager is an awkward place to check what Meta has actually approved.
-- **The template section now explains which configuration wins** and what the agent will see, which until now could only be learned by reading the code.
-- **Fix**: nothing was sent while a channel was inactive, and only templates said so. Text replies and media, the common paths, returned silently. All outbound paths now share one check, record the failure and leave a note on the conversation, and the banner warns even while the customer window is open.
-- **Fix**: the conversation banner offered agents links to channel settings, which are admin-only, so following one produced a 403. Agents now get the same information as text naming what an administrator has to do.
-
-## What's new in v1.8.1
-
-- **Fix**: the last log messages still written in Catalan are now in English. The original fix translated the `Log::` calls and left the exception messages, which reach `laravel-*.log` anyway, both through the queue worker logging the uncaught exception and through the module's own `failed()` handler. Because they only fire on transient errors, they went unnoticed for two months.
-- **Fix**: sending a template on an inactive account left no trace while the conversation still looked like the message had gone out. The attempt is now recorded as a failure and logged, the conversation banner no longer offers send buttons for a stopped channel, and the account health panel finally shows whether the channel is active at all.
-
-## What's new in v1.8.0
-
-- **Delivery failures are logged whichever way Meta reports them.** Meta returns Cloud API errors either in the response to the send, or later over the statuses webhook, and the documented channel is not reliable: `131047` is documented as synchronous but arrives over the webhook. The module only carried error semantics on the response path, so for text messages the `131047` branch never ran, and the webhook path that does run wrote nothing to the log at all. This is why the v1.6.2 logging fix appeared to change nothing. All outbound jobs and the webhook now share one failure handler.
-- **A second, different error code for the same message is reported** instead of quietly replacing the first, and a later status with no `errors` array can no longer blank a code already recorded.
-- **Meta's `error_data.details` is used** for the failure text when present, which is where the actionable wording lives; previously only the short `title` was read.
-- **Fix**: an account whose token Meta rejects over the webhook is no longer deactivated. That only happens when the rejection comes back from our own call, which is unambiguous. The failure is still logged and the error code stored.
-- **Fix**: dashboard cards for WhatsApp mailboxes no longer keep the grey "inactive" background. Showing the counters over an inactive-looking card was half a fix.
-- **Docs**: if you run more than one number, they must belong to the same business portfolio, or the same person gets a different business-scoped ID per number and cannot be recognised as one customer. Documented as a prerequisite.
-
-## What's new in v1.7.0
-
-- **Inbound WhatsApp formatting**: `*bold*`, `_italic_`, `~strikethrough~` and `` ```monospace``` `` now render as formatted text instead of showing their markup literally. WhatsApp's own rules are followed, not CommonMark, so a delimiter only applies within a single line.
-- **Native channel badge and Chat Mode button**: conversations now carry the channel, which is all FreeScout needed to show its own WhatsApp tag and Chat Mode button, both in the conversation view and in the conversation list. Conversations created before this version don't get the badge retroactively.
-- **Mark customer messages as read**: after an agent's reply goes out, the customer's most recent message is marked as read (the blue ticks in WhatsApp). If there's no inbound message to mark, nothing happens.
-- **Delivery failures reopen the conversation**: a message reported as failed by WhatsApp now sets the conversation back to `Active`, so it comes back into view instead of the note being missed. Conversations marked as spam or deleted are left alone, and the assigned agent is never changed.
-- **Failure notes quote the message**: the delivery-failure note now quotes a 60-character excerpt of the message that didn't arrive, instead of the raw `wamid`. Media sent without a caption keeps the `wamid`, since there's no text to quote.
-- **Fix**: dashboard mailbox counters (Unassigned/Mine/Starred) were hidden for WhatsApp mailboxes, because core styles them as inactive when there's no incoming mail server. They're visible again, without touching core's mail-fetching guard.
-- **Fix**: the Cc/Bcc fields could flash into view for a moment before being hidden on WhatsApp mailboxes. The module's CSS was being injected at the end of the page instead of in `<head>`.
-
-## What's new in v1.6.2
-
-- **Fix**: the "message not delivered" note for error `131047` (24h window) was logged at `warning` level instead of `error`, so it could be silently dropped from `laravel-*.log` on installations with `log_level` set above warning, even though the in-conversation note still appeared. Now logged as `error`, consistent with every other delivery failure (text and media).
-- **Cosmetic**: removed stray em dashes from user-facing strings (translations and account/template views); replaced with regular hyphens.
-
-## What's new in v1.6.1
-
-- **Guided account reactivation**: if an account was auto-deactivated (e.g. after an invalid-token error), a successful "Test connection" now reactivates it automatically, with an audit trail (who and when) shown on the account health snapshot — no more manual database edits to recover.
-
-## What's new in v1.6.0
-
-- **Message templates, multi-template**: the expired-window banner now supports up to 5 configured templates (name, language, button label, recovery text) instead of a single one — useful for multi-language accounts. Existing single-template setups keep working unchanged.
-- **Message templates, dynamic picker**: a new "Browse all approved templates…" option fetches your WhatsApp Business Account's actual APPROVED templates live from Meta, shows the body text, and lets you fill in `{{n}}` variables — no static configuration needed. Complements the static list above, doesn't replace it.
-- **Stickers**: `type:sticker` messages are now supported, shown like any other media attachment.
-- **Contact cards**: `type:contacts` messages now show the shared contact's name and phone number(s).
-- **Reactions now quote what they reacted to**: instead of a bare "Reacted: 👍", the module looks up and quotes a short excerpt of the original message.
-- **Delivery failure visibility**: if Meta accepts a message and then reports it as failed asynchronously, that now shows up as a visible note in the conversation instead of a silent status change.
-- **Automatic webhook subscription**: adding a WhatsApp account now automatically subscribes it to Meta's webhooks (with a manual "Subscribe webhook" retry button on the account page).
-- **Debug logging fix**: inbound/outbound payloads no longer get truncated to "Over 9 levels deep..." in debug logs (a Monolog depth-limit issue). Debug logging can now also be scoped to this module only (`METAWHATSAPP_DEBUG=true` in FreeScout's `.env`), writing to its own daily-rotated log file independent of the app-wide log level.
-- **Fix**: the "Add new WhatsApp account" page could 500 on PHP 8.1+ due to a `null` passed into `htmlspecialchars()`.
-
-## What's new in v1.5.1
-
-- **Official channel IDs**: the module now uses the channel IDs officially assigned by the FreeScout team (`103`/`104`) instead of the provisional `100`/`101`. Existing installations are migrated automatically and transparently — no action needed.
-- **Critical fix**: v1.5.0 shipped a `require_once` placed before the file's `namespace` declaration, which is invalid PHP and made the module fail to load entirely. Fixed; if you installed v1.5.0, update to v1.5.1 immediately.
-
-## What's new in v1.5
-
-- **Location and reaction messages**: inbound location messages are now shown as a Google Maps link, and reactions (including removing one) are shown as text.
-- **Connection test & health snapshot**: per-account panel with a live connection test and last-activity info.
-- Media messages without a caption are no longer discarded outright when the placeholder text is empty — only messages with neither text nor media are dropped.
-- Added a [capability matrix](docs/capability-matrix.md) documenting exactly what's supported, planned or out of scope.
-- Added a lightweight [incident notes](docs/incidents.md) log for operational gotchas worth remembering.
+Older releases are listed on the [releases page](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
 ## FreeScout compatibility
 
@@ -351,7 +281,7 @@ These limitations are known and accepted within the current feature scope:
 - Up to 5 statically-configured templates per account, or any APPROVED template fetched live via the dynamic picker (with `{{n}}` variables); no automatic sync/caching of the static list from Meta's catalog.
 - Sending the recovery template is always **manual**, triggered by an agent from the conversation banner; there is no automatic retry outside the window.
 - `delivered` and `read` states are stored in the module database; only `read` is shown visually (via the thread's native "opened" indicator) — `delivered` is not shown in the conversation.
-- If Meta batches webhook events of **different numbers** in a single delivery, only those matching the first resolved account are processed; the rest are discarded with a log warning. In practice Meta usually delivers separate webhooks per number, but keep this in mind with several numbers under the same App.
+- If Meta batches several events in a single delivery, each is routed by what it actually is: a message is attributed by its own phone number and discarded if it names a different one, while an account level fact (template status, quality, restrictions) reaches every active channel on the WABA it belongs to, and is discarded if it names another WABA. In practice Meta usually delivers separate webhooks per number, but keep this in mind with several numbers under the same App.
 - In chat mode, the FreeScout core may leave **empty drafts** in the conversation due to editor autosave; they are harmless and can be discarded manually.
 - The channel's **technical mailbox** remains visible under **Manage → Mailboxes**.
 - The webhook implements no rate limiting of its own; the HMAC signature is the main barrier.
@@ -378,7 +308,7 @@ Before moving from testing to production:
 | Symptom | Likely cause |
 |---|---|
 | Meta cannot verify the webhook | URL not publicly reachable, invalid certificate or wrong verify token |
-| Meta gets 403 on webhook POSTs | Unknown `phone_number_id`, inactive account or invalid HMAC signature |
+| Meta gets 403 on webhook POSTs | Unknown `phone_number_id` or WABA, inactive account or invalid HMAC signature |
 | Messages come in but replies do not go out | Error `131047` (24-hour window) or error `190` (expired token) |
 | Account shows `⚠ Mailbox unlinked` | The linked mailbox was deleted or is no longer resolvable |
 | Nothing gets processed | Queue worker stopped (`php artisan queue:work`) |

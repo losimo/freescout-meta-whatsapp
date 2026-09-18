@@ -18,7 +18,7 @@ class SendWhatsAppMessage implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;
 
-    // El backoff entre reintents el gestiona el worker (Laravel 5.8).
+    // El backoff entre reintents el gestiona el worker (Laravel 5.5).
     public $tries = 3;
 
     /** @var int */

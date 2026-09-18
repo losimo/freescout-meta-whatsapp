@@ -67,7 +67,7 @@ abstract class TestCase extends BaseTestCase
         $account->name                 = 'PHPUnit WhatsApp';
         $account->phone_number         = '+34600999888';
         $account->phone_number_id      = $phoneNumberId;
-        $account->waba_id              = 'test-waba';
+        $account->waba_id              = $overrides['waba_id'] ?? 'test-waba';
         $account->verify_token         = bin2hex(random_bytes(32));
         $account->mailbox_id           = $mailbox->id;
         $account->auto_created_mailbox = true;

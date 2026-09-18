@@ -4,6 +4,18 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 1.13.0 (2026-09-18)
+
+- **Fix**: on a FreeScout installed below the domain root, at `/tickets` for example, nothing in this module could be reached. FreeScout registers its own routes inside the subdirectory prefix and a module's routes are loaded outside it, so every route here answered 404: the settings screen, and the webhook too, which means Meta's deliveries never arrived either. Found by [@SenseiFreak](https://github.com/SenseiFreak) (#33).
+- **Meta rejecting, pausing or disabling an approved template now shows on the account health panel**, naming the template, the language and what happened to it, instead of first appearing as a send that failed. The row goes away when Meta approves the same template again.
+- **An optional record of what Meta reports about the account**, off by default and switched on once for the whole instance, with a screen to read it. Kept 90 days. It holds account-level facts only and never anything that identifies a customer.
+- **Template category changes are now recorded**, both the warning sent 24 hours ahead and the change itself: the category is what sets a template's price. Nothing breaks, so this goes to the account event log and not the panel, which is where faults go.
+- Every webhook field other than messages now goes through one router rather than being logged and dropped, which is what the remaining families will hang off.
+
+- **A customer who writes without a phone number is named after their WhatsApp username** instead of their raw business-scoped ID, which told the agent nothing about who was on the other side. Meta sends the username in the same payload and it was not being read.
+- The counter's note no longer lists where else a number might be sending from. Naming the WhatsApp Business app and "another tool" was both too narrow and too wide: without Meta's Coexistence, which needs a provider, a number on the Cloud API cannot be used from the app at all. It now says anywhere else.
+- **Fix**: a business-scoped ID longer than 100 characters was thrown away, and when that message carried no phone number the message went with it: the customer wrote and nothing appeared anywhere. Meta's ceiling is 131 and the column now holds 191.
+
 ## 1.12.1 (2026-09-13)
 
 - **Critical fix**: saving a WhatsApp channel from its form returned a 500 and lost the edit. 1.12.0 called `Request::boolean()`, which does not exist on the Laravel this runs on. If you installed 1.12.0, update. No test covered that route, which is how it went out; two now go through the form.

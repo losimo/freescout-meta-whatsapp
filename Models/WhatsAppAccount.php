@@ -52,6 +52,7 @@ class WhatsAppAccount extends Model
         'templates'            => 'array',
         'reactivated_at'       => 'datetime',
         'groups_checked_at'    => 'datetime',
+        'templates_issue'      => 'array',
         'token_expires_at'     => 'datetime',
     ];
 

@@ -22,7 +22,7 @@ This project wants a community that is open and demanding at the same time. The 
 
 This code applies to issues, PRs, discussions and any other communication linked to the project.
 
-Violations can be reported privately to the maintainer: losimo@gmail.com. Reports are treated confidentially: your name is not shared with the person you are reporting, or with anyone else, without asking you first.
+Violations can be reported privately to the maintainer: albert@losimo.cat. Reports are treated confidentially: your name is not shared with the person you are reporting, or with anyone else, without asking you first.
 
 This project is maintained by one person, so if your complaint is about the maintainer there is no internal appeal. In that case you can report it to GitHub directly: https://docs.github.com/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam
 

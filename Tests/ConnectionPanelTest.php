@@ -11,6 +11,21 @@ class ConnectionPanelTest extends TestCase
 {
     use DatabaseTransactions;
 
+    /**
+     * The settings page is the last route in the module no test entered the
+     * way a user does. Rendering the partial in isolation is not the same
+     * thing: it skips the controller, the auth, the admin gate and the layout.
+     */
+    public function test_the_settings_page_renders_for_an_administrator()
+    {
+        $this->createTestAccount();
+
+        $response = $this->actingAs($this->makeAdminUser())
+            ->get($this->url('/meta-whatsapp/settings'));
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString(__('metawhatsapp::metawhatsapp.diagnostics_title'), $response->getContent());
+    }
 
     // ------------------------------------------------------------------
     // WhatsAppApiClient::testConnection()

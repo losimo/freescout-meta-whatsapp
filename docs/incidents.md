@@ -49,3 +49,15 @@ Add an entry whenever something takes more than a few minutes to figure out and 
 **Why it is worth writing down:** that symptom now has two possible causes and the core version tells them apart. On 1.8.240 or newer the folder cannot be it, so look at `vendor/`. Below it, ask which button they downloaded from before anything else.
 
 **Follow-up:** none, and deliberately no bump of our minimum FreeScout version. Anyone who installs from the release asset never hits this, and the module keeps working on older cores. The same release also closed another security issue (GHSA-5vw8-4wxh-6mpr, medium), which is why the outdated-core notice no longer names specific versions: a list inside a translated string goes stale every time FreeScout ships a fix, in four languages, one of them a contributor's.
+
+## 2026-09-13 — v1.12.0 shipped a 500 on saving a channel, and the module had the Laravel version wrong
+
+**What happened:** v1.12.0 called `Request::boolean()` in the account update path. That method does not exist on the Laravel this runs on, so every save of an existing channel threw a `BadMethodCallException`: the administrator got a 500 and their edit was gone. It was out for about a day before anyone noticed, and nobody reported it: it was found by a subagent hitting the same method while working on something else.
+
+**Root cause, and it has two layers.** The module had been claiming Laravel 5.8 since its first release, in the READMEs, the specs and four job comments. FreeScout pins `laravel/framework: v5.5.40` in its own `composer.json`. `Request::boolean()` is a later addition, so code written against the wrong version compiles and only fails when that line runs.
+
+The second layer is why nothing caught it: **no test went through `PUT /settings/{id}` at all.** The counter's tests set `usage_counter_enabled` on the model directly. A suite of 228 green tests sat on top of a broken save path, which is exactly how the release went out.
+
+**Resolution:** `(bool) $request->input(...)`, plus two tests that go through the form, one for a save being kept and one for the checkbox switching off. Cut from the v1.12.0 tree rather than from `develop`, so the patch carried the fix and nothing else, and tested there before publishing. Released as v1.12.1 the same evening.
+
+**Follow-up:** the same night's whole-branch review found a second instance of the same pattern, in the webhook controller. The rule now is that any task adding or touching code on a route must carry a test that enters over HTTP, and that requirement belongs in the implementation plan rather than being left to turn up on its own.

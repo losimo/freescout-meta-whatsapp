@@ -5,6 +5,7 @@ namespace Modules\MetaWhatsApp\Tests;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Queue;
 use Modules\MetaWhatsApp\Jobs\ProcessInboundWebhook;
+use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 
 class WebhookSecurityTest extends TestCase
 {
@@ -153,5 +154,109 @@ class WebhookSecurityTest extends TestCase
 
         $this->get($this->webhookUrl('?hub.challenge=x'))
             ->assertStatus(403);
+    }
+
+    /**
+     * Everything that is not a message or a status arrives without
+     * `metadata`: template status changes, quality ratings, account alerts.
+     * These carry only the WABA id on the entry, and must reach the queue
+     * exactly like a message does once the signature checks out.
+     */
+    public function test_a_waba_level_event_with_a_valid_signature_reaches_the_queue()
+    {
+        Queue::fake();
+        $account = $this->createTestAccount();
+        $body    = json_encode($this->templateStatusPayload($account));
+
+        $response = $this->call('POST', $this->webhookUrl(), [], [], [],
+            $this->signedHeaders($body), $body);
+
+        $response->assertStatus(200);
+        Queue::assertPushed(ProcessInboundWebhook::class, 1);
+    }
+
+    public function test_a_waba_level_event_with_a_bad_signature_is_still_refused()
+    {
+        Queue::fake();
+        $account = $this->createTestAccount();
+        $body    = json_encode($this->templateStatusPayload($account));
+
+        $response = $this->call('POST', $this->webhookUrl(), [], [], [], [
+            'HTTP_X-Hub-Signature-256' => 'sha256=' . hash_hmac('sha256', $body, 'wrong-secret'),
+            'CONTENT_TYPE'             => 'application/json',
+        ], $body);
+
+        $response->assertStatus(403);
+        Queue::assertNotPushed(ProcessInboundWebhook::class);
+    }
+
+    public function test_a_payload_with_neither_a_phone_number_nor_a_waba_is_refused()
+    {
+        Queue::fake();
+        $this->createTestAccount();
+
+        $payload = [
+            'object' => 'whatsapp_business_account',
+            'entry'  => [[
+                'changes' => [[
+                    'value' => ['foo' => 'bar'],
+                    'field' => 'account_alerts',
+                ]],
+            ]],
+        ];
+        $body = json_encode($payload);
+
+        $response = $this->call('POST', $this->webhookUrl(), [], [], [],
+            ['CONTENT_TYPE' => 'application/json'], $body);
+
+        $response->assertStatus(403);
+        Queue::assertNotPushed(ProcessInboundWebhook::class);
+    }
+
+    /**
+     * The whole way through: a signed POST from Meta, no queue faking, and
+     * the template ends up recorded on the account. This is the seam where
+     * the 403 lived that made the entire event router unreachable.
+     */
+    public function test_a_signed_template_rejection_ends_up_on_the_account()
+    {
+        // --no-configuration means phpunit.xml's QUEUE_DRIVER=sync override
+        // does not apply, and this module's default queue driver is
+        // 'database'; a real POST would enqueue a row rather than run it.
+        // Forced to 'sync' here so the job actually executes inline, which
+        // is the whole point of this test.
+        \Queue::setDefaultDriver('sync');
+
+        $account = $this->createTestAccount();
+        $body    = json_encode($this->templateStatusPayload($account));
+
+        $response = $this->call('POST', $this->webhookUrl(), [], [], [],
+            $this->signedHeaders($body), $body);
+
+        $response->assertStatus(200);
+        $this->assertCount(1, $account->fresh()->templates_issue);
+    }
+
+    /**
+     * WABA-level payload as Meta sends it: no `metadata` anywhere, only the
+     * WABA id on the entry.
+     */
+    protected function templateStatusPayload(WhatsAppAccount $account, string $event = 'REJECTED'): array
+    {
+        return [
+            'object' => 'whatsapp_business_account',
+            'entry'  => [[
+                'id'      => $account->waba_id,
+                'changes' => [[
+                    'value' => [
+                        'event'                     => $event,
+                        'message_template_id'       => 123456,
+                        'message_template_name'     => 'order_update',
+                        'message_template_language' => 'en_US',
+                    ],
+                    'field' => 'message_template_status_update',
+                ]],
+            ]],
+        ];
     }
 }
