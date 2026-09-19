@@ -177,11 +177,29 @@ return [
     'usage_enable'           => 'Tel de serviceberichten die vanuit FreeScout verstuurd worden',
     'usage_enable_help'      => 'Vanaf 1 oktober 2026 brengt Meta de serviceberichten in rekening die binnen het klantvenster van 24 uur verstuurd worden, met een maandelijkse vrije hoeveelheid per zakelijk telefoonnummer. Deze teller ziet alleen wat via FreeScout de deur uit ging, dus wordt dit nummer ook ergens anders gebruikt, dan ligt het echte totaal bij Meta hoger.',
     'usage_sent_since'       => ':count verstuurd vanuit FreeScout sinds :date',
-    'usage_scope_help'       => 'Alleen berichten die vanuit FreeScout verstuurd zijn. Wordt dit nummer ook vanuit de WhatsApp Business-app of een ander programma gebruikt, dan ligt het echte totaal bij Meta hoger.',
+    'usage_scope_help'       => 'Alleen berichten die vanuit FreeScout verstuurd zijn. Verstuurt dit nummer ook ergens anders vandaan, dan ligt het echte totaal bij Meta hoger.',
 
     // Groepen: niet ondersteund, maar wel getoond zodat een nummer dat in een groep zit niet onopgemerkt blijft.
     'groups_title'           => 'Groepen',
     'groups_none'            => 'Geen. Gecontroleerd op :date.',
     'groups_found'           => ':count. Gecontroleerd op :date.',
     'groups_warning'         => 'Deze module maakt nooit groepen aan en verwerkt de berichten die daarin verstuurd worden niet: ze worden geweigerd en in het log vastgelegd. Zit een nummer in een groep, dan is het daar via de API vanaf een andere plek in gezet.',
+
+    // Statuswijzigingen van templates die Meta via de webhook meldt.
+    'templates_issue_title'  => 'Templates',
+    'templates_issue_value'  => ':summary, sinds :date',
+    'templates_issue_help'   => 'Meta heeft de status van dit template veranderd, dus het kan niet verstuurd worden tot het in WhatsApp Manager is rechtgezet. Van hieruit is daar niets aan te doen.',
+
+    // Accountgebeurtenissen: het optionele overzicht van wat Meta over het account gemeld heeft.
+    'account_events_title'    => 'Accountgebeurtenissen',
+    'account_events_help'     => 'Wat Meta over je account gemeld heeft: statuswijzigingen van templates, kwaliteitsbeoordelingen, beperkingen. Niets hierin maakt een klant herkenbaar. Wat ouder is dan 90 dagen wordt verwijderd.',
+    'account_events_empty'    => 'Niets vastgelegd. Er is niets gebeurd, of het bijhouden staat uit.',
+    'account_events_when'     => 'Wanneer',
+    'account_events_type'     => 'Gebeurtenis',
+    'account_events_severity' => 'Ernst',
+    'account_events_details'  => 'Details',
+    'account_events_link'     => 'Accountgebeurtenissen',
+    'account_events_channel'  => 'Kanaal',
+    'account_events_enable'      => 'Bijhouden wat Meta over het account meldt',
+    'account_events_enable_help' => 'Statuswijzigingen van templates, wijzigingen van categorie (de categorie bepaalt wat een template kost), kwaliteitsbeoordelingen en beperkingen. Dit wordt 90 dagen bewaard en is via de link hieronder in te zien. Het gaat alleen om gegevens over het account: over klanten wordt hier niets vastgelegd. Staat uit, tenzij je het aanzet.',
 ];
