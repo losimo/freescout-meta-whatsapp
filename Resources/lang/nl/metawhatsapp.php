@@ -202,4 +202,18 @@ return [
     'account_events_channel'  => 'Kanaal',
     'account_events_enable'      => 'Bijhouden wat Meta over het account meldt',
     'account_events_enable_help' => 'Statuswijzigingen van templates, wijzigingen van categorie (de categorie bepaalt wat een template kost), kwaliteitsbeoordelingen en beperkingen. Dit wordt 90 dagen bewaard en is via de link hieronder in te zien. Het gaat alleen om gegevens over het account: over klanten wordt hier niets vastgelegd. Staat uit, tenzij je het aanzet.',
+    // Controles op de omgeving: dingen die de module tegenhouden en die niet van
+    // de module zelf zijn, benoemd zodat een beheerder weet waar te kijken.
+    'env_queue_stalled_title'       => 'Er gaat niets uit en er komt niets binnen',
+    'env_queue_stalled_detail'      => 'FreeScout heeft al :minutes minuten taken in de wachtrij staan, en dat betekent dat de queue worker niet draait. WhatsApp-berichten gaan via de wachtrij, dus een antwoord lijkt in het gesprek verstuurd en gaat nooit de deur uit. Controleer of de cron op je server de planner van FreeScout elke minuut draait.',
+    'env_queue_sync_title'          => 'De wachtrij draait binnen het verzoek',
+    'env_queue_sync_detail'         => 'QUEUE_DRIVER staat op sync, dus berichten worden tijdens het webverzoek verstuurd in plaats van op de achtergrond. De knop Ongedaan maken van FreeScout betekent daarmee niet meer wat hij zegt: die leunt op een vertraging die sync negeert, dus de klant heeft het bericht al. Binnenkomende media wordt ook binnengehaald tijdens de aflevering van Meta zelf, en die kan daardoor aflopen. Zet QUEUE_DRIVER=database in de .env van FreeScout.',
+    'env_curl_title'                => 'PHP heeft geen curl',
+    'env_curl_detail'               => 'Deze module praat met Meta via curl, en op jouw hosting ontbreekt die of staat hij uit, dus er kan niets verstuurd of opgehaald worden. Vraag je hostingpartij om de curl-extensie aan te zetten.',
+    'env_app_url_title'             => 'APP_URL is geen https',
+    'env_app_url_detail'            => 'Meta levert alleen af op https met een geldig openbaar certificaat, dus de webhook-URL die op de kanaalpagina staat werkt zo niet. Zet APP_URL goed in de .env van FreeScout en draai php artisan freescout:clear-cache.',
+    'env_logs_title'                => 'De logmap van FreeScout is niet beschrijfbaar',
+    'env_logs_detail'               => 'De uitgebreide logging aanzetten zou het kanaal stilleggen in plaats van je te helpen: het log wordt geschreven voordat een bericht verwerkt wordt, dus als dat niet kan, gaat er niets in of uit. Dit komt meestal doordat er artisan-opdrachten als root gedraaid zijn. Zet de eigenaar van storage/ terug.',
+    'env_memory_title'              => 'Het PHP-geheugen is mogelijk te klein voor grote bijlagen',
+    'env_memory_detail'             => 'memory_limit staat op :limit MB. Binnenkomende media wordt tijdens het ophalen volledig in het geheugen gehouden en WhatsApp accepteert documenten tot 100 MB, dus een groot bestand kan de worker onderuithalen en neemt dan het hele bericht mee, niet alleen de bijlage.',
 ];
