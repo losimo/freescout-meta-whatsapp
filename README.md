@@ -5,9 +5,11 @@
 > [!IMPORTANT]
 > **From 1 October 2026, Meta charges for service messages.**
 >
-> Until now, replying with free-form text inside the 24-hour window carried no cost. From that date it is billed per delivered message, with an allowance of **1,000 service messages per business phone number per month**, which resets monthly and does not roll over. Utility templates sent inside the window become chargeable too, and those have no allowance. The figure of 1,000 comes from industry sources agreeing on it; it is not published on any Meta page.
+> Until now, replying with free-form text inside the 24-hour window carried no cost. From that date it is billed per delivered message, and utility templates sent inside the window become chargeable too. Meta now says so on [its own page](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages): "Effective October 1, 2026, Meta will charge for service messages, which have not been charged since November 2024."
 >
-> Check the rates on [Meta's pricing page](https://whatsappbusiness.com/products/platform-pricing/#rates), selecting your market and currency: each category (authentication, marketing, utility and service) is priced differently. The rate table already carries a service row, but the text around it still describes today's policy and gives no date, so do not be surprised to read there that it is free.
+> What Meta does not publish anywhere is the allowance. The figure of **1,000 service messages per business phone number per month**, resetting monthly and not rolling over, comes from industry sources that agree on it, and we pass it on as exactly that.
+>
+> Two of Meta's own pages disagree as we write this. The one linked above carries the date; the [rates page](https://whatsappbusiness.com/products/platform-pricing/#rates) still says service conversations are free, and so are utility templates inside the window. Use the first for what changes and the second for the rates in your market and currency, where each category is priced differently.
 >
 > More changes are coming from Meta over the next weeks. We will pass on here whatever affects this module, worded as Meta words it, and we will not add anything we cannot stand behind.
 >
@@ -84,6 +86,20 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.14.0
+
+This release comes out of an audit asking a single question: what does this module take for granted about the machine it runs on? The subdirectory bug in v1.13.0 was one of those answers, and a user had to find it. These are the rest, found before anyone had to report them.
+
+- **Fix**: one line needed PHP 7.4 while the README promised 7.1, which is the floor FreeScout itself declares. On 7.1, 7.2 or 7.3 the file that processes webhooks did not parse, so the settings screen worked, the channel saved and Meta's handshake passed, while every inbound message died with a 500 that is invisible from inside FreeScout.
+- **Fix**: the `wamid` column held 100 characters and Meta documents no maximum for it. FreeScout turns MySQL's strict mode off, so a longer id was not refused but cut and stored: receipts stopped matching, and two ids sharing a truncated prefix collided on the unique index, where the error reads as "already processed".
+- **The settings screen now names what is wrong with the environment**, which the module cannot fix but can see: a queue worker that is not running, the `sync` driver, missing curl, an `APP_URL` that is not https, a log directory that cannot be written, and a memory limit too small for the attachments WhatsApp accepts. Red means the installation cannot work, yellow that it works with a caveat. The queue one matters most: when nothing processes the queue, a reply looks sent in the conversation and simply never leaves, with no error anywhere.
+- **When FreeScout's `APP_KEY` changes**, after a server move or a `key:generate` taken from a forum, the module says so instead of failing everywhere at once. Credentials are encrypted with that key, and until now the channel list rendered perfectly while every delivery answered 500, which Meta eventually responds to by disabling the webhook.
+- **Turning on detailed logging no longer stops the channel** when `storage/logs` cannot be written. The log is written before a message is processed, so the diagnostic tool was killing what it was meant to diagnose. Turning it off always works.
+- **Oversized incoming media is refused with its numbers** rather than taking the whole message with it. The file was held in memory while downloading, and a document larger than the memory limit killed the worker and lost the message, not just the attachment.
+- **The pricing notice links Meta's own page**, which documents the 1 October change at last. The caveat now sits only where it belongs: the figure of 1,000 is still published on no Meta page, and two of Meta's own pages disagree as we write this.
+- **A new section for what is not the module**, with what to check and what to send us if you want help.
+- **Dutch kept in step**, contributed by [@jeroenedig](https://github.com/jeroenedig) (#37), including one string he found himself that had gone stale without its key changing.
+
 ## What's new in v1.13.0
 
 Two threads in this release: what Meta says about your account now reaches you instead of being dropped, and a customer who writes without a phone number is no longer a stranger or, in one case, lost.
@@ -101,20 +117,6 @@ Two threads in this release: what Meta says about your account now reaches you i
 ## What's new in v1.12.1
 
 - **Critical fix**: saving a WhatsApp channel from its settings form returned a 500 and the edit was lost. v1.12.0 called a method that does not exist on the Laravel version FreeScout runs, so every save of an existing channel failed. **If you installed v1.12.0, update.** Nothing else changes. No test went through that route, which is why it shipped; two do now.
-
-## What's new in v1.12.0
-
-This release is about what Meta starts charging for on 1 October 2026, and about a kind of message the module was filing as something it is not.
-
-- **A monthly count of the service messages sent from this channel**, in the account health panel, off by default. From 1 October Meta bills the free-form replies sent inside the 24-hour customer window, with a monthly allowance per business phone number, and until now nothing here could tell you how many had gone out. It counts what left through FreeScout, which is all it can honestly see, and says so on screen: if the same number is also used elsewhere, Meta's total is higher. A failed send is not counted, because Meta bills per delivered message.
-- **Outbound messages now record the category Meta bills them under**, service or template. This is the part that outlasts the release: the record could not tell a reply from a template, so no honest number could be built on it, and the window clock planned for 2.0 needs the same distinction. Nothing is backfilled, so messages sent before this release stay unknown and are never counted.
-- **A message sent in a WhatsApp group is refused and logged** instead of being filed as a private conversation with whoever wrote it. A group message names the participant, not the group, so an agent answering what was said in front of others would have replied to that one person, with nothing on screen to say so. The log records the group id and never the participant's phone number, because a group brings in the numbers of people who never wrote to you.
-- **The health panel says how many groups the number belongs to**, checked during a connection test rather than on every page load. The module never creates groups, so anything above zero was done through the API from somewhere else.
-- **Fix**: every webhook event that is not a message was logged as a `phone_number_id` mismatch, which names a serious cross-channel problem, for what is simply an event kind this module does not handle. Subscribing a number to Meta's webhooks subscribes it to every field, so template status changes, quality ratings and account alerts all arrive here too. They now say what they are, by name.
-- The outdated-core notice no longer lists which FreeScout versions closed security issues. That list goes stale every time FreeScout ships a fix, and it had.
-- **Dutch brought up to date**, contributed by [@jeroenedig](https://github.com/jeroenedig): the pricing notice on the Dutch README, the 28 strings that had fallen behind since v1.10.0, and the README sections that changed since that page went in (#34, #35).
-
-See the notice at the top of this page for what changes on 1 October and where to check the rates.
 
 Older releases are listed on the [releases page](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -320,6 +322,29 @@ All module logs carry the `[MetaWhatsApp]` prefix.
 ```bash
 grep MetaWhatsApp storage/logs/laravel-$(date +%Y-%m-%d).log
 ```
+
+## When it is not the module
+
+Some of what stops this module working is not in the module at all: a cron that never runs, a queue driver that quietly changes what "sent" means, a directory the web server cannot write to. The settings screen now checks for these and names the ones it can find, in red when the installation cannot work and in yellow when it works with a caveat.
+
+We would rather hand you the diagnosis than leave you guessing, which is what these checks are for. What the module cannot do is change your server: several of these are settings only you or your hosting provider can touch. If yours cannot change them, that is still worth knowing, because it moves the question from what you might be doing wrong to what the host allows.
+
+| What you see | What to check |
+|---|---|
+| Nothing goes out, nothing comes in, and there is no error anywhere | The queue worker. A reply is queued, so it looks sent in the conversation and never leaves. Check that cron runs FreeScout's scheduler every minute, and how many rows the `jobs` table holds |
+| It all worked, then nothing did, usually after moving server | FreeScout's `APP_KEY`. Credentials are encrypted with it, so a new key makes them unreadable. Re-enter the token and the app secret on the channel page |
+| Meta will not verify the webhook | The URL has to be exactly the one the channel page prints, on https with a valid public certificate, and its domain has to match `APP_URL` |
+| The channel went quiet right after detailed logging was turned on | `storage/logs` is not writable, usually after running artisan commands as root. Restore its owner. The module now refuses to switch logging on in that state instead of stopping the channel |
+| Test connection reports error 60, or times out | The CA bundle or an outbound firewall on your host, not your credentials |
+| Large attachments never arrive while small ones do | PHP's `memory_limit`. Incoming media is held in memory and WhatsApp accepts documents of up to 100 MB. The module now refuses an oversized file and keeps the message, rather than losing both |
+
+If you would like us to look, the two useful things are the text of any notice on the settings screen and the module's own log lines:
+
+```bash
+grep MetaWhatsApp storage/logs/laravel-$(date +%Y-%m-%d).log
+```
+
+Please take out customer phone numbers and message text before posting them.
 
 ## Tests
 

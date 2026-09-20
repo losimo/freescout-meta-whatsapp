@@ -192,4 +192,19 @@ return [
     'account_events_channel'  => 'Channel',
     'account_events_enable'      => 'Record what Meta reports about the account',
     'account_events_enable_help' => 'Template status changes, category changes (which set a template\'s price), quality ratings and restrictions, kept for 90 days and readable from the link below. Account facts only: nothing about any customer is recorded here. Off unless you want it.',
+
+    // Environment checks: things that stop the module working and are not the
+    // module's, surfaced so an administrator knows what to look at.
+    'env_queue_stalled_title'       => 'Nothing is going out or coming in',
+    'env_queue_stalled_detail'      => 'FreeScout has had jobs waiting for :minutes minutes, which means the queue worker is not running. WhatsApp messages are queued, so a reply looks sent in the conversation and never leaves. Check that your server\'s cron runs FreeScout\'s scheduler every minute.',
+    'env_queue_sync_title'          => 'The queue runs inside the request',
+    'env_queue_sync_detail'         => 'QUEUE_DRIVER is set to sync, so messages are sent during the web request instead of in the background. FreeScout\'s Undo button stops meaning what it says: it relies on a delay that sync ignores, so the customer already has the message. Incoming media is also downloaded inside Meta\'s own delivery, which can time it out. Set QUEUE_DRIVER=database in FreeScout\'s .env.',
+    'env_curl_title'                => 'PHP has no curl',
+    'env_curl_detail'               => 'This module talks to Meta over curl, and your hosting has it missing or disabled, so nothing can be sent or fetched. Ask your provider to enable the curl extension.',
+    'env_app_url_title'             => 'APP_URL is not https',
+    'env_app_url_detail'            => 'Meta only delivers to https with a valid public certificate, so the webhook URL shown on the channel page will not work as it stands. Correct APP_URL in FreeScout\'s .env and run php artisan freescout:clear-cache.',
+    'env_logs_title'                => 'FreeScout\'s log directory is not writable',
+    'env_logs_detail'               => 'Turning on detailed logging would stop the channel rather than help you: the log is written before a message is processed, so if it cannot be written, nothing goes in or out. This usually follows running artisan commands as root. Restore the owner of storage/.',
+    'env_memory_title'              => 'PHP memory may be too small for large attachments',
+    'env_memory_detail'             => 'memory_limit is :limit MB. Incoming media is held in memory while it downloads and WhatsApp accepts documents of up to 100 MB, so a large file can kill the worker and the whole message is lost with it, not only the attachment.',
 ];

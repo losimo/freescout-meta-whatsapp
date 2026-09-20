@@ -26,7 +26,7 @@ class WhatsAppApiClient
     public function __construct(WhatsAppAccount $account)
     {
         $this->account     = $account;
-        $this->accessToken = decrypt($account->access_token);
+        $this->accessToken = $account->readAccessToken();
     }
 
     /**
@@ -222,6 +222,25 @@ class WhatsAppApiClient
             ];
         }
 
+        // El fitxer viatja sencer en memòria, i WhatsApp accepta documents de
+        // fins a 100 MB mentre molts allotjaments compartits van a 64M o 128M.
+        // Sense aquesta comprovació el worker mor per falta de memòria, crema
+        // els tres intents i **s'endú el missatge sencer**, no només l'adjunt,
+        // perquè el fil es crea dins la mateixa transacció. Meta ens diu la
+        // mida abans de baixar res: val més refusar-lo dient-ho que perdre el
+        // que el client havia escrit.
+        $tooBig = $this->mediaTooBigForMemory($meta['file_size'] ?? null);
+
+        if ($tooBig !== null) {
+            return [
+                'ok' => false, 'bytes' => null, 'mime_type' => $mimeType,
+                'http_status'   => $metaResponse['http_status'],
+                'error_code'    => null,
+                'error_message' => $tooBig,
+                'transient'     => false,
+            ];
+        }
+
         $fileResponse = $this->curlGet($downloadUrl, ['Authorization: Bearer ' . $this->accessToken]);
         if (!$fileResponse['ok']) {
             return [
@@ -394,7 +413,7 @@ class WhatsAppApiClient
             ];
         }
 
-        $appToken = $this->account->app_id . '|' . decrypt($this->account->app_secret);
+        $appToken = $this->account->app_id . '|' . $this->account->readAppSecret();
 
         $url = rtrim(config('metawhatsapp.api_base', 'https://graph.facebook.com'), '/')
             . '/' . self::API_VERSION . '/debug_token'
@@ -478,6 +497,36 @@ class WhatsAppApiClient
             'error_message' => $data['error']['message'] ?? ('HTTP ' . $httpCode),
             'transient'     => $httpCode >= 500,
         ];
+    }
+
+    /**
+     * Un missatge si el fitxer no cap a la memòria d'aquest PHP, o null si sí.
+     *
+     * El factor de 3 no és supersticiós: el cos arriba com una cadena, es
+     * copia en escriure l'adjunt, i el procés ja porta Laravel a sobre. Amb
+     * memòria il·limitada o mida desconeguda no es refusa res: preferim
+     * intentar-ho abans que rebutjar un fitxer que hauria anat bé.
+     */
+    // Sense tipus de retorn a posta: el Mockery d'aquesta versió no sap
+    // generar un mock d'una classe amb tipus de retorn nullable i peta amb un
+    // ParseError. Ja ens va passar al Media MVP. Torna una cadena o null.
+    protected function mediaTooBigForMemory($fileSize)
+    {
+        $limitMb = \Modules\MetaWhatsApp\Support\EnvironmentCheck::memoryLimitMb();
+
+        if ($limitMb === null || !$fileSize) {
+            return null;
+        }
+
+        $neededMb = ((int) $fileSize * 3) / 1048576;
+
+        if ($neededMb <= $limitMb) {
+            return null;
+        }
+
+        return 'Media of ' . round((int) $fileSize / 1048576, 1) . ' MB not downloaded: PHP memory_limit is '
+            . $limitMb . ' MB and holding the file needs roughly ' . (int) ceil($neededMb)
+            . ' MB. The message was kept; the attachment was not.';
     }
 
     /**

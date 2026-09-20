@@ -5,9 +5,11 @@
 > [!IMPORTANT]
 > **A partir de l'1 d'octubre del 2026, Meta cobra els missatges de servei.**
 >
-> Fins ara, respondre en text lliure dins de la finestra de 24 hores no tenia cost. A partir d'aquesta data es factura per missatge lliurat, amb una franquícia de **1.000 missatges de servei per número de telèfon i mes**, que es reinicia cada mes i no s'acumula. Les plantilles d'utilitat enviades dins de la finestra també passen a ser de pagament, i aquestes sense franquícia. La xifra de 1.000 la donen coincidint les fonts del sector; no surt de cap pàgina de Meta.
+> Fins ara, respondre en text lliure dins de la finestra de 24 hores no tenia cost. A partir d'aquesta data es factura per missatge lliurat, i les plantilles d'utilitat enviades dins de la finestra també passen a ser de pagament. Meta ja ho diu a [la seva pàgina](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages): "Effective October 1, 2026, Meta will charge for service messages, which have not been charged since November 2024."
 >
-> Consulteu les tarifes a la [pàgina de preus de Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), triant-hi el vostre mercat i la vostra moneda: cada categoria (autenticació, màrqueting, utilitat i servei) té un preu diferent. La taula ja porta la fila de servei, però el text que l'acompanya encara descriu la política d'ara i no diu cap data, o sigui que no us estranyi llegir-hi que és gratis.
+> El que Meta no publica enlloc és la franquícia. La xifra de **1.000 missatges de servei per número de telèfon i mes**, que es reinicia cada mes i no s'acumula, la donen coincidint les fonts del sector, i us la traslladem exactament com això.
+>
+> Dues pàgines de Meta es contradiuen mentre escrivim això. La que hem enllaçat a dalt porta la data; la [pàgina de tarifes](https://whatsappbusiness.com/products/platform-pricing/#rates) encara diu que les converses de servei són gratis, i les plantilles d'utilitat dins de la finestra també. Feu servir la primera per saber què canvia i la segona per a les tarifes del vostre mercat i la vostra moneda, on cada categoria té un preu diferent.
 >
 > Venen setmanes de canvis per part de Meta. Aquí hi anirem traslladant el que afecti aquest mòdul, dit com ho digui Meta, i sense afegir-hi res que no puguem sostenir.
 >
@@ -84,6 +86,20 @@ Queda fora d'abast:
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
+## Novetats a la v1.14.0
+
+Aquesta versió surt d'una auditoria amb una sola pregunta: què dona per fet aquest mòdul sobre la màquina on s'executa? El bug del subdirectori de la v1.13.0 era una d'aquelles respostes, i el va haver de trobar un usuari. Aquestes són la resta, trobades abans que ho hagués de reportar ningú.
+
+- **Correcció**: una línia demanava PHP 7.4 mentre el README en prometia 7.1, que és el terra que declara el mateix FreeScout. Amb 7.1, 7.2 o 7.3, el fitxer que processa els webhooks ni es parsejava: la pantalla de configuració anava bé, el canal es desava i el handshake de Meta passava, mentre cada missatge entrant moria amb un 500 invisible des de dins del FreeScout.
+- **Correcció**: la columna `wamid` admetia 100 caràcters i Meta no en documenta cap màxim. El FreeScout desactiva el mode estricte del MySQL, així que un identificador més llarg no es rebutjava sinó que es retallava i es desava: els acusaments de rebuda deixaven de casar, i dos identificadors amb els mateixos primers 100 caràcters xocaven a l'índex únic, on l'error es llegeix com a "ja processat".
+- **La pantalla de configuració ara diu què falla de l'entorn**, que el mòdul no pot arreglar però sí veure: un worker de cua que no corre, el controlador `sync`, el curl que falta, un `APP_URL` que no és https, un directori de registres on no es pot escriure, i un límit de memòria curt per als adjunts que accepta WhatsApp. El vermell vol dir que la instal·lació no pot funcionar i el groc que funciona amb un matís. El de la cua és el que més pesa: si ningú processa la cua, una resposta sembla enviada a la conversa i no surt mai, sense cap error enlloc.
+- **Quan canvia l'`APP_KEY` del FreeScout**, després de moure de servidor o d'un `key:generate` tret d'un fòrum, el mòdul ho diu en comptes de fallar a tot arreu alhora. Les credencials s'hi xifren, i fins ara la llista de canals es pintava perfecta mentre cada entrega responia 500, cosa que Meta acaba responent desactivant el webhook.
+- **Engegar el registre detallat ja no atura el canal** quan no es pot escriure a `storage/logs`. El registre s'escriu abans de processar el missatge, així que l'eina de diagnòstic matava el que havia de diagnosticar. Apagar-lo sempre funciona.
+- **El mèdia entrant massa gros es refusa amb els números a la vista** en comptes d'endur-se el missatge sencer. El fitxer es guardava en memòria mentre es baixava, i un document més gran que el límit tombava el worker i perdia el missatge, no només l'adjunt.
+- **L'avís de preus enllaça la pàgina de Meta**, que per fi documenta el canvi de l'1 d'octubre. El matís queda només on toca: la xifra de 1.000 segueix sense sortir a cap pàgina de Meta, i dues pàgines seves es contradiuen mentre escrivim això.
+- **Un apartat nou per al que no és cosa del mòdul**, amb què comprovar i què enviar-nos si voleu ajuda.
+- **Neerlandès al dia**, aportat per [@jeroenedig](https://github.com/jeroenedig) (#37), amb una cadena que va trobar ell i que havia quedat endarrerida sense que la clau canviés.
+
 ## Novetats a la v1.13.0
 
 Dos fils en aquesta versió: el que Meta diu del vostre compte ara us arriba en comptes de perdre's, i un client que escriu sense número de telèfon ja no és un desconegut ni, en un cas, un missatge perdut.
@@ -101,20 +117,6 @@ Dos fils en aquesta versió: el que Meta diu del vostre compte ara us arriba en 
 ## Novetats a la v1.12.1
 
 - **Correcció crítica**: desar un canal de WhatsApp des del seu formulari tornava un error 500 i l'edició es perdia. La v1.12.0 cridava un mètode que no existeix a la versió de Laravel sobre la qual corre el FreeScout, o sigui que fallava qualsevol desat d'un canal existent. **Si teniu la v1.12.0 instal·lada, actualitzeu.** No canvia res més. Cap test passava per aquella ruta, i per això va sortir; ara n'hi passen dos.
-
-## Novetats a la v1.12.0
-
-Aquesta versió va del que Meta comença a cobrar l'1 d'octubre del 2026, i d'una mena de missatge que el mòdul arxivava com una altra cosa.
-
-- **Un recompte mensual dels missatges de servei enviats des d'aquest canal**, al panell de salut del compte i apagat per defecte. A partir de l'1 d'octubre Meta factura les respostes en text lliure enviades dins de la finestra de 24 hores, amb una franquícia mensual per número de telèfon, i fins ara res d'aquí no us podia dir quants n'havíeu enviat. Compta el que ha sortit del FreeScout, que és l'únic que pot veure honestament, i ho diu a la pantalla: si aquest número també s'usa des d'una altra banda, el total a Meta és més alt. Un enviament fallit no es compta, perquè Meta cobra pel missatge lliurat.
-- **Els missatges de sortida ara desen amb quina categoria els factura Meta**, servei o plantilla. Aquesta és la part que sobreviu a la versió: el registre no sabia distingir una resposta d'una plantilla, o sigui que no s'hi podia construir cap número honest, i el rellotge de finestra previst per a la 2.0 necessita la mateixa distinció. No es reomple res del passat, així que els missatges anteriors a aquesta versió es queden sense categoria i no es compten mai.
-- **Un missatge enviat en un grup de WhatsApp es refusa i es registra** en lloc d'arxivar-se com una conversa privada amb qui l'ha escrit. Un missatge de grup identifica el participant, no el grup, així que un agent que respongués el que s'ha dit davant d'altres hauria contestat a aquella persona sola, sense res a la pantalla que ho digués. Al registre hi va l'identificador del grup i mai el telèfon del participant, perquè un grup porta números de gent que no us ha escrit mai.
-- **El panell de salut diu a quants grups pertany el número**, comprovat durant el test de connexió i no a cada càrrega de pàgina. El mòdul no crea mai grups, així que qualsevol cosa per sobre de zero s'ha fet per l'API des d'una altra banda.
-- **Correcció**: tots els esdeveniments de webhook que no són missatges es registraven com un desajust de `phone_number_id`, que és el nom d'un problema greu entre canals, per una cosa que només és un tipus d'esdeveniment que aquest mòdul no tracta. Subscriure un número als webhooks de Meta el subscriu a tots els camps, o sigui que els canvis d'estat de plantilles, les valoracions de qualitat i els avisos de compte també arriben aquí. Ara diuen què són, pel seu nom.
-- L'avís de nucli antic ja no enumera quines versions del FreeScout van tancar problemes de seguretat. Aquella llista es desactualitza cada vegada que el FreeScout publica un pedaç, i ja ho havia fet.
-- **Neerlandès posat al dia**, aportat per [@jeroenedig](https://github.com/jeroenedig): l'avís de preus al README neerlandès, les 28 cadenes que havien quedat endarrerides des de la v1.10.0, i les seccions del README que havien canviat des que va entrar aquella pàgina (#34, #35).
-
-Vegeu l'avís de dalt de tot d'aquesta pàgina per saber què canvia l'1 d'octubre i on consultar les tarifes.
 
 Les versions anteriors són a la [pàgina de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -315,6 +317,29 @@ Tots els logs del mòdul porten el prefix `[MetaWhatsApp]`.
 ```bash
 grep MetaWhatsApp storage/logs/laravel-$(date +%Y-%m-%d).log
 ```
+
+## Quan no és cosa del mòdul
+
+Part del que impedeix que aquest mòdul funcioni no és al mòdul: un cron que no s'executa mai, un controlador de cues que canvia en silenci què vol dir "enviat", un directori on el servidor web no pot escriure. La pantalla de configuració ara les comprova i diu les que troba, en vermell quan la instal·lació no pot funcionar i en groc quan funciona amb un matís.
+
+Preferim donar-vos el diagnòstic que deixar-vos endevinant, i per això hi són aquestes comprovacions. El que el mòdul no pot fer és canviar el vostre servidor: unes quantes d'aquestes són opcions que només podeu tocar vosaltres o el vostre proveïdor d'allotjament. Si el vostre no les pot canviar, val la pena saber-ho igualment, perquè mou la pregunta de què esteu fent malament a què permet l'allotjament.
+
+| Què veieu | Què cal mirar |
+|---|---|
+| No surt ni entra res, i no hi ha cap error enlloc | El worker de cua. Una resposta s'encua, així que sembla enviada a la conversa i no surt mai. Comproveu que el cron executi el planificador del FreeScout cada minut, i quantes files té la taula `jobs` |
+| Tot anava bé i de cop res, normalment després de canviar de servidor | L'`APP_KEY` del FreeScout. Les credencials s'hi xifren, o sigui que una clau nova les fa il·legibles. Torneu a introduir el token i el secret a la pàgina del canal |
+| Meta no verifica el webhook | La URL ha de ser exactament la que surt a la pàgina del canal, en https amb certificat públic vàlid, i el domini ha de coincidir amb l'`APP_URL` |
+| El canal ha emmudit just després d'engegar el registre detallat | El `storage/logs` no és escrivible, normalment després d'executar comandes artisan com a root. Restaureu-ne el propietari. El mòdul ara es nega a engegar el registre en aquest estat en comptes d'aturar el canal |
+| El test de connexió dona error 60, o esgota el temps | El CA bundle o un tallafocs de sortida del vostre allotjament, no les credencials |
+| Els adjunts grossos no arriben mai i els petits sí | El `memory_limit` del PHP. El mèdia entrant es guarda en memòria i WhatsApp accepta documents de fins a 100 MB. El mòdul ara refusa un fitxer massa gros i conserva el missatge, en comptes de perdre'ls tots dos |
+
+Si voleu que hi mirem, les dues coses útils són el text de qualsevol avís de la pantalla de configuració i les línies de registre del mòdul:
+
+```bash
+grep MetaWhatsApp storage/logs/laravel-$(date +%Y-%m-%d).log
+```
+
+Traieu-ne els telèfons dels clients i el text dels missatges abans de publicar-les.
 
 ## Tests
 

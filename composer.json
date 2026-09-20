@@ -4,7 +4,7 @@
     "license": "AGPL-3.0",
     "type": "library",
     "require": {
-        "php": ">=7.4"
+        "php": ">=7.1"
     },
     "autoload": {
         "psr-4": {

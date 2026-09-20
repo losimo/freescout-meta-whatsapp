@@ -131,6 +131,56 @@ class WhatsAppAccount extends Model
         return null;
     }
 
+    /**
+     * Les credencials es desen xifrades amb l'APP_KEY del FreeScout. Si aquella
+     * clau canvia, i passa en migrar de servidor sense endur-se el .env o fent
+     * un `key:generate` seguint un consell de fòrum, aquestes dues línies
+     * llancen DecryptException i el perfil de fallada és dels dolents: la
+     * pantalla de canals es pinta perfecta perquè llistar no desxifra res, i
+     * tot el que toca Meta mor. Cada webhook entrant, un 500. Cada enviament,
+     * un job que crema els tres intents.
+     *
+     * Passen per aquí perquè el mòdul en pugui parlar en comptes de petar, i
+     * perquè la resposta a "per què no funciona res" sigui una frase i no una
+     * traça al laravel.log.
+     */
+    public function readAccessToken(): string
+    {
+        return $this->readCredential($this->access_token, 'access_token');
+    }
+
+    public function readAppSecret(): string
+    {
+        return $this->readCredential($this->app_secret, 'app_secret');
+    }
+
+    /**
+     * Si les credencials es poden llegir. Per al panell, que ha de dir-ho
+     * abans que ho descobreixi un client escrivint i no rebent resposta.
+     */
+    public function credentialsAreReadable(): bool
+    {
+        try {
+            $this->readAccessToken();
+            $this->readAppSecret();
+
+            return true;
+        } catch (\Modules\MetaWhatsApp\Support\CredentialsUnreadable $e) {
+            return false;
+        }
+    }
+
+    protected function readCredential($value, string $which): string
+    {
+        try {
+            return decrypt($value);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            throw new \Modules\MetaWhatsApp\Support\CredentialsUnreadable(
+                'El ' . $which . ' del canal ' . $this->id . ' no es pot desxifrar amb l\'APP_KEY actual.'
+            );
+        }
+    }
+
     public function mailbox()
     {
         return $this->belongsTo(\App\Mailbox::class);

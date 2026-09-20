@@ -45,7 +45,15 @@ class MetaWhatsAppController extends Controller
             'retention'  => DebugLog::retentionDays(),
         ];
 
-        return view('metawhatsapp::settings', compact('accounts', 'coreOutdated', 'coreVersion', 'coreMinimum', 'debug'));
+        // Coses que impedeixen que el mòdul funcioni i que no són del mòdul.
+        // Van aquí i no al panell de cada canal perquè són de la instal·lació
+        // sencera, i perquè qui arriba preguntant "per què no passa res" ho ha
+        // de trobar abans d'entrar enlloc.
+        $environmentProblems = \Modules\MetaWhatsApp\Support\EnvironmentCheck::problems();
+
+        return view('metawhatsapp::settings', compact(
+            'accounts', 'coreOutdated', 'coreVersion', 'coreMinimum', 'debug', 'environmentProblems'
+        ));
     }
 
     /**
@@ -77,6 +85,17 @@ class MetaWhatsAppController extends Controller
         // dies de retenció no ha d'apagar el registre sense voler.
         if (!$request->filled('debug_window')) {
             \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.diagnostics_saved'));
+            return redirect()->route('metawhatsapp.settings');
+        }
+
+        // Engegar el registre detallat sense poder escriure a storage/logs
+        // no és inofensiu: el registre s'escriu abans de processar el
+        // missatge, així que Monolog llança i el job mor. L'eina de
+        // diagnòstic tombaria el canal, i just quan algú investiga una
+        // avaria. Apagar-lo sí que s'ha de poder fer sempre.
+        if ($request->debug_window !== 'off' && !is_writable(storage_path('logs'))) {
+            \Session::flash('flash_error_floating', __('metawhatsapp::metawhatsapp.env_logs_detail'));
+
             return redirect()->route('metawhatsapp.settings');
         }
 

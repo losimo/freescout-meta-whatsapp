@@ -114,7 +114,25 @@ class WebhookController extends Controller
         }
 
         $signature = $request->header('X-Hub-Signature-256', '');
-        $expected  = 'sha256=' . hash_hmac('sha256', $rawBody, decrypt($account->app_secret));
+
+        try {
+            $appSecret = $account->readAppSecret();
+        } catch (\Modules\MetaWhatsApp\Support\CredentialsUnreadable $e) {
+            // Sense això, cada entrega de Meta era un 500 i l'única pista un
+            // DecryptException al laravel.log. Meta acaba desactivant un
+            // webhook que respon 500 durant dies, i llavors ja no és només
+            // que no entrin missatges: és que cal tornar a subscriure el
+            // número. Es contesta 403 perquè no es pot verificar res, i es
+            // diu en veu alta què ha passat.
+            \Log::error('[MetaWhatsApp] Webhook rejected: credentials cannot be decrypted with the current APP_KEY. '
+                . \Modules\MetaWhatsApp\Support\CredentialsUnreadable::HINT, [
+                'account_id' => $account->id,
+            ]);
+
+            return response('Forbidden', 403);
+        }
+
+        $expected  = 'sha256=' . hash_hmac('sha256', $rawBody, $appSecret);
         if (!$signature || !hash_equals($expected, $signature)) {
             \Log::warning('[MetaWhatsApp] Webhook rejected: missing or invalid signature', [
                 'account_id' => $account->id,

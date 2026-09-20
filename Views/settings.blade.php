@@ -19,6 +19,8 @@
 
             @include('metawhatsapp::partials/core_notice')
 
+            @include('metawhatsapp::partials/environment_notice')
+
             @if($accounts->isEmpty())
                 <div class="alert alert-info">
                     {{ __('metawhatsapp::metawhatsapp.no_accounts') }}

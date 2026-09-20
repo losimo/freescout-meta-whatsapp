@@ -4,6 +4,19 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 1.14.0 (2026-09-20)
+
+Out of an audit asking what this module takes for granted about the machine it runs on. The subdirectory bug in 1.13.0 was one of those, found by a user; these are the rest, found before anyone had to report them.
+
+- **The pricing notice now links Meta's own page**, which documents the 1 October change at last: "Effective October 1, 2026, Meta will charge for service messages". The caveat stays where it belongs, on the allowance: the figure of 1,000 is still on no Meta page. Two of Meta's own pages disagree as of today, and the notice says which to read for what.
+- **Fix**: one line needed PHP 7.4 while the README promised 7.1, the floor FreeScout itself declares. On 7.1, 7.2 or 7.3 the file that processes webhooks did not parse, so the settings screen worked, the channel saved, Meta's handshake passed, and every inbound message died with a 500 invisible from inside FreeScout.
+- **Fix**: the `wamid` column held 100 characters and Meta documents no maximum. FreeScout turns MySQL's strict mode off, so a longer id was cut and stored rather than refused, receipts stopped matching, and two ids sharing a prefix collided on the unique index, where the error reads as "already processed".
+- **The settings screen now names what is wrong with the environment**, which the module cannot fix but can see: a queue worker that is not running (the worst of them, because a reply looks sent and simply never leaves), the `sync` driver, missing curl, an `APP_URL` that is not https, a log directory that cannot be written, and a memory limit too small for the attachments WhatsApp accepts. Red means the install cannot work; yellow means it works with a caveat.
+- **When FreeScout's `APP_KEY` changes**, on a server move or a `key:generate` taken from a forum, the module says so instead of failing everywhere at once. Credentials are encrypted with that key, and until now the channel list rendered perfectly while every delivery answered 500 and Meta eventually disabled the webhook.
+- **Turning on detailed logging no longer stops the channel** when `storage/logs` is not writable. The log is written before a message is processed, so the diagnostic tool was killing the thing it was meant to diagnose. Turning it off always works.
+- **Oversized incoming media is refused with its numbers** instead of taking the whole message with it. The file was held in memory while downloading, and a document larger than the memory limit killed the worker and lost the message, not just the attachment.
+- **A new README section for what is not the module**, with what to check and what to send us. Some of it can only be fixed by the server's owner, and that is said plainly.
+
 ## 1.13.0 (2026-09-18)
 
 - **Fix**: on a FreeScout installed below the domain root, at `/tickets` for example, nothing in this module could be reached. FreeScout registers its own routes inside the subdirectory prefix and a module's routes are loaded outside it, so every route here answered 404: the settings screen, and the webhook too, which means Meta's deliveries never arrived either. Found by [@SenseiFreak](https://github.com/SenseiFreak) (#33).

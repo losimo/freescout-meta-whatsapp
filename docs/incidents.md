@@ -61,3 +61,20 @@ The second layer is why nothing caught it: **no test went through `PUT /settings
 **Resolution:** `(bool) $request->input(...)`, plus two tests that go through the form, one for a save being kept and one for the checkbox switching off. Cut from the v1.12.0 tree rather than from `develop`, so the patch carried the fix and nothing else, and tested there before publishing. Released as v1.12.1 the same evening.
 
 **Follow-up:** the same night's whole-branch review found a second instance of the same pattern, in the webhook controller. The rule now is that any task adding or touching code on a route must carry a test that enters over HTTP, and that requirement belongs in the implementation plan rather than being left to turn up on its own.
+
+## 2026-09-18 — The module was unreachable on every subdirectory install, for seventeen releases
+
+**What happened:** Issue #33, open since 4 September. A user on shared hosting with FreeScout under `/tickets` could not open the module's settings screen: FreeScout's own 404, no log lines. The module's menu entry rendered, `route:list` showed all fourteen routes, and `APP_URL` was right.
+
+**Cause:** FreeScout registers its own routes inside `Route::prefix(\Helper::getSubdirectory())`, in `app/Providers/RouteServiceProvider.php`. A module's `routes.php` is required from `start.php`, outside that group, so module routes get no prefix. Core registered `tickets/conversation/{id}`; this module registered `meta-whatsapp/settings`. Requests arrived at `tickets/meta-whatsapp/settings` and matched nothing. On a root install `getSubdirectory()` returns `''`, nothing differs, and everything works, which is why no test and no user had ever hit it. The webhook route was affected too, so Meta's deliveries would not have arrived either.
+
+**Two wrong turns of mine, both worth naming:**
+
+1. On 7 September I ruled out a route-prefix problem after grepping `routes/web.php` for `getSubdirectory`. The prefix is applied by the provider that *loads* that file, not inside it. Grepping the file a mechanism operates on is not the same as grepping the mechanism.
+2. On 9 September I asked the user to compare the module's 404 against `/conversation/999999`. That cannot discriminate: FreeScout renders the same page whether no route matched or a controller found no record. It cost the user six days and told us only that requests reach FreeScout.
+
+What finally separated the two cases was a route with no `auth` middleware (`meta-whatsapp/webhook`), which answers something other than 404 when it matches.
+
+**Resolution:** `'prefix' => \Helper::getSubdirectory() . '/meta-whatsapp'` on both route groups, which is the shape `SavedReplies` in the same monorepo already used. A test registers the routes with `app.url` pointing at a subdirectory and asserts the prefixed URIs exist; it was red before the change. The same fix went to the six other modules in the monorepo that had it, each with the same test. Released as v1.13.0 the same day it was diagnosed.
+
+**For next time:** a module route that works locally proves nothing about a subdirectory install, because the difference is an empty string. Any new module gets `getSubdirectory()` in its route group from the first line.

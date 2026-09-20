@@ -158,7 +158,15 @@ class ProcessInboundWebhook implements ShouldQueue
         $type  = $message['type'] ?? null;
         $mediaTypes = ['image', 'video', 'audio', 'document', 'sticker'];
 
-        if (!in_array($type, [...$mediaTypes, 'text', 'button', 'location', 'reaction', 'contacts'], true)) {
+        // array_merge() i no un spread dins del literal d'array: aquella
+        // sintaxi és de PHP 7.4, i el README promet que el mòdul va amb 7.1,
+        // que és el terra que declara FreeScout. Amb 7.1, 7.2 o 7.3 aquest
+        // fitxer ni es parseja, i com que només es carrega al processar un
+        // webhook, la pantalla funcionava i els missatges entrants es perdien
+        // amb un 500 que no es veu des de dins del FreeScout.
+        $accepted = array_merge($mediaTypes, ['text', 'button', 'location', 'reaction', 'contacts']);
+
+        if (!in_array($type, $accepted, true)) {
             Log::error('[MetaWhatsApp] Unsupported message type, discarded', [
                 'account_id' => $account->id,
                 'from'       => $from,

@@ -5,9 +5,11 @@
 > [!IMPORTANT]
 > **A partir del 1 de octubre de 2026, Meta cobra los mensajes de servicio.**
 >
-> Hasta ahora, responder con texto libre dentro de la ventana de 24 horas no tenía coste. A partir de esa fecha se factura por mensaje entregado, con una franquicia de **1.000 mensajes de servicio por número de teléfono y mes**, que se reinicia cada mes y no se acumula. Las plantillas de utilidad enviadas dentro de la ventana también pasan a ser de pago, y estas sin franquicia. La cifra de 1.000 la dan coincidiendo las fuentes del sector; no aparece en ninguna página de Meta.
+> Hasta ahora, responder con texto libre dentro de la ventana de 24 horas no tenía coste. A partir de esa fecha se factura por mensaje entregado, y las plantillas de utilidad enviadas dentro de la ventana también pasan a ser de pago. Meta ya lo dice en [su propia página](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages): "Effective October 1, 2026, Meta will charge for service messages, which have not been charged since November 2024."
 >
-> Consulta las tarifas en la [página de precios de Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), eligiendo tu mercado y tu moneda: cada categoría (autenticación, marketing, utilidad y servicio) tiene un precio distinto. La tabla ya lleva la fila de servicio, pero el texto que la acompaña todavía describe la política de ahora y no da ninguna fecha, así que no os extrañe leer allí que es gratis.
+> Lo que Meta no publica en ninguna parte es la franquicia. La cifra de **1.000 mensajes de servicio por número de teléfono y mes**, que se reinicia cada mes y no se acumula, la dan coincidiendo las fuentes del sector, y os la trasladamos exactamente como eso.
+>
+> Dos páginas de Meta se contradicen mientras escribimos esto. La enlazada arriba lleva la fecha; la [página de tarifas](https://whatsappbusiness.com/products/platform-pricing/#rates) todavía dice que las conversaciones de servicio son gratis, y las plantillas de utilidad dentro de la ventana también. Usad la primera para saber qué cambia y la segunda para las tarifas de vuestro mercado y vuestra moneda, donde cada categoría tiene un precio distinto.
 >
 > Vienen semanas de cambios por parte de Meta. Aquí iremos trasladando lo que afecte a este módulo, dicho como lo diga Meta, y sin añadir nada que no podamos sostener.
 >
@@ -84,6 +86,20 @@ Queda fuera de alcance:
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
+## Novedades en la v1.14.0
+
+Esta versión sale de una auditoría con una sola pregunta: ¿qué da por hecho este módulo sobre la máquina donde se ejecuta? El bug del subdirectorio de la v1.13.0 era una de esas respuestas, y lo tuvo que encontrar un usuario. Estas son el resto, encontradas antes de que nadie tuviera que reportarlas.
+
+- **Corrección**: una línea requería PHP 7.4 mientras el README prometía 7.1, que es el suelo que declara el propio FreeScout. Con 7.1, 7.2 o 7.3, el archivo que procesa los webhooks ni se parseaba: la pantalla de configuración iba bien, el canal se guardaba y el handshake de Meta pasaba, mientras cada mensaje entrante moría con un 500 invisible desde dentro de FreeScout.
+- **Corrección**: la columna `wamid` admitía 100 caracteres y Meta no documenta ningún máximo. FreeScout desactiva el modo estricto de MySQL, así que un identificador más largo no se rechazaba sino que se cortaba y se guardaba: los acuses dejaban de casar, y dos identificadores con los mismos primeros 100 caracteres chocaban en el índice único, donde el error se lee como "ya procesado".
+- **La pantalla de configuración ahora dice qué falla del entorno**, que el módulo no puede arreglar pero sí ver: un worker de cola que no se ejecuta, el controlador `sync`, curl que falta, un `APP_URL` que no es https, un directorio de registros donde no se puede escribir, y un límite de memoria corto para los adjuntos que acepta WhatsApp. El rojo significa que la instalación no puede funcionar y el amarillo que funciona con un matiz. El de la cola es el que más pesa: si nadie procesa la cola, una respuesta parece enviada en la conversación y no sale nunca, sin ningún error en ninguna parte.
+- **Cuando cambia el `APP_KEY` de FreeScout**, tras mover de servidor o un `key:generate` sacado de un foro, el módulo lo dice en lugar de fallar en todas partes a la vez. Las credenciales se cifran con él, y hasta ahora la lista de canales se pintaba perfecta mientras cada entrega respondía 500, algo que Meta acaba respondiendo desactivando el webhook.
+- **Activar el registro detallado ya no detiene el canal** cuando no se puede escribir en `storage/logs`. El registro se escribe antes de procesar el mensaje, así que la herramienta de diagnóstico mataba lo que debía diagnosticar. Desactivarlo siempre funciona.
+- **El contenido entrante demasiado grande se rechaza con los números a la vista** en lugar de llevarse el mensaje entero. El archivo se guardaba en memoria mientras se descargaba, y un documento mayor que el límite tumbaba el worker y perdía el mensaje, no solo el adjunto.
+- **El aviso de precios enlaza la página de Meta**, que por fin documenta el cambio del 1 de octubre. El matiz queda solo donde corresponde: la cifra de 1.000 sigue sin aparecer en ninguna página de Meta, y dos páginas suyas se contradicen mientras escribimos esto.
+- **Un apartado nuevo para lo que no es cosa del módulo**, con qué comprobar y qué enviarnos si quiere ayuda.
+- **Neerlandés al día**, aportado por [@jeroenedig](https://github.com/jeroenedig) (#37), con una cadena que encontró él y que se había quedado atrás sin que su clave cambiara.
+
 ## Novedades en la v1.13.0
 
 Dos hilos en esta versión: lo que Meta dice de su cuenta ahora le llega en lugar de perderse, y un cliente que escribe sin número de teléfono ya no es un desconocido ni, en un caso, un mensaje perdido.
@@ -101,20 +117,6 @@ Dos hilos en esta versión: lo que Meta dice de su cuenta ahora le llega en luga
 ## Novedades en la v1.12.1
 
 - **Corrección crítica**: guardar un canal de WhatsApp desde su formulario devolvía un error 500 y la edición se perdía. La v1.12.0 llamaba a un método que no existe en la versión de Laravel sobre la que corre FreeScout, así que fallaba cualquier guardado de un canal existente. **Si tenéis la v1.12.0 instalada, actualizad.** No cambia nada más. Ningún test pasaba por esa ruta, y por eso salió; ahora pasan dos.
-
-## Novedades en la v1.12.0
-
-Esta versión va de lo que Meta empieza a cobrar el 1 de octubre de 2026, y de un tipo de mensaje que el módulo archivaba como otra cosa.
-
-- **Un recuento mensual de los mensajes de servicio enviados desde este canal**, en el panel de salud de la cuenta y apagado por defecto. A partir del 1 de octubre Meta factura las respuestas en texto libre enviadas dentro de la ventana de 24 horas, con una franquicia mensual por número de teléfono, y hasta ahora nada aquí os podía decir cuántos habíais enviado. Cuenta lo que ha salido de FreeScout, que es lo único que puede ver honestamente, y lo dice en pantalla: si ese número también se usa desde otro sitio, el total en Meta es más alto. Un envío fallido no se cuenta, porque Meta cobra por mensaje entregado.
-- **Los mensajes de salida ahora guardan con qué categoría los factura Meta**, servicio o plantilla. Esta es la parte que sobrevive a la versión: el registro no sabía distinguir una respuesta de una plantilla, así que no se podía construir ningún número honesto sobre él, y el reloj de ventana previsto para la 2.0 necesita la misma distinción. No se rellena nada del pasado, así que los mensajes anteriores a esta versión se quedan sin categoría y no se cuentan nunca.
-- **Un mensaje enviado en un grupo de WhatsApp se rechaza y se registra** en lugar de archivarse como una conversación privada con quien lo ha escrito. Un mensaje de grupo identifica al participante, no al grupo, así que un agente que respondiera lo dicho delante de otros habría contestado a esa persona sola, sin nada en pantalla que lo dijera. En el registro va el identificador del grupo y nunca el teléfono del participante, porque un grupo trae números de gente que no os ha escrito nunca.
-- **El panel de salud dice a cuántos grupos pertenece el número**, comprobado durante el test de conexión y no en cada carga de página. El módulo no crea nunca grupos, así que cualquier cosa por encima de cero se ha hecho por la API desde otro sitio.
-- **Corrección**: todos los eventos de webhook que no son mensajes se registraban como un desajuste de `phone_number_id`, que es el nombre de un problema grave entre canales, por algo que solo es un tipo de evento que este módulo no trata. Suscribir un número a los webhooks de Meta lo suscribe a todos los campos, así que los cambios de estado de plantillas, las valoraciones de calidad y los avisos de cuenta también llegan aquí. Ahora dicen qué son, por su nombre.
-- El aviso de núcleo antiguo ya no enumera qué versiones de FreeScout cerraron problemas de seguridad. Esa lista se desactualiza cada vez que FreeScout publica un parche, y ya lo había hecho.
-- **Neerlandés puesto al día**, aportado por [@jeroenedig](https://github.com/jeroenedig): el aviso de precios en el README neerlandés, las 28 cadenas que habían quedado atrasadas desde la v1.10.0, y las secciones del README que habían cambiado desde que entró esa página (#34, #35).
-
-Ved el aviso de arriba del todo de esta página para saber qué cambia el 1 de octubre y dónde consultar las tarifas.
 
 Las versiones anteriores están en la [página de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -315,6 +317,29 @@ Todos los logs del módulo llevan el prefijo `[MetaWhatsApp]`.
 ```bash
 grep MetaWhatsApp storage/logs/laravel-$(date +%Y-%m-%d).log
 ```
+
+## Cuando no es cosa del módulo
+
+Parte de lo que impide que este módulo funcione no está en el módulo: un cron que no se ejecuta nunca, un controlador de colas que cambia en silencio qué significa "enviado", un directorio donde el servidor web no puede escribir. La pantalla de configuración ahora las comprueba y nombra las que encuentra, en rojo cuando la instalación no puede funcionar y en amarillo cuando funciona con un matiz.
+
+Preferimos darle el diagnóstico a dejarle adivinando, y para eso están estas comprobaciones. Lo que el módulo no puede hacer es cambiar su servidor: varias de estas son opciones que solo pueden tocar usted o su proveedor de alojamiento. Si el suyo no puede cambiarlas, vale la pena saberlo igualmente, porque mueve la pregunta de qué está haciendo mal a qué permite el alojamiento.
+
+| Qué ve | Qué comprobar |
+|---|---|
+| No sale ni entra nada, y no hay ningún error en ninguna parte | El worker de cola. Una respuesta se encola, así que parece enviada en la conversación y no sale nunca. Compruebe que el cron ejecute el planificador de FreeScout cada minuto, y cuántas filas tiene la tabla `jobs` |
+| Todo iba bien y de golpe nada, normalmente tras cambiar de servidor | El `APP_KEY` de FreeScout. Las credenciales se cifran con él, o sea que una clave nueva las hace ilegibles. Vuelva a introducir el token y el secreto en la página del canal |
+| Meta no verifica el webhook | La URL tiene que ser exactamente la que aparece en la página del canal, en https con certificado público válido, y el dominio tiene que coincidir con `APP_URL` |
+| El canal ha enmudecido justo tras activar el registro detallado | `storage/logs` no es escribible, normalmente tras ejecutar comandos artisan como root. Restaure su propietario. El módulo ahora se niega a activar el registro en ese estado en lugar de detener el canal |
+| El test de conexión da error 60, o agota el tiempo | El CA bundle o un cortafuegos de salida de su alojamiento, no las credenciales |
+| Los adjuntos grandes no llegan nunca y los pequeños sí | El `memory_limit` de PHP. El contenido entrante se guarda en memoria y WhatsApp acepta documentos de hasta 100 MB. El módulo ahora rechaza un archivo demasiado grande y conserva el mensaje, en lugar de perder ambos |
+
+Si quiere que lo miremos, las dos cosas útiles son el texto de cualquier aviso de la pantalla de configuración y las líneas de registro del módulo:
+
+```bash
+grep MetaWhatsApp storage/logs/laravel-$(date +%Y-%m-%d).log
+```
+
+Quite los teléfonos de los clientes y el texto de los mensajes antes de publicarlas.
 
 ## Tests
 

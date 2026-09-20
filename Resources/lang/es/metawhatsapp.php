@@ -189,4 +189,19 @@ return [
     'account_events_channel'  => 'Canal',
     'account_events_enable'      => 'Registra lo que Meta reporta sobre la cuenta',
     'account_events_enable_help' => 'Cambios de estado de plantillas, cambios de categoría (que deciden su precio), valoraciones de calidad y restricciones, conservados 90 días y legibles desde el enlace de abajo. Solo hechos de la cuenta: aquí no se registra nada de ningún cliente. Apagado si no lo queréis.',
+
+    // Comprobaciones de entorno: cosas que impiden que el módulo funcione y que
+    // no son del módulo, dichas para que el administrador sepa qué mirar.
+    'env_queue_stalled_title'       => 'No sale ni entra nada',
+    'env_queue_stalled_detail'      => 'FreeScout tiene trabajos esperando desde hace :minutes minutos, lo que significa que el worker de cola no se está ejecutando. Los mensajes de WhatsApp se encolan, así que una respuesta parece enviada en la conversación y no sale nunca. Compruebe que el cron del servidor ejecute el planificador de FreeScout cada minuto.',
+    'env_queue_sync_title'          => 'La cola se ejecuta dentro de la petición',
+    'env_queue_sync_detail'         => 'QUEUE_DRIVER está en sync, o sea que los mensajes se envían durante la petición web y no en segundo plano. El botón Deshacer de FreeScout deja de significar lo que dice: depende de un retardo que sync ignora, y el cliente ya tiene el mensaje. El contenido entrante también se descarga dentro de la entrega de Meta, que puede agotar el tiempo. Ponga QUEUE_DRIVER=database en el .env de FreeScout.',
+    'env_curl_title'                => 'PHP no tiene curl',
+    'env_curl_detail'               => 'Este módulo habla con Meta por curl, y su alojamiento no lo tiene o lo tiene desactivado, así que no se puede enviar ni recoger nada. Pida a su proveedor que active la extensión curl.',
+    'env_app_url_title'             => 'APP_URL no es https',
+    'env_app_url_detail'            => 'Meta solo entrega a https con certificado público válido, así que la URL de webhook que aparece en la página del canal no funcionará tal como está. Corrija APP_URL en el .env de FreeScout y ejecute php artisan freescout:clear-cache.',
+    'env_logs_title'                => 'El directorio de registros de FreeScout no es escribible',
+    'env_logs_detail'               => 'Activar el registro detallado detendría el canal en lugar de ayudarle: el registro se escribe antes de procesar el mensaje, así que si no se puede escribir no entra ni sale nada. Suele ocurrir tras ejecutar comandos artisan como root. Restaure el propietario de storage/.',
+    'env_memory_title'              => 'La memoria de PHP puede quedarse corta con adjuntos grandes',
+    'env_memory_detail'             => 'memory_limit es de :limit MB. El contenido entrante se guarda en memoria mientras se descarga y WhatsApp acepta documentos de hasta 100 MB, o sea que un archivo grande puede tumbar el worker y llevarse el mensaje entero, no solo el adjunto.',
 ];

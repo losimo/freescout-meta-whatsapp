@@ -189,4 +189,19 @@ return [
     'account_events_channel'  => 'Canal',
     'account_events_enable'      => 'Registra el que Meta reporta sobre el compte',
     'account_events_enable_help' => 'Canvis d\'estat de plantilles, canvis de categoria (que en decideixen el preu), valoracions de qualitat i restriccions, conservats 90 dies i llegibles des de l\'enllaç de sota. Només fets del compte: aquí no s\'hi registra res de cap client. Apagat si no el voleu.',
+
+    // Comprovacions d'entorn: coses que impedeixen que el mòdul funcioni i que
+    // no són del mòdul, dites perquè l'administrador sàpiga què mirar.
+    'env_queue_stalled_title'       => 'No surt ni entra res',
+    'env_queue_stalled_detail'      => 'El FreeScout té feines esperant des de fa :minutes minuts, i això vol dir que el worker de cua no corre. Els missatges de WhatsApp s\'encuen, així que una resposta sembla enviada a la conversa i no surt mai. Comproveu que el cron del servidor executi el planificador del FreeScout cada minut.',
+    'env_queue_sync_title'          => 'La cua s\'executa dins de la petició',
+    'env_queue_sync_detail'         => 'El QUEUE_DRIVER és sync, o sigui que els missatges s\'envien durant la petició web i no en segon pla. El botó Desfés del FreeScout deixa de voler dir el que diu: depèn d\'un retard que el sync ignora, i el client ja té el missatge. El mèdia entrant també es baixa dins de l\'entrega de Meta, que pot esgotar el temps. Poseu QUEUE_DRIVER=database al .env del FreeScout.',
+    'env_curl_title'                => 'El PHP no té curl',
+    'env_curl_detail'               => 'Aquest mòdul parla amb Meta per curl, i el vostre allotjament no el té o el té desactivat, així que no es pot enviar ni recollir res. Demaneu al proveïdor que activi l\'extensió curl.',
+    'env_app_url_title'             => 'L\'APP_URL no és https',
+    'env_app_url_detail'            => 'Meta només entrega a https amb certificat públic vàlid, així que la URL de webhook que surt a la pàgina del canal no funcionarà tal com està. Corregiu l\'APP_URL al .env del FreeScout i executeu php artisan freescout:clear-cache.',
+    'env_logs_title'                => 'El directori de registres del FreeScout no és escrivible',
+    'env_logs_detail'               => 'Engegar el registre detallat aturaria el canal en comptes d\'ajudar-vos: el registre s\'escriu abans de processar el missatge, així que si no es pot escriure no entra ni surt res. Sol passar després d\'executar comandes artisan com a root. Restaureu el propietari de storage/.',
+    'env_memory_title'              => 'La memòria del PHP pot ser curta per a adjunts grossos',
+    'env_memory_detail'             => 'El memory_limit és de :limit MB. El mèdia entrant es guarda en memòria mentre es baixa i WhatsApp accepta documents de fins a 100 MB, o sigui que un fitxer gros pot tombar el worker i endur-se el missatge sencer, no només l\'adjunt.',
 ];
