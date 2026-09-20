@@ -7,13 +7,20 @@
 > [!IMPORTANT]
 > **Vanaf 1 oktober 2026 brengt Meta serviceberichten in rekening.**
 >
-> Tot nu toe kostte een antwoord in vrije tekst binnen het venster van 24 uur niets. Vanaf die datum wordt het per afgeleverd bericht gefactureerd, met een vrije hoeveelheid van **1.000 serviceberichten per zakelijk telefoonnummer per maand**, die elke maand opnieuw begint en niet doorschuift naar de volgende. Utility-templates die binnen het venster verstuurd worden, gaan ook geld kosten, en daarvoor geldt geen vrije hoeveelheid. Het getal van 1.000 komt van bronnen uit de branche die het daarover eens zijn; het staat op geen enkele pagina van Meta.
+> Tot nu toe kostte een antwoord in vrije tekst binnen het venster van 24 uur niets. Vanaf die datum wordt het per afgeleverd bericht gefactureerd, met een vrije hoeveelheid van **1.000 serviceberichten per zakelijk telefoonnummer per maand**, die elke maand opnieuw begint en niet doorschuift naar de volgende. Utility-templates die binnen het venster verstuurd worden, gaan ook geld kosten, en daarvoor geldt geen vrije hoeveelheid. Meta [zegt het inmiddels zelf](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages): *"Effective October 1, 2026, Meta will charge for service messages, which have not been charged since November 2024."* Het getal van 1.000 staat daar niet bij en ook nergens anders bij Meta; dat komt van bronnen uit de branche die het daarover eens zijn.
 >
-> De tarieven staan op de [prijspagina van Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), waar je je eigen markt en valuta kiest: elke categorie (authenticatie, marketing, utility en service) heeft een eigen prijs.
+> De tarieven staan op de [prijspagina van Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), waar je je eigen markt en valuta kiest: elke categorie (authenticatie, marketing, utility en service) heeft een eigen prijs. Twee pagina's van Meta zijn het op dit moment niet met elkaar eens: de documentatie hierboven noemt de datum, maar de tekst rond de tarieventabel beschrijft nog het huidige beleid en noemt geen datum. Lees je daar dat serviceberichten gratis zijn, dan is dat de reden; de tabel zelf heeft al een regel voor service.
+>
+> De komende weken volgen er meer wijzigingen van Meta. Wat deze module raakt, geven we hier door, in de bewoording van Meta, en we voegen niets toe waar we niet achter kunnen staan.
 >
 > Dit is een prijswijziging van Meta, geen wijziging in de module. De module rekent zelf niets en krijgt geen commissie, en haar idempotentiebeveiliging voorkomt dat een nieuwe poging vanuit de queue een bericht dat al verstuurd is nog een keer verstuurt.
 
-<!-- Haal deze melding weg zodra de prijspagina van Meta de wijziging als
+> [!NOTE]
+> **Het nakijken waard vóór 30 september: staat er een betaalmethode bij je WhatsApp Business-account?**
+>
+> Volgens bronnen uit de branche worden de serviceberichten van een account zonder betaalmethode vanaf 1 oktober niet meer afgeleverd, in plaats van dat ze achteraf gefactureerd worden. Net als het getal van 1.000 hierboven staat dit op geen enkele pagina van Meta, en deze module kan het niet voor je controleren. Het staat hier omdat het geruisloos misgaat: klanten blijven schrijven en de antwoorden komen niet meer aan.
+
+<!-- Haal beide meldingen weg zodra de prijspagina van Meta de wijziging als
      vanzelfsprekend behandelt en er sinds 1 oktober 2026 een paar versies verschenen zijn. -->
 
 FreeScout-module die **WhatsApp Business rechtstreeks met de Meta Cloud API** verbindt, zonder betaalde tussenpartijen zoals 1msg.io of Twilio. Berichten gaan van Meta naar je eigen FreeScout-installatie en nergens anders heen, met volledige zeggenschap over inloggegevens, data en de manier van werken.
@@ -27,7 +34,7 @@ Het project is openbaar en draait sinds v1.0 in echte productie. Het groeit mee 
 - **Fail-closed**: de webhook weigert elk verzoek zonder geldige HMAC-handtekening.
 - **Rechtstreeks naar Meta**: geen gateways van derden.
 - **Interface zonder e-mailresten**: op kanaalpagina's verbergt de module de e-mailelementen van de core (de Cc/Bcc-schakelaar, het interne technische adres) zonder gewone e-mailmailboxen te raken.
-- **Werkt met FreeScout 1.8.x** op Laravel 5.5 en PHP 8.x.
+- **Werkt met FreeScout 1.8.x**, dat draait op Laravel 5.5 en PHP 7.1 of nieuwer.
 
 ## Schermafbeeldingen
 
