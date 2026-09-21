@@ -4,6 +4,10 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 1.14.1 (2026-09-21)
+
+- **Fix**: the message telling an admin to re-enter a channel's token and secret after an `APP_KEY` change was in Catalan, glued onto an otherwise English log line and exception message. Found by [@jeroenedig](https://github.com/jeroenedig) reading the code for the Dutch translation (#38).
+
 ## 1.14.0 (2026-09-20)
 
 Out of an audit asking what this module takes for granted about the machine it runs on. The subdirectory bug in 1.13.0 was one of those, found by a user; these are the rest, found before anyone had to report them.

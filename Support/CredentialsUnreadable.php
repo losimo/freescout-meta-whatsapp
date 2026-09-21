@@ -3,14 +3,14 @@
 namespace Modules\MetaWhatsApp\Support;
 
 /**
- * Les credencials del canal es van xifrar amb una APP_KEY que ja no és la del
- * FreeScout. No és un error de Meta ni de xarxa, i no es resol reintentant:
- * cal tornar a introduir el token i el secret a la pantalla del canal.
+ * The channel's credentials were encrypted with an APP_KEY that is no longer
+ * FreeScout's. It is not a Meta or network error, and retrying will not fix
+ * it: the token and secret need to be re-entered on the channel screen.
  *
- * Té nom propi perquè el missatge que en surt és la diferència entre un
- * administrador que sap què fer i un que veu una traça d'encriptació.
+ * Named on purpose: the message it carries is the difference between an
+ * admin who knows what to do and one staring at a decryption stack trace.
  */
 class CredentialsUnreadable extends \RuntimeException
 {
-    const HINT = 'Torneu a introduir el token i el secret a la configuració del canal.';
+    const HINT = 'Re-enter the token and secret in the channel settings.';
 }

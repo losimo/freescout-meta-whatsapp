@@ -118,12 +118,12 @@ class WebhookController extends Controller
         try {
             $appSecret = $account->readAppSecret();
         } catch (\Modules\MetaWhatsApp\Support\CredentialsUnreadable $e) {
-            // Sense això, cada entrega de Meta era un 500 i l'única pista un
-            // DecryptException al laravel.log. Meta acaba desactivant un
-            // webhook que respon 500 durant dies, i llavors ja no és només
-            // que no entrin missatges: és que cal tornar a subscriure el
-            // número. Es contesta 403 perquè no es pot verificar res, i es
-            // diu en veu alta què ha passat.
+            // Without this, every Meta delivery was a 500 with the only clue
+            // a DecryptException in laravel.log. Meta eventually disables a
+            // webhook that answers 500 for days, and then it is not just that
+            // messages stop arriving: the number needs to be resubscribed.
+            // Answering 403 because nothing can be verified, and saying out
+            // loud what happened.
             \Log::error('[MetaWhatsApp] Webhook rejected: credentials cannot be decrypted with the current APP_KEY. '
                 . \Modules\MetaWhatsApp\Support\CredentialsUnreadable::HINT, [
                 'account_id' => $account->id,

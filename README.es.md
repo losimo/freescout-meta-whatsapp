@@ -86,6 +86,10 @@ Queda fuera de alcance:
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
+## Novedades en la v1.14.1
+
+- **Corrección**: el mensaje que dice a un administrador que vuelva a introducir el token y el secreto de un canal tras un cambio de `APP_KEY` estaba escrito en catalán, pegado a una línea de registro y un mensaje de excepción en inglés, en `WebhookController.php` y `WhatsAppAccount.php`. Un administrador que no lee catalán podía ver que las credenciales estaban rotas, no qué hacer al respecto. Encontrado por [@jeroenedig](https://github.com/jeroenedig) leyendo el código para la traducción al neerlandés (#38).
+
 ## Novedades en la v1.14.0
 
 Esta versión sale de una auditoría con una sola pregunta: ¿qué da por hecho este módulo sobre la máquina donde se ejecuta? El bug del subdirectorio de la v1.13.0 era una de esas respuestas, y lo tuvo que encontrar un usuario. Estas son el resto, encontradas antes de que nadie tuviera que reportarlas.
@@ -113,10 +117,6 @@ Dos hilos en esta versión: lo que Meta dice de su cuenta ahora le llega en luga
 - Todos los campos de webhook que no son mensajes pasan ahora por un único enrutador, en lugar de registrarse y descartarse, que es de donde colgarán las familias que quedan.
 - La nota del contador de mensajes de servicio ya no enumera desde dónde más podría estar enviando un número. Nombrar la aplicación de WhatsApp Business y "otra herramienta" era a la vez demasiado estrecho y demasiado amplio: sin la Coexistencia de Meta, que exige ser proveedor, un número en la Cloud API no puede usarse desde la aplicación. Ahora dice desde cualquier otro sitio.
 - **Neerlandés puesto al día** para la v1.12.0, aportado por [@jeroenedig](https://github.com/jeroenedig) (#36).
-
-## Novedades en la v1.12.1
-
-- **Corrección crítica**: guardar un canal de WhatsApp desde su formulario devolvía un error 500 y la edición se perdía. La v1.12.0 llamaba a un método que no existe en la versión de Laravel sobre la que corre FreeScout, así que fallaba cualquier guardado de un canal existente. **Si tenéis la v1.12.0 instalada, actualizad.** No cambia nada más. Ningún test pasaba por esa ruta, y por eso salió; ahora pasan dos.
 
 Las versiones anteriores están en la [página de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 

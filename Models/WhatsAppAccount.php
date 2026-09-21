@@ -132,17 +132,17 @@ class WhatsAppAccount extends Model
     }
 
     /**
-     * Les credencials es desen xifrades amb l'APP_KEY del FreeScout. Si aquella
-     * clau canvia, i passa en migrar de servidor sense endur-se el .env o fent
-     * un `key:generate` seguint un consell de fòrum, aquestes dues línies
-     * llancen DecryptException i el perfil de fallada és dels dolents: la
-     * pantalla de canals es pinta perfecta perquè llistar no desxifra res, i
-     * tot el que toca Meta mor. Cada webhook entrant, un 500. Cada enviament,
-     * un job que crema els tres intents.
+     * Credentials are stored encrypted with FreeScout's APP_KEY. If that key
+     * changes — migrating servers without carrying over the .env, or running
+     * `key:generate` on a forum's advice — these two lines throw
+     * DecryptException, and the failure profile is the bad kind: the channel
+     * screen paints fine because listing never decrypts anything, and
+     * everything that touches Meta dies. Every inbound webhook, a 500. Every
+     * outbound send, a job that burns its three attempts.
      *
-     * Passen per aquí perquè el mòdul en pugui parlar en comptes de petar, i
-     * perquè la resposta a "per què no funciona res" sigui una frase i no una
-     * traça al laravel.log.
+     * They go through here so the module can say so instead of crashing, and
+     * so the answer to "why is nothing working" is a sentence, not a trace in
+     * laravel.log.
      */
     public function readAccessToken(): string
     {
@@ -155,8 +155,8 @@ class WhatsAppAccount extends Model
     }
 
     /**
-     * Si les credencials es poden llegir. Per al panell, que ha de dir-ho
-     * abans que ho descobreixi un client escrivint i no rebent resposta.
+     * Whether the credentials can be read. For the panel, which should say so
+     * before a customer discovers it by writing in and getting no reply.
      */
     public function credentialsAreReadable(): bool
     {
@@ -176,7 +176,7 @@ class WhatsAppAccount extends Model
             return decrypt($value);
         } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
             throw new \Modules\MetaWhatsApp\Support\CredentialsUnreadable(
-                'El ' . $which . ' del canal ' . $this->id . ' no es pot desxifrar amb l\'APP_KEY actual.'
+                'The ' . $which . ' of channel ' . $this->id . ' cannot be decrypted with the current APP_KEY.'
             );
         }
     }

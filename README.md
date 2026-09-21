@@ -86,6 +86,10 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.14.1
+
+- **Fix**: the message telling an admin to re-enter a channel's token and secret after an `APP_KEY` change was written in Catalan, glued onto an otherwise English log line and exception message in `WebhookController.php` and `WhatsAppAccount.php`. An admin who does not read Catalan could see that credentials were broken, not what to do about it. Found by [@jeroenedig](https://github.com/jeroenedig) reading the code for the Dutch translation (#38).
+
 ## What's new in v1.14.0
 
 This release comes out of an audit asking a single question: what does this module take for granted about the machine it runs on? The subdirectory bug in v1.13.0 was one of those answers, and a user had to find it. These are the rest, found before anyone had to report them.
@@ -113,10 +117,6 @@ Two threads in this release: what Meta says about your account now reaches you i
 - Every webhook field other than messages now goes through one router instead of being logged and dropped, which is what the remaining kinds will hang off.
 - The service message counter's note no longer lists where else a number might be sending from. Naming the WhatsApp Business app and "another tool" was both too narrow and too wide: without Meta's Coexistence, which needs a provider, a number on the Cloud API cannot be used from the app at all. It now says anywhere else.
 - **Dutch brought up to date** for v1.12.0, contributed by [@jeroenedig](https://github.com/jeroenedig) (#36).
-
-## What's new in v1.12.1
-
-- **Critical fix**: saving a WhatsApp channel from its settings form returned a 500 and the edit was lost. v1.12.0 called a method that does not exist on the Laravel version FreeScout runs, so every save of an existing channel failed. **If you installed v1.12.0, update.** Nothing else changes. No test went through that route, which is why it shipped; two do now.
 
 Older releases are listed on the [releases page](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
