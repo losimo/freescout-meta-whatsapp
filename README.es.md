@@ -86,6 +86,10 @@ Queda fuera de alcance:
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
+## Novedades en la v1.15.0
+
+- **Las credenciales rotas ahora aparecen en la lista de cuentas y en la pantalla de edición**, no solo en el registro. Cuando cambia el `APP_KEY` de FreeScout — un cambio de servidor, un `key:generate` sacado de un foro — el canal parecía sano mientras cada entrega fallaba en silencio. `credentialsAreReadable()` existía desde la v1.14.0, pero no la llamaba nadie fuera de los tests, un agujero que encontró [@jeroenedig](https://github.com/jeroenedig) revisando el código (#38).
+
 ## Novedades en la v1.14.1
 
 - **Corrección**: el mensaje que dice a un administrador que vuelva a introducir el token y el secreto de un canal tras un cambio de `APP_KEY` estaba escrito en catalán, pegado a una línea de registro y un mensaje de excepción en inglés, en `WebhookController.php` y `WhatsAppAccount.php`. Un administrador que no lee catalán podía ver que las credenciales estaban rotas, no qué hacer al respecto. Encontrado por [@jeroenedig](https://github.com/jeroenedig) leyendo el código para la traducción al neerlandés (#38).
@@ -103,20 +107,6 @@ Esta versión sale de una auditoría con una sola pregunta: ¿qué da por hecho 
 - **El aviso de precios enlaza la página de Meta**, que por fin documenta el cambio del 1 de octubre. El matiz queda solo donde corresponde: la cifra de 1.000 sigue sin aparecer en ninguna página de Meta, y dos páginas suyas se contradicen mientras escribimos esto.
 - **Un apartado nuevo para lo que no es cosa del módulo**, con qué comprobar y qué enviarnos si quiere ayuda.
 - **Neerlandés al día**, aportado por [@jeroenedig](https://github.com/jeroenedig) (#37), con una cadena que encontró él y que se había quedado atrás sin que su clave cambiara.
-
-## Novedades en la v1.13.0
-
-Dos hilos en esta versión: lo que Meta dice de su cuenta ahora le llega en lugar de perderse, y un cliente que escribe sin número de teléfono ya no es un desconocido ni, en un caso, un mensaje perdido.
-
-- **Corrección**: en un FreeScout instalado bajo la raíz del dominio, por ejemplo en `/tickets`, no se podía llegar a nada del módulo. FreeScout registra sus rutas dentro del prefijo de la subcarpeta y las de un módulo se cargan fuera, así que todas las de aquí daban 404: la pantalla de configuración, y el webhook también, o sea que las entregas de Meta tampoco llegaban. Encontrado por [@SenseiFreak](https://github.com/SenseiFreak) (#33).
-- **Corrección**: un identificador de negocio (BSUID) de más de 100 caracteres se descartaba, y si aquel mensaje no traía número de teléfono, el mensaje se iba con él. El cliente escribía y no aparecía nada en ninguna parte. El techo de Meta es de 131 y la columna admite ahora 191. **Si ha tenido mensajes que nunca llegaron, este es un candidato.**
-- **Un cliente que escribe sin número de teléfono aparece ahora con su nombre de usuario de WhatsApp**, en lugar del identificador en crudo, que no le decía nada al agente sobre quién había al otro lado. Meta envía el nombre de usuario en el mismo mensaje y no se estaba leyendo.
-- **Que Meta rechace, pause o desactive una plantilla aprobada aparece ahora en el panel de salud de la cuenta**, indicando qué plantilla, en qué idioma y qué le ha ocurrido, en lugar de aparecer por primera vez como un envío fallido. La fila desaparece cuando Meta vuelve a aprobar la misma plantilla.
-- **Los cambios de categoría de las plantillas quedan registrados**, tanto el aviso que Meta envía 24 horas antes como el cambio en sí: la categoría es lo que fija el precio de una plantilla. Cuando ocurre no se rompe nada, así que esto va al registro de eventos de la cuenta y no al panel, que es donde van las averías.
-- **Un registro opcional de lo que Meta cuenta sobre la cuenta**, desactivado por defecto y que se activa una sola vez para toda la instalación, con una pantalla para leerlo. Se conserva 90 días. Solo contiene datos de la cuenta y nunca nada que identifique a un cliente.
-- Todos los campos de webhook que no son mensajes pasan ahora por un único enrutador, en lugar de registrarse y descartarse, que es de donde colgarán las familias que quedan.
-- La nota del contador de mensajes de servicio ya no enumera desde dónde más podría estar enviando un número. Nombrar la aplicación de WhatsApp Business y "otra herramienta" era a la vez demasiado estrecho y demasiado amplio: sin la Coexistencia de Meta, que exige ser proveedor, un número en la Cloud API no puede usarse desde la aplicación. Ahora dice desde cualquier otro sitio.
-- **Neerlandés puesto al día** para la v1.12.0, aportado por [@jeroenedig](https://github.com/jeroenedig) (#36).
 
 Las versiones anteriores están en la [página de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 

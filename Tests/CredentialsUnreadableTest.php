@@ -63,4 +63,53 @@ class CredentialsUnreadableTest extends TestCase
 
         $this->assertFalse($broken->fresh()->credentialsAreReadable());
     }
+
+    public function test_the_accounts_list_flags_a_channel_with_broken_credentials()
+    {
+        $admin = $this->makeAdminUser();
+
+        $broken = $this->createTestAccount();
+        $broken->access_token = base64_encode(json_encode([
+            'iv'    => base64_encode(random_bytes(16)),
+            'value' => base64_encode(random_bytes(32)),
+            'mac'   => str_repeat('c', 64),
+        ]));
+        $broken->save();
+
+        $response = $this->actingAs($admin)->get($this->url('/meta-whatsapp/settings'));
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString(
+            __('metawhatsapp::metawhatsapp.credentials_broken'),
+            $response->getContent()
+        );
+    }
+
+    public function test_the_edit_screen_explains_a_broken_channel_and_a_healthy_one_stays_quiet()
+    {
+        $admin = $this->makeAdminUser();
+
+        $broken = $this->createTestAccount();
+        $broken->access_token = base64_encode(json_encode([
+            'iv'    => base64_encode(random_bytes(16)),
+            'value' => base64_encode(random_bytes(32)),
+            'mac'   => str_repeat('d', 64),
+        ]));
+        $broken->save();
+
+        $brokenResponse = $this->actingAs($admin)->get($this->url('/meta-whatsapp/settings/' . $broken->id . '/edit'));
+        $brokenResponse->assertStatus(200);
+        $this->assertStringContainsString(
+            __('metawhatsapp::metawhatsapp.credentials_broken_title'),
+            $brokenResponse->getContent()
+        );
+
+        $healthy = $this->createTestAccount();
+        $healthyResponse = $this->actingAs($admin)->get($this->url('/meta-whatsapp/settings/' . $healthy->id . '/edit'));
+        $healthyResponse->assertStatus(200);
+        $this->assertStringNotContainsString(
+            __('metawhatsapp::metawhatsapp.credentials_broken_title'),
+            $healthyResponse->getContent()
+        );
+    }
 }

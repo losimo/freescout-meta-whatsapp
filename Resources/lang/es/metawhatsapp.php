@@ -59,6 +59,7 @@ return [
     'status'                       => 'Estado',
     'active'                       => 'Activo',
     'inactive'                     => 'Inactivo',
+    'credentials_broken'           => 'Credenciales rotas',
 
     'save'                         => 'Guardar',
     'cancel'                       => 'Cancelar',
@@ -124,6 +125,8 @@ return [
     'app_id_help'                 => 'Opcional. Está al lado del App secret, en la misma pantalla de Meta. Con esto el módulo os puede decir cuándo caduca el token de acceso, en lugar de que lo descubráis cuando un mensaje deje de salir.',
     'token_invalid_warning'       => 'Meta dice que este token de acceso ya no es válido. El canal se ha guardado, pero no se entregará nada hasta que lo sustituyáis.',
     'token_missing_scopes_warning' => 'A este token de acceso le faltan permisos: :scopes. Los envíos fallarán hasta que se concedan en Meta.',
+    'credentials_broken_title'    => 'Las credenciales no se pueden descifrar',
+    'credentials_broken_detail'   => 'No es un error de Meta ni de red, y no se soluciona reintentando. El APP_KEY de FreeScout ha cambiado desde que se guardaron. Vuelva a introducir el token y el secreto abajo.',
     'health_token'                => 'Token de acceso',
     'health_token_unknown'        => 'Sin comprobar. Añadid el App ID de más arriba y guardad para saber cuándo caduca.',
     'health_token_never_expires'  => 'No caduca',

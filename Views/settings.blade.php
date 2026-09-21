@@ -46,6 +46,8 @@
                                         <span class="text-success">&#9679; {{ __('metawhatsapp::metawhatsapp.active') }}</span>
                                     @elseif($account->getStatus() === 'inactive')
                                         <span class="text-muted">&#9675; {{ __('metawhatsapp::metawhatsapp.inactive') }}</span>
+                                    @elseif($account->getStatus() === 'credentials_broken')
+                                        <span class="text-danger">&#9888; {{ __('metawhatsapp::metawhatsapp.credentials_broken') }}</span>
                                     @else
                                         <span class="text-warning">&#9888; {{ __('metawhatsapp::metawhatsapp.mailbox_unlinked') }}</span>
                                     @endif

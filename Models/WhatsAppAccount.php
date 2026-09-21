@@ -196,6 +196,9 @@ class WhatsAppAccount extends Model
      */
     public function getStatus(): string
     {
+        if (!$this->credentialsAreReadable()) {
+            return 'credentials_broken';
+        }
         if (!$this->mailbox) {
             return 'orphan';
         }

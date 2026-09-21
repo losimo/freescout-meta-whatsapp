@@ -86,6 +86,10 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v1.15.0
+
+- **Broken credentials now show on the accounts list and the edit screen**, not just in the log. If FreeScout's `APP_KEY` changes — a server move, a `key:generate` taken from a forum — the channel used to look healthy while every delivery quietly failed. `credentialsAreReadable()` existed since v1.14.0, but nothing called it outside the tests, a gap [@jeroenedig](https://github.com/jeroenedig) found reviewing the code (#38).
+
 ## What's new in v1.14.1
 
 - **Fix**: the message telling an admin to re-enter a channel's token and secret after an `APP_KEY` change was written in Catalan, glued onto an otherwise English log line and exception message in `WebhookController.php` and `WhatsAppAccount.php`. An admin who does not read Catalan could see that credentials were broken, not what to do about it. Found by [@jeroenedig](https://github.com/jeroenedig) reading the code for the Dutch translation (#38).
@@ -103,20 +107,6 @@ This release comes out of an audit asking a single question: what does this modu
 - **The pricing notice links Meta's own page**, which documents the 1 October change at last. The caveat now sits only where it belongs: the figure of 1,000 is still published on no Meta page, and two of Meta's own pages disagree as we write this.
 - **A new section for what is not the module**, with what to check and what to send us if you want help.
 - **Dutch kept in step**, contributed by [@jeroenedig](https://github.com/jeroenedig) (#37), including one string he found himself that had gone stale without its key changing.
-
-## What's new in v1.13.0
-
-Two threads in this release: what Meta says about your account now reaches you instead of being dropped, and a customer who writes without a phone number is no longer a stranger or, in one case, lost.
-
-- **Fix**: on a FreeScout installed below the domain root, at `/tickets` for example, nothing in this module could be reached. FreeScout registers its own routes inside the subdirectory prefix and a module's routes are loaded outside it, so every route here answered 404: the settings screen, and the webhook too, which means Meta's deliveries never arrived either. Found by [@SenseiFreak](https://github.com/SenseiFreak) (#33).
-- **Fix**: a business-scoped ID longer than 100 characters was thrown away, and when that message carried no phone number the message went with it. The customer wrote and nothing appeared anywhere. Meta's ceiling is 131 and the column now holds 191. **If you have had messages that never arrived, this is a candidate.**
-- **A customer who writes without a phone number is now named after their WhatsApp username**, instead of the raw business-scoped ID that told the agent nothing about who was on the other side. Meta sends the username in the same payload and it was not being read.
-- **Meta rejecting, pausing or disabling an approved template now shows on the account health panel**, naming the template, the language and what happened to it, instead of first appearing as a send that failed. The row goes away when Meta approves the same template again.
-- **Template category changes are now recorded**, both the warning Meta sends 24 hours ahead and the change itself: the category is what sets a template's price. Nothing breaks when it happens, so this goes to the account event log rather than the panel, which is where faults go.
-- **An optional record of what Meta reports about the account**, off by default and switched on once for the whole instance, with a screen to read it. Kept 90 days. It holds account-level facts only and never anything that identifies a customer.
-- Every webhook field other than messages now goes through one router instead of being logged and dropped, which is what the remaining kinds will hang off.
-- The service message counter's note no longer lists where else a number might be sending from. Naming the WhatsApp Business app and "another tool" was both too narrow and too wide: without Meta's Coexistence, which needs a provider, a number on the Cloud API cannot be used from the app at all. It now says anywhere else.
-- **Dutch brought up to date** for v1.12.0, contributed by [@jeroenedig](https://github.com/jeroenedig) (#36).
 
 Older releases are listed on the [releases page](https://github.com/losimo/freescout-meta-whatsapp/releases).
 

@@ -86,6 +86,10 @@ Queda fora d'abast:
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
+## Novetats a la v1.15.0
+
+- **Les credencials trencades ara surten a la llista de comptes i a la pantalla d'edició**, no només al registre. Quan canvia l'`APP_KEY` del FreeScout — un canvi de servidor, un `key:generate` tret d'un fòrum — el canal semblava sa mentre cada entrega fallava en silenci. `credentialsAreReadable()` hi era des de la v1.14.0, però no la cridava ningú fora dels tests, un forat que va trobar [@jeroenedig](https://github.com/jeroenedig) revisant el codi (#38).
+
 ## Novetats a la v1.14.1
 
 - **Correcció**: el missatge que diu a un administrador que torni a introduir el token i el secret d'un canal després d'un canvi d'`APP_KEY` estava escrit en català, enganxat a una línia de registre i un missatge d'excepció en anglès, a `WebhookController.php` i `WhatsAppAccount.php`. Un administrador que no llegeix català podia veure que les credencials estaven trencades, no què calia fer-hi. Trobat per [@jeroenedig](https://github.com/jeroenedig) llegint el codi per a la traducció al neerlandès (#38).
@@ -103,20 +107,6 @@ Aquesta versió surt d'una auditoria amb una sola pregunta: què dona per fet aq
 - **L'avís de preus enllaça la pàgina de Meta**, que per fi documenta el canvi de l'1 d'octubre. El matís queda només on toca: la xifra de 1.000 segueix sense sortir a cap pàgina de Meta, i dues pàgines seves es contradiuen mentre escrivim això.
 - **Un apartat nou per al que no és cosa del mòdul**, amb què comprovar i què enviar-nos si voleu ajuda.
 - **Neerlandès al dia**, aportat per [@jeroenedig](https://github.com/jeroenedig) (#37), amb una cadena que va trobar ell i que havia quedat endarrerida sense que la clau canviés.
-
-## Novetats a la v1.13.0
-
-Dos fils en aquesta versió: el que Meta diu del vostre compte ara us arriba en comptes de perdre's, i un client que escriu sense número de telèfon ja no és un desconegut ni, en un cas, un missatge perdut.
-
-- **Correcció**: en un FreeScout instal·lat sota l'arrel del domini, per exemple a `/tickets`, no es podia arribar a res del mòdul. El FreeScout registra les seves rutes dins del prefix de la subcarpeta i les d'un mòdul es carreguen fora, així que totes les d'aquí feien 404: la pantalla de configuració, i el webhook també, o sigui que les entregues de Meta tampoc arribaven. Trobat per [@SenseiFreak](https://github.com/SenseiFreak) (#33).
-- **Correcció**: un identificador de negoci (BSUID) de més de 100 caràcters es llençava, i si aquell missatge no portava número de telèfon, el missatge se n'anava amb ell. El client escrivia i no apareixia res enlloc. El sostre de Meta és de 131 i la columna ara n'admet 191. **Si heu tingut missatges que no van arribar mai, aquest és un candidat.**
-- **Un client que escriu sense número de telèfon ara es mostra amb el seu nom d'usuari de WhatsApp**, en comptes de l'identificador cru, que no deia res a l'agent sobre qui hi havia a l'altra banda. Meta envia el nom d'usuari al mateix missatge i no es llegia.
-- **Que Meta rebutgi, pausi o desactivi una plantilla aprovada ara surt al panell de salut del compte**, dient quina plantilla, en quin idioma i què li ha passat, en comptes d'aparèixer per primer cop com un enviament fallit. La fila desapareix quan Meta torna a aprovar la mateixa plantilla.
-- **Els canvis de categoria de les plantilles queden registrats**, tant l'avís que Meta envia 24 hores abans com el canvi mateix: la categoria és el que fixa el preu d'una plantilla. Quan passa no es trenca res, així que això va al registre d'esdeveniments del compte i no al panell, que és on van les avaries.
-- **Un registre opcional del que Meta explica del compte**, desactivat per defecte i que s'activa un sol cop per a tota la instal·lació, amb una pantalla per llegir-lo. Es conserva 90 dies. Només hi ha dades del compte i mai res que identifiqui un client.
-- Tots els camps de webhook que no són missatges passen ara per un sol encaminador, en comptes de registrar-se i descartar-se, que és d'on penjaran les famílies que queden.
-- La nota del comptador de missatges de servei ja no llista des d'on més podria estar enviant un número. Dir l'aplicació de WhatsApp Business i "una altra eina" era alhora massa estret i massa ampli: sense la Coexistència de Meta, que demana ser proveïdor, un número a la Cloud API no es pot fer servir des de l'aplicació. Ara diu des de qualsevol altre lloc.
-- **Neerlandès posat al dia** per a la v1.12.0, aportat per [@jeroenedig](https://github.com/jeroenedig) (#36).
 
 Les versions anteriors són a la [pàgina de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 

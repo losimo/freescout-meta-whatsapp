@@ -59,6 +59,7 @@ return [
     'status'                       => 'Status',
     'active'                       => 'Active',
     'inactive'                     => 'Inactive',
+    'credentials_broken'           => 'Credentials broken',
 
     'save'                         => 'Save',
     'cancel'                       => 'Cancel',
@@ -125,6 +126,8 @@ return [
     'app_id_help'                 => 'Optional. Next to the App secret on the same Meta screen. With it the module can tell you when your access token expires, instead of you finding out when a message stops going out.',
     'token_invalid_warning'       => 'Meta says this access token is no longer valid. The channel is saved, but nothing will be delivered until you replace it.',
     'token_missing_scopes_warning' => 'This access token is missing permissions: :scopes. Sending will fail until they are granted in Meta.',
+    'credentials_broken_title'    => 'Credentials cannot be decrypted',
+    'credentials_broken_detail'   => 'This is not a Meta or network error, and retrying will not fix it. FreeScout\'s APP_KEY changed since these were saved. Re-enter the token and secret below.',
     'health_token'                => 'Access token',
     'health_token_unknown'        => 'Not checked. Add the App ID above and save to find out when it expires.',
     'health_token_never_expires'  => 'Does not expire',

@@ -59,6 +59,7 @@ return [
     'status'                       => 'Estat',
     'active'                       => 'Actiu',
     'inactive'                     => 'Inactiu',
+    'credentials_broken'           => 'Credencials trencades',
 
     'save'                         => 'Desa',
     'cancel'                       => 'Cancel·la',
@@ -124,6 +125,8 @@ return [
     'app_id_help'                 => 'Opcional. És al costat de l\'App secret, a la mateixa pantalla de Meta. Amb això el mòdul us pot dir quan caduca el testimoni d\'accés, en comptes que ho descobriu quan un missatge deixi de sortir.',
     'token_invalid_warning'       => 'Meta diu que aquest testimoni d\'accés ja no és vàlid. El canal s\'ha desat, però no s\'entregarà res fins que el substituïu.',
     'token_missing_scopes_warning' => 'A aquest testimoni d\'accés li falten permisos: :scopes. Els enviaments fallaran fins que es concedeixin a Meta.',
+    'credentials_broken_title'    => 'Les credencials no es poden desxifrar',
+    'credentials_broken_detail'   => 'No és un error de Meta ni de xarxa, i no es resol reintentant-ho. L\'APP_KEY del FreeScout ha canviat des que es van desar. Torneu a introduir el testimoni i el secret a sota.',
     'health_token'                => 'Testimoni d\'accés',
     'health_token_unknown'        => 'Sense comprovar. Afegiu l\'App ID de més amunt i deseu per saber quan caduca.',
     'health_token_never_expires'  => 'No caduca',

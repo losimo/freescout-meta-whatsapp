@@ -12,6 +12,13 @@
         <div class="col-xs-12 col-md-8 col-md-offset-2">
             @include('partials/flash_messages')
 
+            @if($account && !$account->credentialsAreReadable())
+                <div class="alert alert-danger metawhatsapp-credentials-broken">
+                    <strong>{{ __('metawhatsapp::metawhatsapp.credentials_broken_title') }}</strong>
+                    <div>{{ __('metawhatsapp::metawhatsapp.credentials_broken_detail') }}</div>
+                </div>
+            @endif
+
             <form method="POST"
                   action="{{ $account ? route('metawhatsapp.update', $account->id) : route('metawhatsapp.store') }}"
                   class="form-horizontal">
