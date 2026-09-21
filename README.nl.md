@@ -7,9 +7,11 @@
 > [!IMPORTANT]
 > **Vanaf 1 oktober 2026 brengt Meta serviceberichten in rekening.**
 >
-> Tot nu toe kostte een antwoord in vrije tekst binnen het venster van 24 uur niets. Vanaf die datum wordt het per afgeleverd bericht gefactureerd, met een vrije hoeveelheid van **1.000 serviceberichten per zakelijk telefoonnummer per maand**, die elke maand opnieuw begint en niet doorschuift naar de volgende. Utility-templates die binnen het venster verstuurd worden, gaan ook geld kosten, en daarvoor geldt geen vrije hoeveelheid. Meta [zegt het inmiddels zelf](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages): *"Effective October 1, 2026, Meta will charge for service messages, which have not been charged since November 2024."* Het getal van 1.000 staat daar niet bij en ook nergens anders bij Meta; dat komt van bronnen uit de branche die het daarover eens zijn.
+> Tot nu toe kostte een antwoord in vrije tekst binnen het venster van 24 uur niets. Vanaf die datum wordt het per afgeleverd bericht gefactureerd, en utility-templates die binnen het venster verstuurd worden gaan ook geld kosten. Meta [zegt het inmiddels zelf](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages): *"Effective October 1, 2026, Meta will charge for service messages, which have not been charged since November 2024."*
 >
-> De tarieven staan op de [prijspagina van Meta](https://whatsappbusiness.com/products/platform-pricing/#rates), waar je je eigen markt en valuta kiest: elke categorie (authenticatie, marketing, utility en service) heeft een eigen prijs. Twee pagina's van Meta zijn het op dit moment niet met elkaar eens: de documentatie hierboven noemt de datum, maar de tekst rond de tarieventabel beschrijft nog het huidige beleid en noemt geen datum. Lees je daar dat serviceberichten gratis zijn, dan is dat de reden; de tabel zelf heeft al een regel voor service.
+> Wat Meta nergens publiceert, is de vrije hoeveelheid. Het getal van **1.000 serviceberichten per zakelijk telefoonnummer per maand**, dat elke maand opnieuw begint en niet doorschuift naar de volgende, komt van bronnen uit de branche die het daarover eens zijn, en zo geven we het ook door.
+>
+> Twee pagina's van Meta spreken elkaar op dit moment tegen. De pagina hierboven noemt de datum; op de [tarievenpagina](https://whatsappbusiness.com/products/platform-pricing/#rates) staat nog dat servicegesprekken gratis zijn, en utility-templates binnen het venster ook. Lees de eerste voor wat er verandert en de tweede voor de tarieven in je eigen markt en valuta, waar elke categorie (authenticatie, marketing, utility en service) een eigen prijs heeft.
 >
 > De komende weken volgen er meer wijzigingen van Meta. Wat deze module raakt, geven we hier door, in de bewoording van Meta, en we voegen niets toe waar we niet achter kunnen staan.
 >
@@ -290,6 +292,29 @@ Alle logregels van de module beginnen met `[MetaWhatsApp]`.
 ```bash
 grep MetaWhatsApp storage/logs/laravel-$(date +%Y-%m-%d).log
 ```
+
+## Als het niet aan de module ligt
+
+Een deel van wat deze module tegenhoudt, zit helemaal niet in de module: een cron die nooit draait, een queue driver die stilletjes verandert wat "verstuurd" betekent, een map waar de webserver niet in mag schrijven. Het instellingenscherm controleert hierop en benoemt wat het kan vinden, rood als de installatie zo niet kan werken en geel als het werkt met een kanttekening.
+
+We geven liever de diagnose dan dat je zit te gissen, en daar zijn die controles voor. Wat de module niet kan, is je server veranderen: een aantal van deze dingen kun alleen jij of je hostingpartij aanpassen. Kan die het niet, dan is dat nog steeds de moeite waard om te weten, want dan verschuift de vraag van wat jij verkeerd doet naar wat de hosting toelaat.
+
+| Wat je ziet | Wat je moet nakijken |
+|---|---|
+| Er gaat niets uit, er komt niets binnen, en er staat nergens een fout | De queue worker. Een antwoord gaat de wachtrij in, dus het lijkt in het gesprek verstuurd en gaat nooit de deur uit. Controleer of cron de planner van FreeScout elke minuut draait, en hoeveel rijen er in de tabel `jobs` staan |
+| Het werkte allemaal en toen ineens niets meer, meestal na een serververhuizing | De `APP_KEY` van FreeScout. De inloggegevens zijn daarmee versleuteld, dus met een nieuwe sleutel zijn ze onleesbaar. Vul het token en het app secret opnieuw in op de kanaalpagina |
+| Meta wil de webhook niet verifiëren | De URL moet exact zijn wat de kanaalpagina toont, op https met een geldig openbaar certificaat, en het domein moet overeenkomen met `APP_URL` |
+| Het kanaal viel stil meteen nadat de uitgebreide logging aan ging | `storage/logs` is niet beschrijfbaar, meestal nadat er artisan-opdrachten als root zijn gedraaid. Zet de eigenaar terug. De module weigert de logging in die toestand nu aan te zetten, in plaats van het kanaal stil te leggen |
+| De verbindingstest meldt fout 60, of loopt af zonder antwoord | De CA-bundel of een uitgaande firewall op je hosting, niet je inloggegevens |
+| Grote bijlagen komen nooit aan en kleine wel | De `memory_limit` van PHP. Binnenkomende media wordt in het geheugen gehouden en WhatsApp accepteert documenten tot 100 MB. De module weigert een te groot bestand nu en houdt het bericht, in plaats van allebei te verliezen |
+
+Wil je dat wij meekijken, dan zijn dit de twee bruikbare dingen: de tekst van de melding op het instellingenscherm en de eigen logregels van de module:
+
+```bash
+grep MetaWhatsApp storage/logs/laravel-$(date +%Y-%m-%d).log
+```
+
+Haal de telefoonnummers en de berichttekst van klanten eruit voordat je ze ergens plaatst.
 
 ## Tests
 
