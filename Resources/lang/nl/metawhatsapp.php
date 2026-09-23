@@ -69,6 +69,7 @@ return [
     'status'                       => 'Status',
     'active'                       => 'Actief',
     'inactive'                     => 'Inactief',
+    'credentials_broken'           => 'Inloggegevens onleesbaar',
 
     'save'                         => 'Opslaan',
     'cancel'                       => 'Annuleren',
@@ -135,6 +136,8 @@ return [
     'app_id_help'                 => 'Optioneel. Staat naast het App secret op hetzelfde scherm bij Meta. Hiermee kan de module je laten weten wanneer je access token verloopt, in plaats van dat je daar pas achter komt als er een bericht niet meer uitgaat.',
     'token_invalid_warning'       => 'Volgens Meta is dit access token niet meer geldig. Het kanaal is opgeslagen, maar er wordt niets afgeleverd totdat je het vervangt.',
     'token_missing_scopes_warning' => 'Dit access token mist rechten: :scopes. Versturen mislukt totdat die bij Meta zijn toegekend.',
+    'credentials_broken_title'    => 'De inloggegevens kunnen niet worden ontsleuteld',
+    'credentials_broken_detail'   => 'Dit is geen fout bij Meta of in het netwerk, en opnieuw proberen lost het niet op. De APP_KEY van FreeScout is veranderd sinds deze gegevens zijn opgeslagen. Vul hieronder het access token en het App secret opnieuw in.',
     'health_token'                => 'Access token',
     'health_token_unknown'        => 'Niet gecontroleerd. Vul hierboven de App ID in en sla op om te zien wanneer het verloopt.',
     'health_token_never_expires'  => 'Verloopt niet',
