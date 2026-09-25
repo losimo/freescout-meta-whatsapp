@@ -207,4 +207,14 @@ return [
     'env_logs_detail'               => 'Engegar el registre detallat aturaria el canal en comptes d\'ajudar-vos: el registre s\'escriu abans de processar el missatge, així que si no es pot escriure no entra ni surt res. Sol passar després d\'executar comandes artisan com a root. Restaureu el propietari de storage/.',
     'env_memory_title'              => 'La memòria del PHP pot ser curta per a adjunts grossos',
     'env_memory_detail'             => 'El memory_limit és de :limit MB. El mèdia entrant es guarda en memòria mentre es baixa i WhatsApp accepta documents de fins a 100 MB, o sigui que un fitxer gros pot tombar el worker i endur-se el missatge sencer, no només l\'adjunt.',
+
+    // Window clock (v2.0.0): the always-visible countdown to Meta's real
+    // 24h rule (Clock A). Separate from template_threshold_minutes
+    // (Clock B), which still governs the recovery banner below.
+    'window_clock_open'               => 'Finestra oberta',
+    'window_clock_closing_soon'       => 'A punt de tancar-se',
+    'window_clock_minutes_left'       => 'Queden :minutes min',
+    'window_clock_hours_left'         => 'Queden :hours h',
+    'window_clock_hours_minutes_left' => 'Queden :hours h :minutes min',
+    'window_clock_tooltip'            => 'Des de l\'últim missatge del client. Respondre no la reinicia.',
 ];

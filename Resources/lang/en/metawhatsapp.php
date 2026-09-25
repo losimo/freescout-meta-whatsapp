@@ -210,4 +210,14 @@ return [
     'env_logs_detail'               => 'Turning on detailed logging would stop the channel rather than help you: the log is written before a message is processed, so if it cannot be written, nothing goes in or out. This usually follows running artisan commands as root. Restore the owner of storage/.',
     'env_memory_title'              => 'PHP memory may be too small for large attachments',
     'env_memory_detail'             => 'memory_limit is :limit MB. Incoming media is held in memory while it downloads and WhatsApp accepts documents of up to 100 MB, so a large file can kill the worker and the whole message is lost with it, not only the attachment.',
+
+    // Window clock (v2.0.0): the always-visible countdown to Meta's real
+    // 24h rule (Clock A). Separate from template_threshold_minutes
+    // (Clock B), which still governs the recovery banner below.
+    'window_clock_open'               => 'Window open',
+    'window_clock_closing_soon'       => 'Closing soon',
+    'window_clock_minutes_left'       => ':minutes min left',
+    'window_clock_hours_left'         => ':hours h left',
+    'window_clock_hours_minutes_left' => ':hours h :minutes min left',
+    'window_clock_tooltip'            => 'Counts from the customer\'s last message. Replying does not reset it.',
 ];

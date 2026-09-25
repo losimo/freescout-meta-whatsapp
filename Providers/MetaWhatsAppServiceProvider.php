@@ -70,6 +70,8 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
         \Eventy::addAction('layout.head', function () {
             if ($this->currentPageIsWhatsAppMailbox()) {
                 echo '<style>#toggle-cc, .sidebar-title-email { display: none !important; }</style>';
+                echo '<style>.metawhatsapp-window-clock-open { color: #767676; } '
+                    .'.metawhatsapp-window-clock-warning { color: #8a6d3b; }</style>';
             }
 
             if (\Route::currentRouteName() == 'dashboard') {
@@ -77,9 +79,12 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
             }
         });
 
-        // Banner de finestra expirada: només si la conversa és del mòdul
-        // (té fila meta_whatsapp_messages) i la finestra ha caducat.
-        // Signatura verificada al core (view.blade.php): 2 arguments.
+        // Window clock (v2.0.0) + expired banner: only if the conversation
+        // is the module's (has a meta_whatsapp_messages row). Clock A (real
+        // 24h) decides which of the three states to show; Clock B
+        // (template_threshold_minutes) still, and only, decides when the
+        // recovery banner appears — see
+        // docs/superpowers/specs/2026-09-23-metawhatsapp-window-clock-design.md.
         \Eventy::addAction('conversation.after_subject_block', function ($conversation, $mailbox) {
             $accountId = WhatsAppMessage::where('conversation_id', $conversation->id)
                 ->value('account_id');
@@ -91,25 +96,33 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 return;
             }
 
-            // Un canal aturat s'ha d'avisar encara que la finestra sigui
-            // oberta (issue #29): és quan l'agent escriu amb tota
-            // normalitat que la pèrdua passa més desapercebuda.
             $inactive = !$account->is_active;
-            if (!$inactive && !WhatsAppMessage::windowExpired($conversation->id, $account)) {
+
+            // Channel stopped, or the module's own (configurable) rule
+            // already considers the window closed: today's banner, byte
+            // for byte, no change to its logic.
+            if ($inactive || WhatsAppMessage::windowExpired($conversation->id, $account)) {
+                $phone = WhatsAppMessage::where('conversation_id', $conversation->id)
+                    ->whereNotNull('contact_phone')
+                    ->orderByDesc('id')
+                    ->value('contact_phone');
+                echo view('metawhatsapp::partials/window_banner', [
+                    'conversation'  => $conversation,
+                    'account'       => $account,
+                    'phone'         => $phone,
+                    'accountActive' => !$inactive,
+                ])->render();
                 return;
             }
-            $phone = WhatsAppMessage::where('conversation_id', $conversation->id)
-                ->whereNotNull('contact_phone')
-                ->orderByDesc('id')
-                ->value('contact_phone');
-            echo view('metawhatsapp::partials/window_banner', [
-                'conversation' => $conversation,
-                'account'      => $account,
-                'phone'        => $phone,
-                // Un compte inactiu no pot enviar res. Oferir-hi els botons
-                // fa que l'agent hi insisteixi sense que surti mai cap
-                // missatge; val més dir-li que el canal està aturat.
-                'accountActive' => !$inactive,
+
+            // Window still open by Meta's real rule: the new clock, never
+            // the banner.
+            $remainingMinutes = WhatsAppMessage::realWindowRemainingMinutes($conversation->id);
+            if ($remainingMinutes === null) {
+                return;
+            }
+            echo view('metawhatsapp::partials/window_clock', [
+                'remainingMinutes' => $remainingMinutes,
             ])->render();
         }, 20, 2);
 

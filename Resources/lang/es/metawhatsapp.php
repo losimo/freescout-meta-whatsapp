@@ -207,4 +207,14 @@ return [
     'env_logs_detail'               => 'Activar el registro detallado detendría el canal en lugar de ayudarle: el registro se escribe antes de procesar el mensaje, así que si no se puede escribir no entra ni sale nada. Suele ocurrir tras ejecutar comandos artisan como root. Restaure el propietario de storage/.',
     'env_memory_title'              => 'La memoria de PHP puede quedarse corta con adjuntos grandes',
     'env_memory_detail'             => 'memory_limit es de :limit MB. El contenido entrante se guarda en memoria mientras se descarga y WhatsApp acepta documentos de hasta 100 MB, o sea que un archivo grande puede tumbar el worker y llevarse el mensaje entero, no solo el adjunto.',
+
+    // Window clock (v2.0.0): the always-visible countdown to Meta's real
+    // 24h rule (Clock A). Separate from template_threshold_minutes
+    // (Clock B), which still governs the recovery banner below.
+    'window_clock_open'               => 'Ventana abierta',
+    'window_clock_closing_soon'       => 'A punto de cerrarse',
+    'window_clock_minutes_left'       => 'Quedan :minutes min',
+    'window_clock_hours_left'         => 'Quedan :hours h',
+    'window_clock_hours_minutes_left' => 'Quedan :hours h :minutes min',
+    'window_clock_tooltip'            => 'Desde el último mensaje del cliente. Responder no la reinicia.',
 ];

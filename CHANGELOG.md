@@ -4,6 +4,13 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 2.0.0 (2026-09-25)
+
+Committed publicly on 2026-08-25 (issue #2): every open conversation now shows a real, live countdown to Meta's 24-hour window, not just a banner after it has already closed.
+
+- **New**: a small always-visible indicator counts down the time left in the customer service window, from the customer's last message. It switches to a warning style in the last hour. Purely informational — it always reflects Meta's real rule and is completely independent from the existing recovery threshold, which keeps working exactly as before.
+- First major version bump since 1.0.0, tied to this being a notable, publicly-promised feature rather than to anything breaking — the versioning convention reserves round numbers for this.
+
 ## 1.15.0 (2026-09-21)
 
 - **Broken credentials now show on the accounts list and the edit screen**, not just in the log. `credentialsAreReadable()` existed since v1.14.0 but nothing called it outside the tests. Found by [@jeroenedig](https://github.com/jeroenedig) (#38).

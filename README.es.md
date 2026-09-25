@@ -86,6 +86,13 @@ Queda fuera de alcance:
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
+## Novedades en la v2.0.0
+
+Comprometido públicamente el 2026-08-25 (issue #2): cada conversación abierta muestra ahora una cuenta atrás real y en vivo hasta la ventana de servicio de 24 horas de Meta, no solo un banner una vez ya se ha cerrado.
+
+- **Un indicador pequeño y siempre visible cuenta atrás la ventana**, desde el último mensaje del cliente, y cambia a estilo de aviso durante la última hora. Es puramente informativo y siempre refleja la regla real de Meta — es totalmente independiente del umbral de recuperación de más abajo, que sigue decidiendo cuándo aparece el banner de recuperación exactamente como siempre.
+- Primer salto de versión mayor desde la 1.0.0. No se rompe nada ni cambia el significado de ninguna opción — va ligado a ser una mejora notable y comprometida públicamente, que es para lo que sirven los números redondos en este proyecto.
+
 ## Novedades en la v1.15.0
 
 - **Las credenciales rotas ahora aparecen en la lista de cuentas y en la pantalla de edición**, no solo en el registro. Cuando cambia el `APP_KEY` de FreeScout — un cambio de servidor, un `key:generate` sacado de un foro — el canal parecía sano mientras cada entrega fallaba en silencio. `credentialsAreReadable()` existía desde la v1.14.0, pero no la llamaba nadie fuera de los tests, un agujero que encontró [@jeroenedig](https://github.com/jeroenedig) revisando el código (#38).
@@ -93,20 +100,6 @@ Queda fuera de alcance:
 ## Novedades en la v1.14.1
 
 - **Corrección**: el mensaje que dice a un administrador que vuelva a introducir el token y el secreto de un canal tras un cambio de `APP_KEY` estaba escrito en catalán, pegado a una línea de registro y un mensaje de excepción en inglés, en `WebhookController.php` y `WhatsAppAccount.php`. Un administrador que no lee catalán podía ver que las credenciales estaban rotas, no qué hacer al respecto. Encontrado por [@jeroenedig](https://github.com/jeroenedig) leyendo el código para la traducción al neerlandés (#38).
-
-## Novedades en la v1.14.0
-
-Esta versión sale de una auditoría con una sola pregunta: ¿qué da por hecho este módulo sobre la máquina donde se ejecuta? El bug del subdirectorio de la v1.13.0 era una de esas respuestas, y lo tuvo que encontrar un usuario. Estas son el resto, encontradas antes de que nadie tuviera que reportarlas.
-
-- **Corrección**: una línea requería PHP 7.4 mientras el README prometía 7.1, que es el suelo que declara el propio FreeScout. Con 7.1, 7.2 o 7.3, el archivo que procesa los webhooks ni se parseaba: la pantalla de configuración iba bien, el canal se guardaba y el handshake de Meta pasaba, mientras cada mensaje entrante moría con un 500 invisible desde dentro de FreeScout.
-- **Corrección**: la columna `wamid` admitía 100 caracteres y Meta no documenta ningún máximo. FreeScout desactiva el modo estricto de MySQL, así que un identificador más largo no se rechazaba sino que se cortaba y se guardaba: los acuses dejaban de casar, y dos identificadores con los mismos primeros 100 caracteres chocaban en el índice único, donde el error se lee como "ya procesado".
-- **La pantalla de configuración ahora dice qué falla del entorno**, que el módulo no puede arreglar pero sí ver: un worker de cola que no se ejecuta, el controlador `sync`, curl que falta, un `APP_URL` que no es https, un directorio de registros donde no se puede escribir, y un límite de memoria corto para los adjuntos que acepta WhatsApp. El rojo significa que la instalación no puede funcionar y el amarillo que funciona con un matiz. El de la cola es el que más pesa: si nadie procesa la cola, una respuesta parece enviada en la conversación y no sale nunca, sin ningún error en ninguna parte.
-- **Cuando cambia el `APP_KEY` de FreeScout**, tras mover de servidor o un `key:generate` sacado de un foro, el módulo lo dice en lugar de fallar en todas partes a la vez. Las credenciales se cifran con él, y hasta ahora la lista de canales se pintaba perfecta mientras cada entrega respondía 500, algo que Meta acaba respondiendo desactivando el webhook.
-- **Activar el registro detallado ya no detiene el canal** cuando no se puede escribir en `storage/logs`. El registro se escribe antes de procesar el mensaje, así que la herramienta de diagnóstico mataba lo que debía diagnosticar. Desactivarlo siempre funciona.
-- **El contenido entrante demasiado grande se rechaza con los números a la vista** en lugar de llevarse el mensaje entero. El archivo se guardaba en memoria mientras se descargaba, y un documento mayor que el límite tumbaba el worker y perdía el mensaje, no solo el adjunto.
-- **El aviso de precios enlaza la página de Meta**, que por fin documenta el cambio del 1 de octubre. El matiz queda solo donde corresponde: la cifra de 1.000 sigue sin aparecer en ninguna página de Meta, y dos páginas suyas se contradicen mientras escribimos esto.
-- **Un apartado nuevo para lo que no es cosa del módulo**, con qué comprobar y qué enviarnos si quiere ayuda.
-- **Neerlandés al día**, aportado por [@jeroenedig](https://github.com/jeroenedig) (#37), con una cadena que encontró él y que se había quedado atrás sin que su clave cambiara.
 
 Las versiones anteriores están en la [página de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -224,6 +217,10 @@ Si se intenta responder fuera de ventana:
 - El cliente no recibe ninguna respuesta.
 
 Desde la v1.3.0, una ventana caducada se puede recuperar manualmente con una plantilla HSM preaprobada — ver más abajo.
+
+### Cuenta atrás de la ventana (v2.0.0)
+
+Cada conversación abierta de este canal muestra cuánto queda de la ventana de 24 horas, contando desde el último mensaje del cliente — tus respuestas nunca la reinician. Cambia a estilo de aviso durante la última hora. Es puramente informativo: siempre refleja la regla real de Meta, nunca el umbral interno de más abajo.
 
 ### Recuperación de ventana caducada (v1.3.0)
 

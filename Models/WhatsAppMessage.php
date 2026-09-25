@@ -87,4 +87,27 @@ class WhatsAppMessage extends Model
 
         return \Carbon\Carbon::parse($last)->lt(now()->subMinutes($threshold));
     }
+
+    /**
+     * Clock A: minutes left in Meta's real 24-hour customer service window,
+     * from the last inbound message. Deliberately separate from
+     * windowExpired() (Clock B): this one is never configurable and never
+     * shares code or state with it, so the two can diverge, or either can
+     * be removed, without touching the other.
+     *
+     * Negative once the real window has closed. Null when the conversation
+     * has no inbound message on record.
+     */
+    public static function realWindowRemainingMinutes(int $conversationId): ?int
+    {
+        $last = static::where('conversation_id', $conversationId)
+            ->where('direction', static::DIRECTION_INBOUND)
+            ->max('created_at');
+
+        if (!$last) {
+            return null;
+        }
+
+        return now()->diffInMinutes(\Carbon\Carbon::parse($last)->addHours(24), false);
+    }
 }

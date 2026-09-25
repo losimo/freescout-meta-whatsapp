@@ -86,6 +86,13 @@ Queda fora d'abast:
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
+## Novetats a la v2.0.0
+
+Compromès públicament el 2026-08-25 (issue #2): cada conversa oberta ara mostra un compte enrere real i en viu fins a la finestra de servei de 24 hores de Meta, no només un banner un cop ja s'ha tancat.
+
+- **Un indicador petit i sempre visible compta enrere la finestra**, des de l'últim missatge del client, i canvia a estil d'avís durant l'última hora. És purament informatiu i sempre reflecteix la regla real de Meta — és totalment independent del llindar de recuperació de més avall, que segueix decidint quan apareix el banner de recuperació exactament com sempre.
+- Primer bump de versió major des de la 1.0.0. No es trenca res ni canvia el significat de cap opció — va lligat a ser una millora notable i compromesa públicament, que és per a què serveixen els números rodons en aquest projecte.
+
 ## Novetats a la v1.15.0
 
 - **Les credencials trencades ara surten a la llista de comptes i a la pantalla d'edició**, no només al registre. Quan canvia l'`APP_KEY` del FreeScout — un canvi de servidor, un `key:generate` tret d'un fòrum — el canal semblava sa mentre cada entrega fallava en silenci. `credentialsAreReadable()` hi era des de la v1.14.0, però no la cridava ningú fora dels tests, un forat que va trobar [@jeroenedig](https://github.com/jeroenedig) revisant el codi (#38).
@@ -93,20 +100,6 @@ Queda fora d'abast:
 ## Novetats a la v1.14.1
 
 - **Correcció**: el missatge que diu a un administrador que torni a introduir el token i el secret d'un canal després d'un canvi d'`APP_KEY` estava escrit en català, enganxat a una línia de registre i un missatge d'excepció en anglès, a `WebhookController.php` i `WhatsAppAccount.php`. Un administrador que no llegeix català podia veure que les credencials estaven trencades, no què calia fer-hi. Trobat per [@jeroenedig](https://github.com/jeroenedig) llegint el codi per a la traducció al neerlandès (#38).
-
-## Novetats a la v1.14.0
-
-Aquesta versió surt d'una auditoria amb una sola pregunta: què dona per fet aquest mòdul sobre la màquina on s'executa? El bug del subdirectori de la v1.13.0 era una d'aquelles respostes, i el va haver de trobar un usuari. Aquestes són la resta, trobades abans que ho hagués de reportar ningú.
-
-- **Correcció**: una línia demanava PHP 7.4 mentre el README en prometia 7.1, que és el terra que declara el mateix FreeScout. Amb 7.1, 7.2 o 7.3, el fitxer que processa els webhooks ni es parsejava: la pantalla de configuració anava bé, el canal es desava i el handshake de Meta passava, mentre cada missatge entrant moria amb un 500 invisible des de dins del FreeScout.
-- **Correcció**: la columna `wamid` admetia 100 caràcters i Meta no en documenta cap màxim. El FreeScout desactiva el mode estricte del MySQL, així que un identificador més llarg no es rebutjava sinó que es retallava i es desava: els acusaments de rebuda deixaven de casar, i dos identificadors amb els mateixos primers 100 caràcters xocaven a l'índex únic, on l'error es llegeix com a "ja processat".
-- **La pantalla de configuració ara diu què falla de l'entorn**, que el mòdul no pot arreglar però sí veure: un worker de cua que no corre, el controlador `sync`, el curl que falta, un `APP_URL` que no és https, un directori de registres on no es pot escriure, i un límit de memòria curt per als adjunts que accepta WhatsApp. El vermell vol dir que la instal·lació no pot funcionar i el groc que funciona amb un matís. El de la cua és el que més pesa: si ningú processa la cua, una resposta sembla enviada a la conversa i no surt mai, sense cap error enlloc.
-- **Quan canvia l'`APP_KEY` del FreeScout**, després de moure de servidor o d'un `key:generate` tret d'un fòrum, el mòdul ho diu en comptes de fallar a tot arreu alhora. Les credencials s'hi xifren, i fins ara la llista de canals es pintava perfecta mentre cada entrega responia 500, cosa que Meta acaba responent desactivant el webhook.
-- **Engegar el registre detallat ja no atura el canal** quan no es pot escriure a `storage/logs`. El registre s'escriu abans de processar el missatge, així que l'eina de diagnòstic matava el que havia de diagnosticar. Apagar-lo sempre funciona.
-- **El mèdia entrant massa gros es refusa amb els números a la vista** en comptes d'endur-se el missatge sencer. El fitxer es guardava en memòria mentre es baixava, i un document més gran que el límit tombava el worker i perdia el missatge, no només l'adjunt.
-- **L'avís de preus enllaça la pàgina de Meta**, que per fi documenta el canvi de l'1 d'octubre. El matís queda només on toca: la xifra de 1.000 segueix sense sortir a cap pàgina de Meta, i dues pàgines seves es contradiuen mentre escrivim això.
-- **Un apartat nou per al que no és cosa del mòdul**, amb què comprovar i què enviar-nos si voleu ajuda.
-- **Neerlandès al dia**, aportat per [@jeroenedig](https://github.com/jeroenedig) (#37), amb una cadena que va trobar ell i que havia quedat endarrerida sense que la clau canviés.
 
 Les versions anteriors són a la [pàgina de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -224,6 +217,10 @@ Si s'intenta respondre fora de finestra:
 - El client no rep cap resposta.
 
 Des de la v1.3.0, una finestra caducada es pot recuperar manualment amb una plantilla HSM pre-aprovada — vegeu més avall.
+
+### Compte enrere de la finestra (v2.0.0)
+
+Cada conversa oberta d'aquest canal mostra quant queda de la finestra de 24 hores, comptant des de l'últim missatge del client — les teves respostes no la reinicien mai. Canvia a estil d'avís durant l'última hora. És purament informatiu: sempre reflecteix la regla real de Meta, mai el llindar intern de més avall.
 
 ### Recuperació de finestra caducada (v1.3.0)
 

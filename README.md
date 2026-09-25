@@ -86,6 +86,13 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v2.0.0
+
+Committed publicly back on 2026-08-25 (issue #2): every open conversation now shows a real, live countdown to Meta's 24-hour customer service window, not just a banner after it has already closed.
+
+- **A small, always-visible indicator counts down the window**, from the customer's last message, switching to a warning style in the last hour. It is purely informational and always reflects Meta's real rule — it is completely independent from the existing recovery threshold below, which keeps deciding when the recovery banner appears exactly as it always has.
+- First major version bump since 1.0.0. Nothing breaks and no setting changes meaning — it is tied to this being a notable, publicly-promised feature, which is what round numbers are for in this project.
+
 ## What's new in v1.15.0
 
 - **Broken credentials now show on the accounts list and the edit screen**, not just in the log. If FreeScout's `APP_KEY` changes — a server move, a `key:generate` taken from a forum — the channel used to look healthy while every delivery quietly failed. `credentialsAreReadable()` existed since v1.14.0, but nothing called it outside the tests, a gap [@jeroenedig](https://github.com/jeroenedig) found reviewing the code (#38).
@@ -93,20 +100,6 @@ Out of scope:
 ## What's new in v1.14.1
 
 - **Fix**: the message telling an admin to re-enter a channel's token and secret after an `APP_KEY` change was written in Catalan, glued onto an otherwise English log line and exception message in `WebhookController.php` and `WhatsAppAccount.php`. An admin who does not read Catalan could see that credentials were broken, not what to do about it. Found by [@jeroenedig](https://github.com/jeroenedig) reading the code for the Dutch translation (#38).
-
-## What's new in v1.14.0
-
-This release comes out of an audit asking a single question: what does this module take for granted about the machine it runs on? The subdirectory bug in v1.13.0 was one of those answers, and a user had to find it. These are the rest, found before anyone had to report them.
-
-- **Fix**: one line needed PHP 7.4 while the README promised 7.1, which is the floor FreeScout itself declares. On 7.1, 7.2 or 7.3 the file that processes webhooks did not parse, so the settings screen worked, the channel saved and Meta's handshake passed, while every inbound message died with a 500 that is invisible from inside FreeScout.
-- **Fix**: the `wamid` column held 100 characters and Meta documents no maximum for it. FreeScout turns MySQL's strict mode off, so a longer id was not refused but cut and stored: receipts stopped matching, and two ids sharing a truncated prefix collided on the unique index, where the error reads as "already processed".
-- **The settings screen now names what is wrong with the environment**, which the module cannot fix but can see: a queue worker that is not running, the `sync` driver, missing curl, an `APP_URL` that is not https, a log directory that cannot be written, and a memory limit too small for the attachments WhatsApp accepts. Red means the installation cannot work, yellow that it works with a caveat. The queue one matters most: when nothing processes the queue, a reply looks sent in the conversation and simply never leaves, with no error anywhere.
-- **When FreeScout's `APP_KEY` changes**, after a server move or a `key:generate` taken from a forum, the module says so instead of failing everywhere at once. Credentials are encrypted with that key, and until now the channel list rendered perfectly while every delivery answered 500, which Meta eventually responds to by disabling the webhook.
-- **Turning on detailed logging no longer stops the channel** when `storage/logs` cannot be written. The log is written before a message is processed, so the diagnostic tool was killing what it was meant to diagnose. Turning it off always works.
-- **Oversized incoming media is refused with its numbers** rather than taking the whole message with it. The file was held in memory while downloading, and a document larger than the memory limit killed the worker and lost the message, not just the attachment.
-- **The pricing notice links Meta's own page**, which documents the 1 October change at last. The caveat now sits only where it belongs: the figure of 1,000 is still published on no Meta page, and two of Meta's own pages disagree as we write this.
-- **A new section for what is not the module**, with what to check and what to send us if you want help.
-- **Dutch kept in step**, contributed by [@jeroenedig](https://github.com/jeroenedig) (#37), including one string he found himself that had gone stale without its key changing.
 
 Older releases are listed on the [releases page](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -229,6 +222,10 @@ If a reply is attempted outside the window:
 - The customer receives nothing.
 
 Since v1.3.0, an expired window can be manually recovered with a pre-approved HSM template — see below.
+
+### Window countdown (v2.0.0)
+
+Every open conversation for this channel shows how much of the 24-hour window is left, counting from the customer's last message — your replies never reset it. It switches to a warning style in the last hour. This is purely informational: it always reflects Meta's real rule, never the internal threshold below.
 
 ### Expired window recovery (v1.3.0)
 
