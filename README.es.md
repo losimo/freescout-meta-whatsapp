@@ -91,6 +91,7 @@ Queda fuera de alcance:
 Comprometido públicamente el 2026-08-25 (issue #2): cada conversación abierta muestra ahora una cuenta atrás real y en vivo hasta la ventana de servicio de 24 horas de Meta, no solo un banner una vez ya se ha cerrado.
 
 - **Un indicador pequeño y siempre visible cuenta atrás la ventana**, desde el último mensaje del cliente, y cambia a estilo de aviso durante la última hora. Es puramente informativo y siempre refleja la regla real de Meta — es totalmente independiente del umbral de recuperación de más abajo, que sigue decidiendo cuándo aparece el banner de recuperación exactamente como siempre.
+- El indicador lleva un pequeño icono de reloj, incrustado del conjunto [Lucide](https://lucide.dev), sin ninguna petición externa. El primer icono que este módulo incorpora más allá de los Glyphicons propios de FreeScout — una versión de número redondo se merece algo más de cuidado en cómo se ve, no solo en qué hace.
 - Primer salto de versión mayor desde la 1.0.0. No se rompe nada ni cambia el significado de ninguna opción — va ligado a ser una mejora notable y comprometida públicamente, que es para lo que sirven los números redondos en este proyecto.
 
 ## Novedades en la v1.15.0

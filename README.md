@@ -91,6 +91,7 @@ Out of scope:
 Committed publicly back on 2026-08-25 (issue #2): every open conversation now shows a real, live countdown to Meta's 24-hour customer service window, not just a banner after it has already closed.
 
 - **A small, always-visible indicator counts down the window**, from the customer's last message, switching to a warning style in the last hour. It is purely informational and always reflects Meta's real rule — it is completely independent from the existing recovery threshold below, which keeps deciding when the recovery banner appears exactly as it always has.
+- The indicator carries a small clock icon, inlined from the [Lucide](https://lucide.dev) set, no external request. The first icon this module ships beyond FreeScout's own Glyphicons — a round-number release earns a bit more care in how something looks, not only what it does.
 - First major version bump since 1.0.0. Nothing breaks and no setting changes meaning — it is tied to this being a notable, publicly-promised feature, which is what round numbers are for in this project.
 
 ## What's new in v1.15.0

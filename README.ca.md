@@ -91,6 +91,7 @@ Queda fora d'abast:
 Compromès públicament el 2026-08-25 (issue #2): cada conversa oberta ara mostra un compte enrere real i en viu fins a la finestra de servei de 24 hores de Meta, no només un banner un cop ja s'ha tancat.
 
 - **Un indicador petit i sempre visible compta enrere la finestra**, des de l'últim missatge del client, i canvia a estil d'avís durant l'última hora. És purament informatiu i sempre reflecteix la regla real de Meta — és totalment independent del llindar de recuperació de més avall, que segueix decidint quan apareix el banner de recuperació exactament com sempre.
+- L'indicador porta una petita icona de rellotge, incrustada del joc [Lucide](https://lucide.dev), sense cap petició externa. La primera icona que aquest mòdul incorpora més enllà dels Glyphicons propis del FreeScout — una versió de número rodó es mereix una mica més de cura en com es veu, no només en què fa.
 - Primer bump de versió major des de la 1.0.0. No es trenca res ni canvia el significat de cap opció — va lligat a ser una millora notable i compromesa públicament, que és per a què serveixen els números rodons en aquest projecte.
 
 ## Novetats a la v1.15.0
