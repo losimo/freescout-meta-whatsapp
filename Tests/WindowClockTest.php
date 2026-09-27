@@ -204,6 +204,29 @@ class WindowClockTest extends TestCase
         $this->assertStringNotContainsString('http', $html);
     }
 
+    /**
+     * aria-label overrides an element's visible text content in the
+     * accessible-name computation, so a screen reader would announce only
+     * the tooltip and never the countdown itself — the entire point of the
+     * feature. The explanation instead goes in an .sr-only span, read
+     * after the visible countdown text, not instead of it.
+     */
+    public function test_partial_does_not_hide_the_countdown_behind_aria_label()
+    {
+        $html = \View::make('metawhatsapp::partials/window_clock', [
+            'remainingMinutes' => 119,
+        ])->render();
+
+        $this->assertStringNotContainsString('aria-label=', $html);
+        $this->assertStringContainsString(__('metawhatsapp::metawhatsapp.window_clock_open'), $html);
+        $this->assertStringContainsString('1 h 59', $html);
+
+        $this->assertMatchesRegularExpression(
+            '/<span class="sr-only">\s*' . preg_quote(e(__('metawhatsapp::metawhatsapp.window_clock_tooltip')), '/') . '\s*<\/span>/',
+            $html
+        );
+    }
+
     private function makeInbound($account, int $conversationId, $createdAt): WhatsAppMessage
     {
         $message = new WhatsAppMessage();
@@ -219,38 +242,82 @@ class WindowClockTest extends TestCase
         return $message;
     }
 
+    /**
+     * The clock now lives on conversation.after_subject (never collapsed
+     * behind Chat Mode's "Show Details" — v2.0.1 finding #2), while the
+     * banner stays on conversation.after_subject_block. Both assertions
+     * below establish that the two hooks agree: the clock fires and the
+     * banner hook stays silent for the very same open-window scenario.
+     */
     public function test_hook_renders_the_clock_for_an_open_window_and_not_the_banner()
     {
         $account = $this->createTestAccount();
         $this->makeInbound($account, 555020, now()->subMinutes(30));
         $conversation = $this->fakeConversation(555020);
 
-        $html = $this->renderAfterSubjectBlock($conversation, $account);
+        $clockHtml = $this->renderAfterSubject($conversation, $account);
+        $this->assertStringContainsString(__('metawhatsapp::metawhatsapp.window_clock_open'), $clockHtml);
+        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_expired_notice'), $clockHtml);
 
-        $this->assertStringContainsString(__('metawhatsapp::metawhatsapp.window_clock_open'), $html);
-        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_expired_notice'), $html);
+        $bannerHtml = $this->renderAfterSubjectBlock($conversation, $account);
+        $this->assertSame('', $bannerHtml);
     }
 
+    /**
+     * Mirror of the above for the closed-window case: the banner hook
+     * renders it, and the clock hook stays silent for the same scenario.
+     */
     public function test_hook_renders_only_the_banner_once_the_real_window_is_closed()
     {
         $account = $this->createTestAccount();
         $this->makeInbound($account, 555021, now()->subHours(25));
         $conversation = $this->fakeConversation(555021);
 
-        $html = $this->renderAfterSubjectBlock($conversation, $account);
+        $bannerHtml = $this->renderAfterSubjectBlock($conversation, $account);
+        $this->assertStringContainsString(__('metawhatsapp::metawhatsapp.window_expired_notice'), $bannerHtml);
+        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_open'), $bannerHtml);
+        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_closing_soon'), $bannerHtml);
 
-        $this->assertStringContainsString(__('metawhatsapp::metawhatsapp.window_expired_notice'), $html);
-        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_open'), $html);
-        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_closing_soon'), $html);
+        // CollisionDetection also listens on conversation.after_subject
+        // (unrelated to this module), so the hook's total output isn't
+        // empty — only assert our own clock markup is absent from it.
+        $clockHtml = $this->renderAfterSubject($conversation, $account);
+        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_open'), $clockHtml);
+        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_closing_soon'), $clockHtml);
     }
 
     public function test_hook_renders_nothing_for_a_conversation_outside_the_module()
     {
         $conversation = $this->fakeConversation(555022);
 
-        $html = $this->renderAfterSubjectBlock($conversation, null);
+        $this->assertSame('', $this->renderAfterSubjectBlock($conversation, null));
 
-        $this->assertSame('', $html);
+        // conversation.after_subject also carries CollisionDetection's
+        // listener, so assert absence of our own markup, not an empty
+        // string overall.
+        $clockHtml = $this->renderAfterSubject($conversation, null);
+        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_open'), $clockHtml);
+        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_closing_soon'), $clockHtml);
+    }
+
+    /**
+     * Issue #29: an inactive channel must show the banner (not the clock)
+     * even when the window is still open by Meta's real rule — it's
+     * exactly when an agent believes the channel works and replies
+     * normally that a silent delivery failure goes unnoticed.
+     */
+    public function test_hook_renders_the_banner_not_the_clock_when_channel_inactive_but_window_open()
+    {
+        $account = $this->createTestAccount(['is_active' => false]);
+        $this->makeInbound($account, 555023, now()->subMinutes(30));
+        $conversation = $this->fakeConversation(555023);
+
+        $bannerHtml = $this->renderAfterSubjectBlock($conversation, $account);
+        $this->assertStringContainsString(__('metawhatsapp::metawhatsapp.account_inactive_banner'), $bannerHtml);
+
+        $clockHtml = $this->renderAfterSubject($conversation, $account);
+        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_open'), $clockHtml);
+        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_closing_soon'), $clockHtml);
     }
 
     private function fakeConversation(int $id): \App\Conversation
@@ -265,6 +332,13 @@ class WindowClockTest extends TestCase
     {
         ob_start();
         \Eventy::action('conversation.after_subject_block', $conversation, $account ? $account->mailbox : new \App\Mailbox());
+        return ob_get_clean();
+    }
+
+    private function renderAfterSubject(\App\Conversation $conversation, $account): string
+    {
+        ob_start();
+        \Eventy::action('conversation.after_subject', $conversation, $account ? $account->mailbox : new \App\Mailbox());
         return ob_get_clean();
     }
 }

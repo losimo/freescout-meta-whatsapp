@@ -86,6 +86,10 @@ Queda fuera de alcance:
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
+## Novedades en la v2.0.1
+
+- **Corrección**: la cuenta atrás de la v2.0.0 era inalcanzable para lectores de pantalla, y quedaba oculta tras "Show Details" en cualquier conversación con el Chat Mode activado. Ambas arregladas: ahora anuncia la cuenta atrás en sí en lugar de solo el tooltip, y se renderiza desde un punto que el Chat Mode nunca colapsa. El banner de recuperación existente no se ve afectado.
+
 ## Novedades en la v2.0.0
 
 Comprometido públicamente el 2026-08-25 (issue #2): cada conversación abierta muestra ahora una cuenta atrás real y en vivo hasta la ventana de servicio de 24 horas de Meta, no solo un banner una vez ya se ha cerrado.
@@ -97,10 +101,6 @@ Comprometido públicamente el 2026-08-25 (issue #2): cada conversación abierta 
 ## Novedades en la v1.15.0
 
 - **Las credenciales rotas ahora aparecen en la lista de cuentas y en la pantalla de edición**, no solo en el registro. Cuando cambia el `APP_KEY` de FreeScout — un cambio de servidor, un `key:generate` sacado de un foro — el canal parecía sano mientras cada entrega fallaba en silencio. `credentialsAreReadable()` existía desde la v1.14.0, pero no la llamaba nadie fuera de los tests, un agujero que encontró [@jeroenedig](https://github.com/jeroenedig) revisando el código (#38).
-
-## Novedades en la v1.14.1
-
-- **Corrección**: el mensaje que dice a un administrador que vuelva a introducir el token y el secreto de un canal tras un cambio de `APP_KEY` estaba escrito en catalán, pegado a una línea de registro y un mensaje de excepción en inglés, en `WebhookController.php` y `WhatsAppAccount.php`. Un administrador que no lee catalán podía ver que las credenciales estaban rotas, no qué hacer al respecto. Encontrado por [@jeroenedig](https://github.com/jeroenedig) leyendo el código para la traducción al neerlandés (#38).
 
 Las versiones anteriores están en la [página de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 

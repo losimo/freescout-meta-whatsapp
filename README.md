@@ -86,6 +86,10 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v2.0.1
+
+- **Fix**: the window countdown from v2.0.0 was unreachable to screen readers, and hidden behind "Show Details" for any conversation with Chat Mode on. Both fixed: it announces the countdown itself instead of only the tooltip, and now renders from a hook Chat Mode never collapses. The existing recovery banner is unaffected either way.
+
 ## What's new in v2.0.0
 
 Committed publicly back on 2026-08-25 (issue #2): every open conversation now shows a real, live countdown to Meta's 24-hour customer service window, not just a banner after it has already closed.
@@ -97,10 +101,6 @@ Committed publicly back on 2026-08-25 (issue #2): every open conversation now sh
 ## What's new in v1.15.0
 
 - **Broken credentials now show on the accounts list and the edit screen**, not just in the log. If FreeScout's `APP_KEY` changes — a server move, a `key:generate` taken from a forum — the channel used to look healthy while every delivery quietly failed. `credentialsAreReadable()` existed since v1.14.0, but nothing called it outside the tests, a gap [@jeroenedig](https://github.com/jeroenedig) found reviewing the code (#38).
-
-## What's new in v1.14.1
-
-- **Fix**: the message telling an admin to re-enter a channel's token and secret after an `APP_KEY` change was written in Catalan, glued onto an otherwise English log line and exception message in `WebhookController.php` and `WhatsAppAccount.php`. An admin who does not read Catalan could see that credentials were broken, not what to do about it. Found by [@jeroenedig](https://github.com/jeroenedig) reading the code for the Dutch translation (#38).
 
 Older releases are listed on the [releases page](https://github.com/losimo/freescout-meta-whatsapp/releases).
 

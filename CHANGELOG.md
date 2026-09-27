@@ -4,6 +4,11 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 2.0.1 (2026-09-25)
+
+- **Fix**: the window countdown was unreachable to screen readers — an `aria-label` on the same element as the visible text overrode it, so only the tooltip was announced, never the countdown itself.
+- **Fix**: the countdown was hidden behind "Show Details" for any conversation with Chat Mode on, which every conversation this module creates has available. It now renders from a different hook that Chat Mode's collapse never wraps; the existing recovery banner is unaffected.
+
 ## 2.0.0 (2026-09-25)
 
 Committed publicly on 2026-08-25 (issue #2): every open conversation now shows a real, live countdown to Meta's 24-hour window, not just a banner after it has already closed.

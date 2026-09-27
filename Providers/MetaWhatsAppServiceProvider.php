@@ -85,13 +85,50 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
         // (template_threshold_minutes) still, and only, decides when the
         // recovery banner appears — see
         // docs/superpowers/specs/2026-09-23-metawhatsapp-window-clock-design.md.
-        \Eventy::addAction('conversation.after_subject_block', function ($conversation, $mailbox) {
-            $accountId = WhatsAppMessage::where('conversation_id', $conversation->id)
-                ->value('account_id');
-            if (!$accountId) {
+        //
+        // Split across two Eventy hooks (v2.0.1, review finding #2), not
+        // one function: the core template wraps conversation.after_subject_block
+        // in a Bootstrap collapse behind "Show Details" whenever the
+        // conversation is in Chat Mode — and this module always puts its
+        // conversations in Chat Mode, so that's the normal case, not an
+        // edge case. conversation.after_subject fires a few lines earlier
+        // in the same template and is never collapsed, in or out of Chat
+        // Mode. The clock is the part that must be genuinely always
+        // visible, so it moves to that hook; the banner stays on
+        // after_subject_block exactly as before — moving it is a separate
+        // decision for a separate patch, not fixed here.
+        //
+        // Each closure re-decides open/closed independently by calling the
+        // same tested static methods below; only the account lookup itself
+        // is shared, via windowClockAccountFor().
+        \Eventy::addAction('conversation.after_subject', function ($conversation, $mailbox) {
+            $account = $this->windowClockAccountFor($conversation);
+            if (!$account) {
                 return;
             }
-            $account = WhatsAppAccount::find($accountId);
+
+            $inactive = !$account->is_active;
+
+            // Channel stopped, or the module's own (configurable) rule
+            // already considers the window closed: the banner hook owns
+            // both cases, this one stays silent.
+            if ($inactive || WhatsAppMessage::windowExpired($conversation->id, $account)) {
+                return;
+            }
+
+            // Window still open by Meta's real rule: the clock, never the
+            // banner.
+            $remainingMinutes = WhatsAppMessage::realWindowRemainingMinutes($conversation->id);
+            if ($remainingMinutes === null) {
+                return;
+            }
+            echo view('metawhatsapp::partials/window_clock', [
+                'remainingMinutes' => $remainingMinutes,
+            ])->render();
+        }, 20, 2);
+
+        \Eventy::addAction('conversation.after_subject_block', function ($conversation, $mailbox) {
+            $account = $this->windowClockAccountFor($conversation);
             if (!$account) {
                 return;
             }
@@ -101,6 +138,13 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
             // Channel stopped, or the module's own (configurable) rule
             // already considers the window closed: today's banner, byte
             // for byte, no change to its logic.
+            //
+            // The inactive-channel case fires regardless of window state
+            // (issue #29): it's precisely when an agent writes a reply
+            // normally, believing the channel works, that a silent
+            // delivery failure goes unnoticed — so the warning has to
+            // appear whenever the channel itself is down, independent of
+            // what the window would otherwise say.
             if ($inactive || WhatsAppMessage::windowExpired($conversation->id, $account)) {
                 $phone = WhatsAppMessage::where('conversation_id', $conversation->id)
                     ->whereNotNull('contact_phone')
@@ -110,20 +154,13 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                     'conversation'  => $conversation,
                     'account'       => $account,
                     'phone'         => $phone,
+                    // accountActive lets the partial avoid offering "send"
+                    // buttons that would always fail silently when the
+                    // channel itself is inactive.
                     'accountActive' => !$inactive,
                 ])->render();
                 return;
             }
-
-            // Window still open by Meta's real rule: the new clock, never
-            // the banner.
-            $remainingMinutes = WhatsAppMessage::realWindowRemainingMinutes($conversation->id);
-            if ($remainingMinutes === null) {
-                return;
-            }
-            echo view('metawhatsapp::partials/window_clock', [
-                'remainingMinutes' => $remainingMinutes,
-            ])->render();
         }, 20, 2);
 
         // Miniatura d'imatge als adjunts multimèdia de WhatsApp: el core ja
@@ -141,6 +178,22 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 . 'style="max-width:200px;max-height:200px;border-radius:4px;margin-top:6px;">'
                 . '</a></div>';
         }, 20, 4);
+    }
+
+    /**
+     * Shared account lookup for the two window-clock hooks above: finds
+     * the WhatsApp account tied to this conversation, or null when the
+     * conversation isn't the module's (no meta_whatsapp_messages row).
+     */
+    private function windowClockAccountFor($conversation): ?WhatsAppAccount
+    {
+        $accountId = WhatsAppMessage::where('conversation_id', $conversation->id)
+            ->value('account_id');
+        if (!$accountId) {
+            return null;
+        }
+
+        return WhatsAppAccount::find($accountId);
     }
 
     protected function currentPageIsWhatsAppMailbox(): bool
