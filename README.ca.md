@@ -36,6 +36,18 @@ El projecte és públic i porta en ús real de producció des de la v1.0, iteran
 - **Interfície neta de correu**: a les vistes del canal, el mòdul amaga els artefactes d'email del core (toggle Cc/Bcc, adreça tècnica interna), sense afectar les bústies de correu normals.
 - **Compatible amb FreeScout 1.8.x**, que corre sobre Laravel 5.5 i PHP 7.1 o superior.
 
+## Inici ràpid
+
+Cinc passos des d'una instal·lació de FreeScout nova fins a tenir un canal de WhatsApp funcionant. Cada pas enllaça amb el detall complet més avall — és el camí més curt, no un substitut.
+
+1. **Instal·la el mòdul.** Activa **MetaWhatsApp** des de Manage → Modules (o les tres comandes `artisan` si treballes des de la línia de comandes). Vegeu [Instal·lació](#installació).
+2. **Prepara Meta.** Necessites una App de tipus Business amb el producte WhatsApp afegit, un número de telèfon registrat, i quatre valors de l'App Dashboard: **Phone Number ID**, **WABA ID**, **Access Token**, **App Secret**. Vegeu [Requisits previs a Meta](#requisits-previs-a-meta) — en particular, genera un token permanent en lloc del de 24 hores que Meta mostra per defecte.
+3. **Afegeix el canal a FreeScout.** Manage → WhatsApp → Add account, enganxa els quatre valors, desa. Vegeu [Configuració del canal → A FreeScout](#a-freescout).
+4. **Apunta Meta cap al webhook.** Enganxa l'URL del webhook i el verify token que la pàgina del compte t'acaba de donar a la pantalla de configuració de Webhook de Meta, i activa el camp `messages`. Vegeu [Configuració del canal → A Meta](#a-meta).
+5. **Envia un missatge real** al número i confirma que crea una conversa a FreeScout, després respon des de FreeScout i confirma que arriba al telèfon.
+
+Si el pas 5 no funciona, comença per [Resolució de problemes](#resolució-de-problemes) i [Quan no és cosa del mòdul](#quan-no-és-cosa-del-mòdul) abans de donar per fet que el problema és del mòdul — un worker de cues aturat, un URL de webhook que no coincideix del tot, o un problema de certificat expliquen la majoria d'incidències del primer dia.
+
 ## Captures de pantalla
 
 *Llistat de canals WhatsApp configurats:*

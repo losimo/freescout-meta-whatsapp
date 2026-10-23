@@ -36,6 +36,18 @@ The project is public and has been running in real production use since v1.0, it
 - **Email-free interface**: on channel pages the module hides the core's email artifacts (Cc/Bcc toggle, internal technical address) without affecting regular email mailboxes.
 - **Compatible with FreeScout 1.8.x**, which runs on Laravel 5.5 and PHP 7.1 or newer.
 
+## Quick start
+
+Five steps from a fresh FreeScout install to a working WhatsApp channel. Each links to the full detail further down — this is the shortest path through it, not a replacement for it.
+
+1. **Install the module.** Activate **MetaWhatsApp** from Manage → Modules (or the three `artisan` commands if you're working from the command line). See [Installation](#installation).
+2. **Prepare Meta.** You need a Business-type App with the WhatsApp product added, a phone number registered in it, and four values from the App Dashboard: **Phone Number ID**, **WABA ID**, **Access Token**, **App Secret**. See [Meta prerequisites](#meta-prerequisites) — in particular, generate a permanent token rather than the 24-hour one Meta shows you by default.
+3. **Add the channel in FreeScout.** Manage → WhatsApp → Add account, paste the four values in, save. See [Channel configuration → In FreeScout](#in-freescout).
+4. **Point Meta at the webhook.** Paste the webhook URL and verify token the account page just gave you into Meta's own Webhook configuration screen, and enable the `messages` field. See [Channel configuration → In Meta](#in-meta).
+5. **Send a real message** to the number from a phone and confirm it creates a conversation in FreeScout, then reply from FreeScout and confirm it arrives back on the phone.
+
+If step 5 doesn't work, start with [Troubleshooting](#troubleshooting) and [When it is not the module](#when-it-is-not-the-module) before assuming something is broken in the module itself — a stopped queue worker, a webhook URL that doesn't quite match, or a certificate problem account for most first-run issues.
+
 ## Screenshots
 
 *List of configured WhatsApp channels:*

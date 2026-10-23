@@ -36,6 +36,18 @@ El proyecto es público y lleva en uso real de producción desde la v1.0, iteran
 - **Interfaz limpia de correo**: en las vistas del canal, el módulo oculta los artefactos de email del core (toggle Cc/Bcc, dirección técnica interna) sin afectar a los buzones de correo normales.
 - **Compatible con FreeScout 1.8.x**, que corre sobre Laravel 5.5 y PHP 7.1 o superior.
 
+## Inicio rápido
+
+Cinco pasos desde una instalación de FreeScout nueva hasta tener un canal de WhatsApp funcionando. Cada paso enlaza con el detalle completo más abajo — es el camino más corto, no un sustituto.
+
+1. **Instala el módulo.** Activa **MetaWhatsApp** desde Manage → Modules (o los tres comandos `artisan` si trabajas desde la línea de comandos). Ver [Instalación](#instalación).
+2. **Prepara Meta.** Necesitas una App de tipo Business con el producto WhatsApp añadido, un número de teléfono registrado, y cuatro valores del App Dashboard: **Phone Number ID**, **WABA ID**, **Access Token**, **App Secret**. Ver [Requisitos previos en Meta](#requisitos-previos-en-meta) — en particular, genera un token permanente en lugar del de 24 horas que Meta muestra por defecto.
+3. **Añade el canal en FreeScout.** Manage → WhatsApp → Add account, pega los cuatro valores, guarda. Ver [Configuración del canal → En FreeScout](#en-freescout).
+4. **Apunta Meta hacia el webhook.** Pega la URL del webhook y el verify token que la página de la cuenta te acaba de dar en la pantalla de configuración de Webhook de Meta, y activa el campo `messages`. Ver [Configuración del canal → En Meta](#en-meta).
+5. **Envía un mensaje real** al número y confirma que crea una conversación en FreeScout, luego responde desde FreeScout y confirma que llega al teléfono.
+
+Si el paso 5 no funciona, empieza por [Resolución de problemas](#resolución-de-problemas) y [Cuando no es cosa del módulo](#cuando-no-es-cosa-del-módulo) antes de asumir que el problema es del módulo — un worker de colas detenido, una URL de webhook que no coincide del todo, o un problema de certificado explican la mayoría de incidencias del primer día.
+
 ## Capturas de pantalla
 
 *Listado de canales de WhatsApp configurados:*
