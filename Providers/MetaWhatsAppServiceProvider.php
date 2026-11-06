@@ -107,24 +107,11 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 return;
             }
 
-            $inactive = !$account->is_active;
-
-            // Channel stopped, or the module's own (configurable) rule
-            // already considers the window closed: the banner hook owns
-            // both cases, this one stays silent.
-            if ($inactive || WhatsAppMessage::windowExpired($conversation->id, $account)) {
-                return;
-            }
-
-            // Window still open by Meta's real rule: the clock, never the
-            // banner.
-            $remainingMinutes = WhatsAppMessage::realWindowRemainingMinutes($conversation->id);
-            if ($remainingMinutes === null) {
-                return;
-            }
-            echo view('metawhatsapp::partials/window_clock', [
-                'remainingMinutes' => $remainingMinutes,
-            ])->render();
+            echo '<div id="metawhatsapp-window-clock-wrapper" data-window-state-url="'
+                . route('metawhatsapp.window_state', ['id' => $conversation->id])
+                . '">'
+                . \Modules\MetaWhatsApp\Support\WindowState::renderClock($conversation, $account)
+                . '</div>';
         }, 20, 2);
 
         \Eventy::addAction('conversation.after_subject_block', function ($conversation, $mailbox) {
@@ -133,35 +120,24 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 return;
             }
 
-            $inactive = !$account->is_active;
-
-            // Channel stopped, or the module's own (configurable) rule
-            // already considers the window closed: today's banner, byte
-            // for byte, no change to its logic.
-            //
-            // The inactive-channel case fires regardless of window state
-            // (issue #29): it's precisely when an agent writes a reply
-            // normally, believing the channel works, that a silent
-            // delivery failure goes unnoticed — so the warning has to
-            // appear whenever the channel itself is down, independent of
-            // what the window would otherwise say.
-            if ($inactive || WhatsAppMessage::windowExpired($conversation->id, $account)) {
-                $phone = WhatsAppMessage::where('conversation_id', $conversation->id)
-                    ->whereNotNull('contact_phone')
-                    ->orderByDesc('id')
-                    ->value('contact_phone');
-                echo view('metawhatsapp::partials/window_banner', [
-                    'conversation'  => $conversation,
-                    'account'       => $account,
-                    'phone'         => $phone,
-                    // accountActive lets the partial avoid offering "send"
-                    // buttons that would always fail silently when the
-                    // channel itself is inactive.
-                    'accountActive' => !$inactive,
-                ])->render();
-                return;
-            }
+            echo '<div id="metawhatsapp-window-banner">'
+                . \Modules\MetaWhatsApp\Support\WindowState::renderBanner($conversation, $account)
+                . '</div>';
         }, 20, 2);
+
+        // Live updates for the window clock (#41) and the expired-window
+        // banner (#42): loads the client-side script that polls the
+        // window-state endpoint (Task 2) and listens to the existing
+        // Polycast channel for new threads. Harmless on the mailbox-list
+        // page too (currentPageIsWhatsAppMailbox() also returns true
+        // there) — the script's own early-return guard finds no wrapper
+        // elements on that page and exits immediately.
+        \Eventy::addFilter('javascripts', function ($scripts) {
+            if ($this->currentPageIsWhatsAppMailbox()) {
+                $scripts[] = '/modules/metawhatsapp/js/window-state.js';
+            }
+            return $scripts;
+        }, 20, 1);
 
         // Miniatura d'imatge als adjunts multimèdia de WhatsApp: el core ja
         // llista qualsevol Attachment (nom + enllaç de descàrrega); només

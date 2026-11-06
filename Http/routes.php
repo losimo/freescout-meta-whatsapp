@@ -28,6 +28,9 @@ Route::group([
     // Banner de finestra expirada: enviament manual de la plantilla de recuperació.
     Route::post('/conversation/{id}/send-template', 'MetaWhatsAppController@sendTemplate')->name('metawhatsapp.send_template');
 
+    // Live refresh del rellotge/banner de finestra (issues #41/#42).
+    Route::get('/conversation/{id}/window-state', 'MetaWhatsAppController@windowState')->name('metawhatsapp.window_state');
+
     // Picker de plantilles en viu (fetch dinàmic de Meta + variables).
     Route::get('/conversation/{id}/templates', 'MetaWhatsAppController@browseTemplates')->name('metawhatsapp.browse_templates');
     Route::post('/conversation/{id}/send-dynamic-template', 'MetaWhatsAppController@sendDynamicTemplate')->name('metawhatsapp.send_dynamic_template');

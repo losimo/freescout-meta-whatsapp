@@ -1387,6 +1387,63 @@ class ProcessInboundWebhookTest extends TestCase
         $this->assertNull(Thread::find($thread->id)->opened_at);
     }
 
+    /**
+     * 'played' arrives for voice notes once the customer actually plays
+     * them, distinct from 'delivered'/'read' in Meta's own webhook. We map
+     * it to the same STATUS_READ and the same native "opened" indicator as
+     * 'read' already gets (issue found via the Meta changelog check), on
+     * the view that a played voice note is read in every sense that
+     * matters to an agent.
+     */
+    public function test_status_played_marca_el_thread_com_a_obert()
+    {
+        $account = $this->createTestAccount();
+        [$thread, $message] = $this->createOutboundMessage($account, 'wamid.qw6');
+        $this->assertNull($thread->opened_at);
+
+        $this->runJob($account, $this->statusPayload($account, 'wamid.qw6', 'played'));
+
+        $this->assertNotNull(Thread::find($thread->id)->opened_at);
+        $this->assertEquals(WhatsAppMessage::STATUS_READ, $message->fresh()->status);
+    }
+
+    public function test_status_played_posterior_no_sobreescriu_opened_at()
+    {
+        $account = $this->createTestAccount();
+        [$thread] = $this->createOutboundMessage($account, 'wamid.qw7');
+        $original = '2026-01-01 10:00:00';
+        $thread->opened_at = $original;
+        $thread->save();
+
+        $this->runJob($account, $this->statusPayload($account, 'wamid.qw7', 'played'));
+
+        $this->assertEquals($original, (string) Thread::find($thread->id)->opened_at);
+    }
+
+    public function test_status_played_sense_delivered_previ_omple_els_dos_timestamps()
+    {
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.in12', '34611222333', 'hola'));
+
+        $statusPayload = $this->inboundPayload($account, 'x', 'x', 'x');
+        $statusPayload['entry'][0]['changes'][0]['value'] = [
+            'messaging_product' => 'whatsapp',
+            'metadata'          => ['phone_number_id' => $account->phone_number_id],
+            'statuses'          => [[
+                'id'        => 'wamid.in12',
+                'status'    => 'played',
+                'timestamp' => (string) 1700000000,
+            ]],
+        ];
+        $this->runJob($account, $statusPayload);
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.in12')->first();
+        $this->assertNotNull($msg->delivered_at);
+        $this->assertNotNull($msg->read_at);
+        $this->assertEquals($msg->delivered_at->timestamp, $msg->read_at->timestamp);
+        $this->assertEquals(WhatsAppMessage::STATUS_READ, $msg->status);
+    }
+
     public function test_compte_inactiu_no_processa_res()
     {
         $account = $this->createTestAccount(['is_active' => false]);

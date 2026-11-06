@@ -71,7 +71,7 @@ class MetaWhatsAppController extends Controller
 
         $request->validate([
             'debug_window'    => 'nullable|in:off,1,3,7,30,always',
-            'debug_retention' => 'required|integer|min:1|max:90',
+            'debug_retention' => 'required|integer|min:0|max:365',
         ]);
 
         DebugLog::setRetentionDays((int) $request->debug_retention);
@@ -456,6 +456,24 @@ class MetaWhatsAppController extends Controller
 
         \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.template_sent'));
         return redirect()->back();
+    }
+
+    /**
+     * Live refresh for the clock/banner wrappers — see
+     * docs/superpowers/specs/2026-11-03-metawhatsapp-window-clock-live-update-design.md.
+     * Returns the SAME HTML a fresh page load would render for both,
+     * via WindowState — never a separate representation of the state
+     * that could drift from what conversation.after_subject/
+     * after_subject_block already show.
+     */
+    public function windowState($id)
+    {
+        [$conversation, $account] = $this->resolveModuleConversation($id);
+
+        return response()->json([
+            'clock'  => \Modules\MetaWhatsApp\Support\WindowState::renderClock($conversation, $account),
+            'banner' => \Modules\MetaWhatsApp\Support\WindowState::renderBanner($conversation, $account),
+        ]);
     }
 
     /**

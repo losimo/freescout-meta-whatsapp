@@ -67,7 +67,7 @@
                 <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.diagnostics_retention') }}</label>
                 <div class="col-sm-8">
                     <input type="number" name="debug_retention" class="form-control" style="max-width:120px"
-                           min="1" max="90" value="{{ $debug['retention'] }}">
+                           min="0" max="365" value="{{ $debug['retention'] }}">
                     <p class="help-block">{{ __('metawhatsapp::metawhatsapp.diagnostics_retention_help') }}</p>
                 </div>
             </div>

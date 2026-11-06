@@ -119,7 +119,7 @@ return [
     'diagnostics_window_days'     => ':days days',
     'diagnostics_window_always'   => 'Until I turn it off',
     'diagnostics_retention'       => 'Keep log files for',
-    'diagnostics_retention_help'  => 'Days. One file per day; older ones are deleted.',
+    'diagnostics_retention_help'  => 'Days. One file per day; older ones are deleted. 0 keeps every file forever: think about that before choosing it, since this log holds message text and phone numbers.',
     'diagnostics_view_log'        => 'Read the log',
     'diagnostics_saved'           => 'Detailed logging updated.',
     'app_id'                      => 'App ID',

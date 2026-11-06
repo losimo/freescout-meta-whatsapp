@@ -86,15 +86,28 @@ class DebugLogTest extends TestCase
         $this->assertEquals(DebugLog::DEFAULT_RETENTION_DAYS, DebugLog::retentionDays());
     }
 
-    public function test_retention_is_configurable_and_never_unbounded()
+    public function test_retention_is_configurable()
     {
         DebugLog::setRetentionDays(30);
         $this->assertEquals(30, DebugLog::retentionDays());
+    }
 
-        // Monolog reads 0 as "keep every file for ever", which is the opposite
-        // of what anyone typing 0 into that box wants.
-        \Option::set(DebugLog::OPTION_RETENTION, 0);
-        $this->assertEquals(DebugLog::DEFAULT_RETENTION_DAYS, DebugLog::retentionDays());
+    /**
+     * MarkoD asked for this directly (issue #10): Monolog's
+     * RotatingFileHandler already reads a maxFiles of 0 as "keep every
+     * file forever", so 0 here means exactly that literal thing, not a
+     * fallback to the default.
+     */
+    public function test_retention_of_zero_means_keep_every_file_forever()
+    {
+        DebugLog::setRetentionDays(0);
+        $this->assertEquals(0, DebugLog::retentionDays());
+    }
+
+    public function test_retention_rejects_negative_values()
+    {
+        DebugLog::setRetentionDays(-5);
+        $this->assertEquals(0, DebugLog::retentionDays());
     }
 
     public function test_the_panel_says_which_of_the_three_states_it_is_in()
@@ -154,5 +167,37 @@ class DebugLogTest extends TestCase
         $this->assertTrue(DebugLog::isEnabled(), 'canviar la retenció ha apagat el registre');
         $this->assertEquals($before->format('Y-m-d H:i'), DebugLog::expiresAt()->format('Y-m-d H:i'));
         $this->assertEquals(21, DebugLog::retentionDays());
+    }
+
+    /**
+     * The door, not just the class: confirms the controller's own
+     * validation actually accepts 0 and the raised 365 ceiling (issue #10),
+     * not only that DebugLog itself would store them if asked.
+     */
+    public function test_the_settings_form_accepts_zero_and_the_raised_ceiling()
+    {
+        $admin = new \App\User();
+        $admin->first_name = 'Admin';
+        $admin->last_name  = 'Test';
+        $admin->email      = 'admin-' . uniqid() . '@example.com';
+        $admin->password   = bcrypt('secret');
+        $admin->role       = \App\User::ROLE_ADMIN;
+        $admin->save();
+
+        $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/diagnostics'), [
+                'debug_window'    => '',
+                'debug_retention' => 0,
+            ]);
+        $this->assertEquals(0, DebugLog::retentionDays());
+
+        $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/diagnostics'), [
+                'debug_window'    => '',
+                'debug_retention' => 365,
+            ]);
+        $this->assertEquals(365, DebugLog::retentionDays());
     }
 }

@@ -16,9 +16,9 @@
 > This is a Meta pricing change, not a module change. The module charges nothing and takes no commission, and its idempotency guards stop a queue retry from re-sending a message that already went out.
 
 > [!NOTE]
-> **Worth checking before 30 September: does your WhatsApp Business Account have a payment method on file?**
+> **Worth checking: does your WhatsApp Business Account have a payment method on file?**
 >
-> Industry sources report that accounts without one stop having their service messages delivered from 1 October, rather than being billed afterwards. Like the figure of 1,000 above, this is on no Meta page, and it is not something this module can check for you. It is mentioned here because the failure would be a quiet one: customers keep writing and replies stop arriving.
+> Industry sources report that accounts without one stop having their service messages delivered, rather than being billed afterwards. Like the figure of 1,000 above, this is on no Meta page, and it is not something this module can check for you. It is mentioned here because the failure would be a quiet one: customers keep writing and replies stop arriving.
 
 <!-- Remove both notices once Meta's pricing page covers the change as routine and
      a few versions have passed since 1 October 2026. -->
@@ -82,7 +82,7 @@ Currently covers:
 - One or more WhatsApp numbers, each as an independent module account.
 - Automatic conversation creation in FreeScout from incoming messages.
 - Replies from FreeScout to WhatsApp honoring the core undo window.
-- Best-effort tracking of `delivered` and `read` states in the module database; since v1.2.0, a `read` receipt from Meta also marks the outbound thread as opened, using FreeScout's native "opened" indicator.
+- Best-effort tracking of `delivered` and `read` states in the module database; since v1.2.0, a `read` receipt from Meta also marks the outbound thread as opened, using FreeScout's native "opened" indicator. Since v2.1.0, a `played` status (a voice note the customer has listened to) gets the same treatment.
 - Since v1.3.0, manual recovery of an expired window with a pre-approved HSM template — see [Expired window recovery](#expired-window-recovery-v130) below.
 - Since v1.4.0, media messages (image, video, audio, document): inbound download & attachment, image thumbnail preview, outbound send gated to the open 24h window — see [Media support](#media-support-v140) below.
 - Since v1.5.0, inbound location and reaction messages (including quoted-message context), and a connection health panel per account (last inbound/outbound, last error, "Test connection" button).
@@ -98,6 +98,12 @@ Out of scope:
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
 
+## What's new in v2.1.0
+
+- **The window countdown and the recovery banner now update live** while a conversation stays open: a customer reply or the window closing is reflected automatically, with no page reload needed (#41, #42).
+- **Recognizes Meta's `played` webhook status** for voice notes: a played voice note now gets the same "opened" treatment a read text message already had.
+- **Debug log retention now accepts `0` for "keep every file forever"**, with the ceiling raised from 90 to 365 days (#10).
+
 ## What's new in v2.0.1
 
 - **Fix**: the window countdown from v2.0.0 was unreachable to screen readers, and hidden behind "Show Details" for any conversation with Chat Mode on. Both fixed: it announces the countdown itself instead of only the tooltip, and now renders from a hook Chat Mode never collapses. The existing recovery banner is unaffected either way.
@@ -110,10 +116,6 @@ Committed publicly back on 2026-08-25 (issue #2): every open conversation now sh
 - The indicator carries a small clock icon, inlined from the [Lucide](https://lucide.dev) set, no external request. The first icon this module ships beyond FreeScout's own Glyphicons — a round-number release earns a bit more care in how something looks, not only what it does.
 - First major version bump since 1.0.0. Nothing breaks and no setting changes meaning — it is tied to this being a notable, publicly-promised feature, which is what round numbers are for in this project.
 
-## What's new in v1.15.0
-
-- **Broken credentials now show on the accounts list and the edit screen**, not just in the log. If FreeScout's `APP_KEY` changes — a server move, a `key:generate` taken from a forum — the channel used to look healthy while every delivery quietly failed. `credentialsAreReadable()` existed since v1.14.0, but nothing called it outside the tests, a gap [@jeroenedig](https://github.com/jeroenedig) found reviewing the code (#38).
-
 Older releases are listed on the [releases page](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
 ## FreeScout compatibility
@@ -125,7 +127,7 @@ Older releases are listed on the [releases page](https://github.com/losimo/frees
 
 From 1.10.0 the module uses the conversation status API that FreeScout added in 1.8.234, so that a status contributed by another module is understood rather than filed as unknown. On anything older it falls back to the previous behaviour, which is exactly right there, since a core without that API cannot carry custom statuses either. Nothing breaks; the channel settings screen tells you what it found.
 
-Newer than 1.8.234 is worth having on its own: 1.8.235, 1.8.236 and 1.8.237 each closed security issues in FreeScout.
+Newer than 1.8.234 is worth having on its own: 1.8.235, 1.8.236 and 1.8.237 each closed security issues in FreeScout. 1.8.234 itself is also where FreeScout's own HTML sanitizer started allowing the `<code>` tag; on anything older, the monospace formatting this module renders for inbound WhatsApp text (see [Feature scope](#feature-scope)) gets silently stripped by the core, not by this module.
 
 ## Installation
 
@@ -240,6 +242,8 @@ Since v1.3.0, an expired window can be manually recovered with a pre-approved HS
 
 Every open conversation for this channel shows how much of the 24-hour window is left, counting from the customer's last message — your replies never reset it. It switches to a warning style in the last hour. This is purely informational: it always reflects Meta's real rule, never the internal threshold below.
 
+Since v2.1.0, the clock and the recovery banner also update live while the conversation stays open: a customer reply or the window closing is reflected automatically, with no page reload needed.
+
 ### Expired window recovery (v1.3.0)
 
 When the customer window looks expired, a banner appears in the conversation offering to send a **single pre-approved WhatsApp template**, configured per account (name + language). Sending is always **manual**: an agent clicks the button in the banner, there is no automatic template retry.
@@ -316,6 +320,7 @@ Before moving from testing to production:
 | Nothing gets processed | Queue worker stopped (`php artisan queue:work`) |
 | **Manage → WhatsApp** gives "page could not be found" | The module's routes are not reaching FreeScout. Open `/meta-whatsapp/webhook`: if that answers, the routes are alive and the problem is elsewhere; if it also 404s, they are not. Note that `/meta-whatsapp` is a route, not a folder, so there is nothing to look for on disk, and a 404 is never written to any log, so an empty log tells you nothing |
 | A fix from a module update does not seem to apply | Queue worker keeps running with old code in memory. Restarting cron does not reload it; run `php artisan queue:restart` |
+| Pages 500, or the window clock never updates after a module update | A broken module asset symlink. Open **Manage → Modules** once; FreeScout repairs it automatically |
 
 All module logs carry the `[MetaWhatsApp]` prefix.
 

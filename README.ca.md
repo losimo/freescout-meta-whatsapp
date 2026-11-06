@@ -16,9 +16,9 @@
 > És un canvi de tarifes de Meta, no del mòdul. El mòdul no cobra res ni rep cap comissió, i les seves guardes d'idempotència eviten que un reintent de la cua torni a enviar un missatge que ja havia sortit.
 
 > [!NOTE]
-> **Val la pena comprovar-ho abans del 30 de setembre: el vostre compte de WhatsApp Business té un mètode de pagament donat d'alta?**
+> **Val la pena comprovar-ho: el vostre compte de WhatsApp Business té un mètode de pagament donat d'alta?**
 >
-> Fonts del sector diuen que els comptes que no en tinguin deixaran de tenir els missatges de servei **entregats** a partir de l'1 d'octubre, en comptes de rebre'n la factura després. Com la xifra de mil de més amunt, això no surt a cap pàgina de Meta, i no és una cosa que aquest mòdul us pugui comprovar. Ho esmentem aquí perquè la fallada seria silenciosa: els clients continuen escrivint i les respostes deixen d'arribar.
+> Fonts del sector diuen que els comptes que no en tinguin deixen de tenir els missatges de servei **entregats**, en comptes de rebre'n la factura després. Com la xifra de mil de més amunt, això no surt a cap pàgina de Meta, i no és una cosa que aquest mòdul us pugui comprovar. Ho esmentem aquí perquè la fallada seria silenciosa: els clients continuen escrivint i les respostes deixen d'arribar.
 
 <!-- Retirar tots dos avisos quan la pàgina de preus de Meta reculli el canvi amb
      normalitat i hagin passat unes quantes versions des de l'1 d'octubre del 2026. -->
@@ -82,7 +82,7 @@ Actualment cobreix:
 - Un o més números WhatsApp, cadascun com a compte independent del mòdul.
 - Creació automàtica de converses a FreeScout a partir de missatges entrants.
 - Resposta des de FreeScout cap a WhatsApp respectant la finestra d'undo del core.
-- Actualització best-effort dels estats `delivered` i `read` a la base de dades del mòdul; des de la v1.2.0, l'estat `read` de Meta també marca el thread outbound com a obert, amb l'indicador natiu "obert" de FreeScout.
+- Actualització best-effort dels estats `delivered` i `read` a la base de dades del mòdul; des de la v1.2.0, l'estat `read` de Meta també marca el thread outbound com a obert, amb l'indicador natiu "obert" de FreeScout. Des de la v2.1.0, un estat `played` (una nota de veu que el client ha escoltat) rep el mateix tractament.
 - Des de la v1.3.0, recuperació manual d'una finestra caducada amb una plantilla HSM pre-aprovada — vegeu [Recuperació de finestra caducada](#recuperació-de-finestra-caducada-v130) més avall.
 - Des de la v1.4.0, missatges multimèdia (imatge, vídeo, àudio, document): descàrrega i adjunció entrant, previsualització en miniatura d'imatges, enviament sortint limitat a la finestra oberta de 24h — vegeu [Suport multimèdia](#suport-multimèdia-v140) més avall.
 - Des de la v1.5.0, missatges entrants d'ubicació i reacció (amb context del missatge citat), i un panell d'estat de connexió per compte (últim inbound/outbound, últim error, botó "Test connection").
@@ -98,6 +98,12 @@ Queda fora d'abast:
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 
+## Novetats a la v2.1.0
+
+- **El compte enrere de la finestra i el banner de recuperació ara s'actualitzen en viu** mentre la conversa es manté oberta: una resposta del client o el tancament de la finestra es reflecteixen automàticament, sense recarregar la pàgina (#41, #42).
+- **Es reconeix l'estat `played` de Meta** per a notes de veu: una nota de veu escoltada rep ara el mateix tractament "obert" que ja tenia un missatge de text llegit.
+- **La retenció del registre detallat admet ara `0` per a "conservar-ho tot per sempre"**, amb el límit pujat de 90 a 365 dies (#10).
+
 ## Novetats a la v2.0.1
 
 - **Correcció**: el compte enrere de la v2.0.0 era inabastable per a lectors de pantalla, i quedava amagat rere "Show Details" en qualsevol conversa amb el Chat Mode activat. Tots dos arreglats: ara anuncia el compte enrere mateix en lloc de només el tooltip, i es renderitza des d'un punt que el Chat Mode mai amaga. El banner de recuperació existent no es veu afectat.
@@ -110,10 +116,6 @@ Compromès públicament el 2026-08-25 (issue #2): cada conversa oberta ara mostr
 - L'indicador porta una petita icona de rellotge, incrustada del joc [Lucide](https://lucide.dev), sense cap petició externa. La primera icona que aquest mòdul incorpora més enllà dels Glyphicons propis del FreeScout — una versió de número rodó es mereix una mica més de cura en com es veu, no només en què fa.
 - Primer bump de versió major des de la 1.0.0. No es trenca res ni canvia el significat de cap opció — va lligat a ser una millora notable i compromesa públicament, que és per a què serveixen els números rodons en aquest projecte.
 
-## Novetats a la v1.15.0
-
-- **Les credencials trencades ara surten a la llista de comptes i a la pantalla d'edició**, no només al registre. Quan canvia l'`APP_KEY` del FreeScout — un canvi de servidor, un `key:generate` tret d'un fòrum — el canal semblava sa mentre cada entrega fallava en silenci. `credentialsAreReadable()` hi era des de la v1.14.0, però no la cridava ningú fora dels tests, un forat que va trobar [@jeroenedig](https://github.com/jeroenedig) revisant el codi (#38).
-
 Les versions anteriors són a la [pàgina de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
 ## Compatibilitat amb FreeScout
@@ -125,7 +127,7 @@ Les versions anteriors són a la [pàgina de releases](https://github.com/losimo
 
 Des de la 1.10.0 el mòdul fa servir l'API d'estats de conversa que FreeScout va afegir a la 1.8.234, perquè un estat aportat per un altre mòdul s'entengui en comptes de quedar classificat com a desconegut. En versions anteriors torna al comportament de sempre, que allà és exactament el correcte, perquè un nucli sense aquella API tampoc pot tenir estats personalitzats. No es trenca res, i la pantalla de configuració del canal us diu què ha trobat.
 
-Anar per sobre de la 1.8.234 val la pena pel seu compte: les 1.8.235, 1.8.236 i 1.8.237 tanquen problemes de seguretat del propi FreeScout.
+Anar per sobre de la 1.8.234 val la pena pel seu compte: les 1.8.235, 1.8.236 i 1.8.237 tanquen problemes de seguretat del propi FreeScout. La 1.8.234 mateixa és també quan el sanititzador d'HTML del propi FreeScout va començar a admetre el tag `<code>`; en qualsevol versió anterior, el format monospace que aquest mòdul renderitza per al text entrant de WhatsApp (vegeu [Abast de funcionalitats](#abast-de-funcionalitats)) l'esborra el core en silenci, no el mòdul.
 
 ## Instal·lació
 
@@ -235,6 +237,8 @@ Des de la v1.3.0, una finestra caducada es pot recuperar manualment amb una plan
 
 Cada conversa oberta d'aquest canal mostra quant queda de la finestra de 24 hores, comptant des de l'últim missatge del client — les teves respostes no la reinicien mai. Canvia a estil d'avís durant l'última hora. És purament informatiu: sempre reflecteix la regla real de Meta, mai el llindar intern de més avall.
 
+Des de la v2.1.0, el rellotge i el banner de recuperació també s'actualitzen en viu mentre la conversa es manté oberta: una resposta del client o el tancament de la finestra es reflecteixen automàticament, sense haver de recarregar la pàgina.
+
 ### Recuperació de finestra caducada (v1.3.0)
 
 Quan la finestra del client sembla caducada, apareix un banner a la conversa que permet enviar **una única plantilla de WhatsApp pre-aprovada**, configurada per compte (nom + idioma). L'enviament és sempre **manual**: un agent prem el botó del banner; no hi ha cap reintent automàtic de plantilla.
@@ -311,6 +315,7 @@ Abans de fer el pas de proves a producció:
 | No es processa res | El worker de cues està aturat (`php artisan queue:work`) |
 | **Gestionar → WhatsApp** dona "pàgina no trobada" | Les rutes del mòdul no arriben al FreeScout. Obriu `/meta-whatsapp/webhook`: si respon, les rutes són vives i el problema és un altre; si també dona 404, no hi arriben. Tingueu present que `/meta-whatsapp` és una ruta i no una carpeta, així que no hi ha res a buscar al disc, i que un 404 no s'escriu mai a cap registre, per tant un registre buit no vol dir res |
 | Un fix d'una actualització del mòdul no sembla aplicar-se | El worker de cues continua executant codi antic en memòria. Reiniciar el cron no el recarrega; cal `php artisan queue:restart` |
+| Les pàgines donen 500, o el rellotge de finestra mai s'actualitza després d'una actualització del mòdul | Un symlink dels assets del mòdul trencat. Obriu **Gestiona → Mòduls** un cop; el FreeScout el repara automàticament |
 
 Tots els logs del mòdul porten el prefix `[MetaWhatsApp]`.
 

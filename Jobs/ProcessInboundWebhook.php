@@ -797,10 +797,17 @@ class ProcessInboundWebhook implements ShouldQueue
             return;
         }
 
+        // 'played' arrives for voice notes once the customer actually plays
+        // them (Meta changelog check, folded into the #10/#41/#42 batch). It
+        // maps to the same STATUS_READ and gets the same downstream
+        // treatment as 'read' below: a played voice note is read in every
+        // sense that matters to an agent, and there is no separate "played"
+        // state anywhere else in this module (no migration needed).
         $map = [
             'sent'      => WhatsAppMessage::STATUS_SENT,
             'delivered' => WhatsAppMessage::STATUS_DELIVERED,
             'read'      => WhatsAppMessage::STATUS_READ,
+            'played'    => WhatsAppMessage::STATUS_READ,
             'failed'    => WhatsAppMessage::STATUS_FAILED,
         ];
         if (!isset($map[$newStatus])) {
@@ -809,28 +816,30 @@ class ProcessInboundWebhook implements ShouldQueue
 
         $record->status = $map[$newStatus];
 
-        if (in_array($newStatus, ['delivered', 'read'], true)) {
+        $countsAsRead = in_array($newStatus, ['read', 'played'], true);
+
+        if (in_array($newStatus, ['delivered', 'read', 'played'], true)) {
             $statusAt = isset($status['timestamp'])
                 ? \Carbon\Carbon::createFromTimestamp((int) $status['timestamp'])
                 : now();
 
-            // Meta no sempre envia 'delivered' abans de 'read'; si arriba
-            // 'read' sense que ho haguem vist, deduïm delivered_at del
+            // Meta no sempre envia 'delivered' abans de 'read'/'played'; si
+            // arriba sense que ho haguem vist, deduïm delivered_at del
             // mateix esdeveniment en lloc de deixar-lo buit.
             if (!$record->delivered_at) {
                 $record->delivered_at = $statusAt;
             }
-            if ($newStatus === 'read' && !$record->read_at) {
+            if ($countsAsRead && !$record->read_at) {
                 $record->read_at = $statusAt;
             }
         }
 
         $record->save();
 
-        // Indicador de lectura natiu (issue #3): el 'read' de Meta marca el
-        // thread outbound com a obert, igual que el píxel de tracking dels
-        // emails (OpenController). Només la primera lectura.
-        if ($newStatus === 'read'
+        // Indicador de lectura natiu (issue #3): el 'read'/'played' de Meta
+        // marca el thread outbound com a obert, igual que el píxel de
+        // tracking dels emails (OpenController). Només la primera lectura.
+        if ($countsAsRead
             && $record->direction === WhatsAppMessage::DIRECTION_OUTBOUND
             && $record->thread_id
         ) {

@@ -260,7 +260,7 @@ class WindowClockTest extends TestCase
         $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_expired_notice'), $clockHtml);
 
         $bannerHtml = $this->renderAfterSubjectBlock($conversation, $account);
-        $this->assertSame('', $bannerHtml);
+        $this->assertSame('<div id="metawhatsapp-window-banner"></div>', $bannerHtml);
     }
 
     /**
@@ -318,6 +318,124 @@ class WindowClockTest extends TestCase
         $clockHtml = $this->renderAfterSubject($conversation, $account);
         $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_open'), $clockHtml);
         $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_closing_soon'), $clockHtml);
+    }
+
+    /**
+     * The banner hook must now ALWAYS emit the wrapper div when an account
+     * exists, even with nothing to show inside — the JS (Task 3) needs a
+     * stable element to swap content into later, regardless of what state
+     * the page was in at load time.
+     */
+    public function test_banner_hook_always_emits_the_wrapper_div_when_an_account_exists()
+    {
+        $account = $this->createTestAccount();
+        $this->makeInbound($account, 555030, now()->subMinutes(30));
+        $conversation = $this->fakeConversation(555030);
+
+        $bannerHtml = $this->renderAfterSubjectBlock($conversation, $account);
+
+        $this->assertSame('<div id="metawhatsapp-window-banner"></div>', $bannerHtml);
+    }
+
+    /**
+     * Mirror for the clock hook: the wrapper must be present even when
+     * there's nothing to show (window closed), so a later live refresh can
+     * still find somewhere to put a fresh clock if the window reopens.
+     */
+    public function test_clock_hook_always_emits_the_wrapper_div_when_an_account_exists()
+    {
+        $account = $this->createTestAccount();
+        $this->makeInbound($account, 555031, now()->subHours(25));
+        $conversation = $this->fakeConversation(555031);
+
+        $clockHtml = $this->renderAfterSubject($conversation, $account);
+
+        $this->assertStringContainsString('<div id="metawhatsapp-window-clock-wrapper"', $clockHtml);
+        $this->assertStringNotContainsString(__('metawhatsapp::metawhatsapp.window_clock_open'), $clockHtml);
+
+        // The sole bridge from this PHP-rendered page to window-state.js's
+        // fetch calls (#41/#42 live refresh). It lives on the outer wrapper,
+        // so it's emitted regardless of open/closed state — asserted here on
+        // the closed-window case precisely because that's the one with the
+        // least other markup to accidentally keep this test green.
+        $this->assertStringContainsString('data-window-state-url="', $clockHtml);
+        $this->assertStringContainsString('/window-state', $clockHtml);
+    }
+
+    /**
+     * WindowState::renderClock()/renderBanner() must agree with the hooks
+     * that already-tested behavior above didn't just move the goalposts:
+     * same open-window scenario, same split (clock yes, banner no).
+     */
+    public function test_window_state_render_clock_and_render_banner_agree_with_the_hooks()
+    {
+        $account = $this->createTestAccount();
+        $this->makeInbound($account, 555032, now()->subMinutes(30));
+        $conversation = $this->fakeConversation(555032);
+
+        $clockHtml = \Modules\MetaWhatsApp\Support\WindowState::renderClock($conversation, $account);
+        $this->assertStringContainsString(__('metawhatsapp::metawhatsapp.window_clock_open'), $clockHtml);
+
+        $bannerHtml = \Modules\MetaWhatsApp\Support\WindowState::renderBanner($conversation, $account);
+        $this->assertSame('', $bannerHtml);
+    }
+
+    public function test_window_state_render_banner_matches_the_expired_window_case()
+    {
+        $account = $this->createTestAccount();
+        $this->makeInbound($account, 555033, now()->subHours(25));
+        $conversation = $this->fakeConversation(555033);
+
+        $bannerHtml = \Modules\MetaWhatsApp\Support\WindowState::renderBanner($conversation, $account);
+        $this->assertStringContainsString(__('metawhatsapp::metawhatsapp.window_expired_notice'), $bannerHtml);
+
+        $clockHtml = \Modules\MetaWhatsApp\Support\WindowState::renderClock($conversation, $account);
+        $this->assertSame('', $clockHtml);
+    }
+
+    /**
+     * The clock partial must carry data-expires-at plus the raw,
+     * already-translated templates (with their :placeholder markers
+     * intact) for JS to do its own arithmetic — never a format JS has to
+     * reimplement. Checked in all three active locales, not just English
+     * (spec §8, item 1): a JS-side reformat bug would otherwise only show
+     * up for ca/es users.
+     */
+    public function test_clock_partial_carries_data_attributes_for_js_in_every_locale()
+    {
+        foreach (['en', 'es', 'ca'] as $locale) {
+            app()->setLocale($locale);
+
+            $html = \View::make('metawhatsapp::partials/window_clock', [
+                'remainingMinutes' => 119,
+            ])->render();
+
+            $this->assertStringContainsString('id="metawhatsapp-window-clock"', $html);
+            $this->assertStringContainsString('data-expires-at="', $html);
+            $this->assertStringContainsString(
+                'data-label-open="' . e(__('metawhatsapp::metawhatsapp.window_clock_open')) . '"',
+                $html
+            );
+            $this->assertStringContainsString(
+                'data-label-closing="' . e(__('metawhatsapp::metawhatsapp.window_clock_closing_soon')) . '"',
+                $html
+            );
+            $this->assertStringContainsString(
+                'data-template-minutes="' . e(__('metawhatsapp::metawhatsapp.window_clock_minutes_left')) . '"',
+                $html
+            );
+            $this->assertStringContainsString(
+                'data-template-hours="' . e(__('metawhatsapp::metawhatsapp.window_clock_hours_left')) . '"',
+                $html
+            );
+            $this->assertStringContainsString(
+                'data-template-hours-minutes="' . e(__('metawhatsapp::metawhatsapp.window_clock_hours_minutes_left')) . '"',
+                $html
+            );
+            $this->assertStringContainsString('id="metawhatsapp-window-clock-text"', $html);
+        }
+
+        app()->setLocale('en');
     }
 
     private function fakeConversation(int $id): \App\Conversation

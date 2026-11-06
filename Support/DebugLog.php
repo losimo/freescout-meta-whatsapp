@@ -98,18 +98,19 @@ class DebugLog
         \Option::set(self::OPTION_UNTIL, '');
     }
 
+    /**
+     * 0 means forever, literally: Monolog's RotatingFileHandler already
+     * reads a maxFiles of 0 that way, and MarkoD asked for exactly this
+     * (issue #10) rather than just a higher ceiling.
+     */
     public static function retentionDays(): int
     {
-        $days = (int) self::option(self::OPTION_RETENTION, self::DEFAULT_RETENTION_DAYS);
-
-        // A retention of zero would mean "keep every file for ever" in
-        // Monolog, which is the opposite of what anyone typing 0 wants.
-        return $days > 0 ? $days : self::DEFAULT_RETENTION_DAYS;
+        return (int) self::option(self::OPTION_RETENTION, self::DEFAULT_RETENTION_DAYS);
     }
 
     public static function setRetentionDays(int $days): void
     {
-        \Option::set(self::OPTION_RETENTION, max(1, $days));
+        \Option::set(self::OPTION_RETENTION, max(0, $days));
     }
 
     /**

@@ -16,9 +16,9 @@
 > Es un cambio de tarifas de Meta, no del módulo. El módulo no cobra nada ni recibe ninguna comisión, y sus guardas de idempotencia evitan que un reintento de la cola vuelva a enviar un mensaje que ya había salido.
 
 > [!NOTE]
-> **Conviene comprobarlo antes del 30 de septiembre: ¿su cuenta de WhatsApp Business tiene un método de pago dado de alta?**
+> **Conviene comprobarlo: ¿su cuenta de WhatsApp Business tiene un método de pago dado de alta?**
 >
-> Fuentes del sector afirman que las cuentas que no lo tengan dejarán de tener los mensajes de servicio **entregados** a partir del 1 de octubre, en lugar de recibir la factura después. Como la cifra de mil de más arriba, esto no aparece en ninguna página de Meta, y no es algo que este módulo pueda comprobar por usted. Se menciona aquí porque el fallo sería silencioso: los clientes siguen escribiendo y las respuestas dejan de llegar.
+> Fuentes del sector afirman que las cuentas que no lo tengan dejan de tener los mensajes de servicio **entregados**, en lugar de recibir la factura después. Como la cifra de mil de más arriba, esto no aparece en ninguna página de Meta, y no es algo que este módulo pueda comprobar por usted. Se menciona aquí porque el fallo sería silencioso: los clientes siguen escribiendo y las respuestas dejan de llegar.
 
 <!-- Retirar ambos avisos cuando la página de precios de Meta recoja el cambio con
      normalidad y hayan pasado unas cuantas versiones desde el 1 de octubre de 2026. -->
@@ -82,7 +82,7 @@ Actualmente cubre:
 - Uno o más números de WhatsApp, cada uno como cuenta independiente del módulo.
 - Creación automática de conversaciones en FreeScout a partir de mensajes entrantes.
 - Respuesta desde FreeScout hacia WhatsApp respetando la ventana de deshacer del core.
-- Actualización best-effort de los estados `delivered` y `read` en la base de datos del módulo; desde la v1.2.0, un `read` de Meta también marca el thread outbound como abierto, con el indicador nativo "abierto" de FreeScout.
+- Actualización best-effort de los estados `delivered` y `read` en la base de datos del módulo; desde la v1.2.0, un `read` de Meta también marca el thread outbound como abierto, con el indicador nativo "abierto" de FreeScout. Desde la v2.1.0, un estado `played` (una nota de voz que el cliente ha escuchado) recibe el mismo tratamiento.
 - Desde la v1.3.0, recuperación manual de una ventana caducada con una plantilla HSM preaprobada — ver [Recuperación de ventana caducada](#recuperación-de-ventana-caducada-v130) más abajo.
 - Desde la v1.4.0, mensajes multimedia (imagen, vídeo, audio, documento): descarga y adjunción entrante, previsualización en miniatura de imágenes, envío saliente limitado a la ventana abierta de 24h — ver [Soporte multimedia](#soporte-multimedia-v140) más abajo.
 - Desde la v1.5.0, mensajes entrantes de ubicación y reacción (incluyendo contexto del mensaje citado), y un panel de estado de conexión por cuenta (último inbound/outbound, último error, botón "Test connection").
@@ -98,6 +98,12 @@ Queda fuera de alcance:
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 
+## Novedades en la v2.1.0
+
+- **El contador de la ventana y el banner de recuperación ahora se actualizan en vivo** mientras la conversación permanece abierta: una respuesta del cliente o el cierre de la ventana se reflejan automáticamente, sin recargar la página (#41, #42).
+- **Se reconoce el estado `played` de Meta** para notas de voz: una nota de voz escuchada recibe ahora el mismo tratamiento "abierto" que ya tenía un mensaje de texto leído.
+- **La retención del registro detallado admite ahora `0` para "conservarlo todo para siempre"**, con el límite subido de 90 a 365 días (#10).
+
 ## Novedades en la v2.0.1
 
 - **Corrección**: la cuenta atrás de la v2.0.0 era inalcanzable para lectores de pantalla, y quedaba oculta tras "Show Details" en cualquier conversación con el Chat Mode activado. Ambas arregladas: ahora anuncia la cuenta atrás en sí en lugar de solo el tooltip, y se renderiza desde un punto que el Chat Mode nunca colapsa. El banner de recuperación existente no se ve afectado.
@@ -110,10 +116,6 @@ Comprometido públicamente el 2026-08-25 (issue #2): cada conversación abierta 
 - El indicador lleva un pequeño icono de reloj, incrustado del conjunto [Lucide](https://lucide.dev), sin ninguna petición externa. El primer icono que este módulo incorpora más allá de los Glyphicons propios de FreeScout — una versión de número redondo se merece algo más de cuidado en cómo se ve, no solo en qué hace.
 - Primer salto de versión mayor desde la 1.0.0. No se rompe nada ni cambia el significado de ninguna opción — va ligado a ser una mejora notable y comprometida públicamente, que es para lo que sirven los números redondos en este proyecto.
 
-## Novedades en la v1.15.0
-
-- **Las credenciales rotas ahora aparecen en la lista de cuentas y en la pantalla de edición**, no solo en el registro. Cuando cambia el `APP_KEY` de FreeScout — un cambio de servidor, un `key:generate` sacado de un foro — el canal parecía sano mientras cada entrega fallaba en silencio. `credentialsAreReadable()` existía desde la v1.14.0, pero no la llamaba nadie fuera de los tests, un agujero que encontró [@jeroenedig](https://github.com/jeroenedig) revisando el código (#38).
-
 Las versiones anteriores están en la [página de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
 ## Compatibilidad con FreeScout
@@ -125,7 +127,7 @@ Las versiones anteriores están en la [página de releases](https://github.com/l
 
 Desde la 1.10.0 el módulo usa la API de estados de conversación que FreeScout añadió en la 1.8.234, para que un estado aportado por otro módulo se entienda en lugar de quedar clasificado como desconocido. En versiones anteriores vuelve al comportamiento de siempre, que allí es exactamente el correcto, porque un núcleo sin esa API tampoco puede tener estados personalizados. No se rompe nada, y la pantalla de configuración del canal os dice qué ha encontrado.
 
-Ir por encima de la 1.8.234 vale la pena por su cuenta: las 1.8.235, 1.8.236 y 1.8.237 cierran problemas de seguridad del propio FreeScout.
+Ir por encima de la 1.8.234 vale la pena por su cuenta: las 1.8.235, 1.8.236 y 1.8.237 cierran problemas de seguridad del propio FreeScout. La propia 1.8.234 es también cuando el sanitizador de HTML de FreeScout empezó a admitir la etiqueta `<code>`; en cualquier versión anterior, el formato monoespaciado que este módulo renderiza para el texto entrante de WhatsApp (ver [Alcance de funcionalidades](#alcance-de-funcionalidades)) lo borra el core en silencio, no el módulo.
 
 ## Instalación
 
@@ -235,6 +237,8 @@ Desde la v1.3.0, una ventana caducada se puede recuperar manualmente con una pla
 
 Cada conversación abierta de este canal muestra cuánto queda de la ventana de 24 horas, contando desde el último mensaje del cliente — tus respuestas nunca la reinician. Cambia a estilo de aviso durante la última hora. Es puramente informativo: siempre refleja la regla real de Meta, nunca el umbral interno de más abajo.
 
+Desde la v2.1.0, el reloj y el banner de recuperación también se actualizan en vivo mientras la conversación permanece abierta: una respuesta del cliente o el cierre de la ventana se reflejan automáticamente, sin tener que recargar la página.
+
 ### Recuperación de ventana caducada (v1.3.0)
 
 Cuando la ventana del cliente parece caducada, aparece un banner en la conversación que permite enviar **una única plantilla de WhatsApp preaprobada**, configurada por cuenta (nombre + idioma). El envío es siempre **manual**: un agente pulsa el botón del banner; no hay ningún reintento automático de plantilla.
@@ -311,6 +315,7 @@ Antes de pasar de pruebas a producción:
 | No se procesa nada | El worker de colas está parado (`php artisan queue:work`) |
 | **Gestionar → WhatsApp** da "página no encontrada" | Las rutas del módulo no llegan a FreeScout. Abrid `/meta-whatsapp/webhook`: si responde, las rutas están vivas y el problema es otro; si también da 404, no llegan. Tened presente que `/meta-whatsapp` es una ruta y no una carpeta, así que no hay nada que buscar en el disco, y que un 404 no se escribe nunca en ningún registro, por lo que un registro vacío no significa nada |
 | Un fix de una actualización del módulo no parece aplicarse | El worker de colas sigue ejecutando código antiguo en memoria. Reiniciar el cron no lo recarga; hace falta `php artisan queue:restart` |
+| Las páginas dan 500, o el reloj de ventana nunca se actualiza tras una actualización del módulo | Un symlink de los assets del módulo roto. Abre **Gestionar → Módulos** una vez; FreeScout lo repara automáticamente |
 
 Todos los logs del módulo llevan el prefijo `[MetaWhatsApp]`.
 

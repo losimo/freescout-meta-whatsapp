@@ -118,7 +118,7 @@ return [
     'diagnostics_window_days'     => ':days días',
     'diagnostics_window_always'   => 'Hasta que lo apague',
     'diagnostics_retention'       => 'Conserva los archivos',
-    'diagnostics_retention_help'  => 'Días. Un archivo por día; los más viejos se borran.',
+    'diagnostics_retention_help'  => 'Días. Un archivo por día; los más viejos se borran. 0 los conserva todos para siempre: piénsalo antes de elegirlo, porque este registro contiene texto de mensajes y teléfonos.',
     'diagnostics_view_log'        => 'Leer el registro',
     'diagnostics_saved'           => 'Registro detallado actualizado.',
     'app_id'                      => 'App ID',

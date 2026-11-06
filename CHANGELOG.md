@@ -4,6 +4,12 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 2.1.0 (2026-11-06)
+
+- **New**: the window countdown and the recovery banner now update live while a conversation stays open, through FreeScout's own real-time channel — a customer reply or the window closing is reflected automatically, no page reload needed (#41, #42).
+- **New**: recognizes Meta's `played` webhook status for voice notes, giving a played voice note the same "opened" treatment a read text message already had.
+- **New**: debug log retention accepts `0` for "keep every file forever", and the ceiling is raised from 90 to 365 days (#10).
+
 ## 2.0.1 (2026-09-25)
 
 - **Fix**: the window countdown was unreachable to screen readers — an `aria-label` on the same element as the visible text overrode it, so only the tooltip was announced, never the countdown itself.

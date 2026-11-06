@@ -118,7 +118,7 @@ return [
     'diagnostics_window_days'     => ':days dies',
     'diagnostics_window_always'   => 'Fins que l\'apagui',
     'diagnostics_retention'       => 'Conserva els fitxers',
-    'diagnostics_retention_help'  => 'Dies. Un fitxer per dia; els més vells s\'esborren.',
+    'diagnostics_retention_help'  => 'Dies. Un fitxer per dia; els més vells s\'esborren. 0 els conserva tots per sempre: penseu-ho abans de triar-ho, ja que aquest registre conté text de missatges i telèfons.',
     'diagnostics_view_log'        => 'Llegeix el registre',
     'diagnostics_saved'           => 'Registre detallat actualitzat.',
     'app_id'                      => 'App ID',
