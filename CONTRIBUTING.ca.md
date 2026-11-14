@@ -84,6 +84,8 @@ Si el canvi altera alguna limitació o expectativa documentada, la documentació
 
 Les cadenes noves arriben primer en anglès, i un idioma que encara no les tingui ensenya l'anglès a la pantalla, mai la clau crua. Per tant una traducció mai no bloqueja ni queda trencada, només menys completa del que podria ser.
 
+**Qui manté cada idioma.** L'anglès, el català i el castellà els mantenen els autors del mòdul. El neerlandès el manté [@jeroenedig](https://github.com/jeroenedig). No escrivim traduccions d'un idioma que manté una altra persona, ni una sola cadena encara que estiguem dins del fitxer: qui el parla decideix com es llegeix. Si t'encarregues d'un idioma, el teu nom surt aquí.
+
 El codi anterior porta comentaris i noms de test en català, d'abans que el projecte tingués col·laboradors de fora. Es van substituint a mesura que es toquen els fitxers, no de cop, així que durant un temps hi conviuran tots dos. El codi nou ha de ser en anglès.
 
 ## Política de discussions

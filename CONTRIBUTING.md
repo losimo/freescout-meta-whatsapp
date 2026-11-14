@@ -84,6 +84,8 @@ If the change alters any documented limitation or expectation, the documentation
 
 New strings land in English first, and a language that does not have them yet falls back to English on screen, never to a raw key. So a translation is never blocking and never broken, only less complete than it could be.
 
+**Who keeps each language.** English, Catalan and Castellano are maintained by the module's authors. Dutch is maintained by [@jeroenedig](https://github.com/jeroenedig). We do not write translations for a language somebody else maintains, not even a single string while we are in the file: the person who speaks it decides how it reads. If you take on a language, you get named here.
+
 Earlier code carries Catalan comments and test names, from before the project had outside contributors. Those are being replaced as files are touched rather than in one sweep, so you will find both for a while. New code should be English throughout.
 
 ## Discussion policy

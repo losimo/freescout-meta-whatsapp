@@ -279,8 +279,18 @@ class ProcessInboundWebhook implements ShouldQueue
                 // Patró de xat del core (#4902): es reutilitza la darrera conversa
                 // encara que estigui tancada (es reobre), tret que l'opció de
                 // bústia 'chat_start_new' digui de començar-ne una de nova.
+                // El filtre per type és la meitat defensiva de l'issue #44: el
+                // botó "New Conversation" del menú lateral del core deixa que
+                // un agent creï una conversa de correu en una bústia de
+                // WhatsApp, i com que aquesta tria ordena per created_at,
+                // aquella conversa (més nova) s'enduia els entrants següents.
+                // El mòdul només és propietari de converses de xat: la línia
+                // 298 és l'únic lloc del codi de producció que crea una
+                // conversa i sempre hi posa TYPE_CHAT, així que això només pot
+                // saltar files que no ha creat el mòdul.
                 $conversation = Conversation::where('mailbox_id', $account->mailbox_id)
                     ->where('customer_id', $customer->id)
+                    ->where('type', Conversation::TYPE_CHAT)
                     ->where('status', '!=', Conversation::STATUS_SPAM)
                     ->orderBy('created_at', 'desc')
                     ->first();
@@ -917,9 +927,26 @@ class ProcessInboundWebhook implements ShouldQueue
         $excerpt    = $this->excerptForOutboundRecord($record);
         $identifier = $excerpt !== null ? '"' . $excerpt . '"' : $record->wamid;
 
+        // Issue #43. L'avatar i la disposició de la nota els decideix el core
+        // amb Thread::getPerson(), que per a notes llegeix
+        // created_by_user_cached; sense aquest camp la nota sortia sense cara.
+        // L'agent de qui parla la nota és qui va escriure el missatge que no
+        // s'ha lliurat, i hi arribem pel thread original. Es deixa nul quan no
+        // n'hi ha cap de resoluble (thread esborrat, usuari esborrat,
+        // plantilla enviada pel sistema), cas en què es veu com fins ara.
+        //
+        // user_id es queda com estava, amb l'usuari del sistema: aquí no vol
+        // dir qui ha escrit la nota sinó a qui queda lligada, i canviar-ho
+        // seria decidir una assignació per l'equip.
+        $failedThread = $record->thread_id ? Thread::find($record->thread_id) : null;
+        $agentId      = $failedThread
+            ? ($failedThread->created_by_user_id ?: $failedThread->user_id)
+            : null;
+
         $thread = new Thread();
         $thread->conversation_id = $conversation->id;
         $thread->user_id         = optional($this->resolveSystemUser($account, $conversation))->id;
+        $thread->created_by_user_id = $agentId ?: null;
         $thread->type            = Thread::TYPE_NOTE;
         $thread->status          = $conversation->status;
         $thread->state           = Thread::STATE_PUBLISHED;

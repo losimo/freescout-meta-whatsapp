@@ -4,6 +4,14 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 2.2.0 (2026-11-14)
+
+- **New**: an administrator screen for answering a right-of-erasure request. Search what the module holds about one person by phone number or WhatsApp ID, erase it, and take away a one-time receipt that also states, honestly, what remains outside the module's reach and where each of those things is removed. A queued message waiting to be sent to an erased contact is refused instead of delivered, and says so in the conversation. This closes a gap the module had documented about itself: `meta_whatsapp_messages` was never cleaned when a customer or a conversation was deleted in FreeScout, so an administrator could believe they had answered an erasure request while the phone number and the WhatsApp ID stayed behind.
+- **New**: starting a conversation is refused in a WhatsApp mailbox, by the sidebar button, by the new-conversation route and by Clone (#44). The form behind it could never work, since the Cloud API only allows replying inside the window the customer opened or sending an approved template, and an agent who used it got a conversation that looked saved while nothing was delivered and nothing was logged. The refusal explains itself rather than bouncing silently.
+- **Fix**: an inbound message is no longer filed into a conversation an agent created by hand (#44). The conversation it reuses is now required to be a chat conversation, so the email-type one left behind by that button cannot swallow the customer's next message. This is also what protects installs that already carry such conversations.
+- **New**: the module's automatic notes (a refused reply, a failed delivery) now carry the face and name of the agent they concern, like any other note, instead of appearing without an avatar (#43). Where no author can be resolved, the note still appears, exactly as before.
+- The README now says why the module will not link a number through WhatsApp Web's unofficial companion-device protocol, which needs no Cloud API approval and can get the number suspended. CONTRIBUTING now names who maintains each language, Dutch included.
+
 ## 2.1.0 (2026-11-06)
 
 - **New**: the window countdown and the recovery banner now update live while a conversation stays open, through FreeScout's own real-time channel — a customer reply or the window closing is reflected automatically, no page reload needed (#41, #42).

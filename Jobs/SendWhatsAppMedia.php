@@ -62,6 +62,13 @@ class SendWhatsAppMedia implements ShouldQueue
             OutboundGuard::SUBJECT_MEDIA
         );
         if (!$account) {
+            // An inactive account and an erasure can land in the same
+            // window (a synchronous 190 deactivates the account). Without
+            // this check, recordFailure() below would write the erased
+            // phone straight back into a failed-thread-N row.
+            if (OutboundGuard::refuseIfContactErased($this->threadId, $this->toPhone)) {
+                return;
+            }
             $thread = Thread::find($this->threadId);
             if ($thread) {
                 $this->recordFailure($this->accountId, $thread, 'account_inactive');
@@ -76,6 +83,22 @@ class SendWhatsAppMedia implements ShouldQueue
             ->where('direction', WhatsAppMessage::DIRECTION_OUTBOUND)
             ->exists()
         ) {
+            return;
+        }
+
+        // A queued or retried job must not resend to someone whose
+        // identity was erased while it waited. See
+        // OutboundGuard::stillHoldsPhone().
+        //
+        // Deliberately after the idempotency check: a retry of a message
+        // that already went out must stop there, not here, or we would
+        // write a "nothing was sent" note about a message the customer
+        // actually received.
+        if (!OutboundGuard::stillHoldsPhone($this->toPhone)) {
+            OutboundGuard::noteRefusal(
+                Thread::find($this->threadId),
+                'metawhatsapp::metawhatsapp.not_sent_contact_erased'
+            );
             return;
         }
 
@@ -273,6 +296,12 @@ class SendWhatsAppMedia implements ShouldQueue
             ->where('direction', WhatsAppMessage::DIRECTION_OUTBOUND)
             ->exists();
         if (!$exists) {
+            // Same reason as the !$account branch above: a job that
+            // exhausted its retries can still land here after an erasure,
+            // and recordFailure() would write the phone straight back.
+            if (OutboundGuard::refuseIfContactErased($this->threadId, $this->toPhone)) {
+                return;
+            }
             $thread = Thread::find($this->threadId);
             if ($thread) {
                 $this->recordFailure($this->accountId, $thread, 'transient');

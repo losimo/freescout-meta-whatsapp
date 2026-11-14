@@ -74,6 +74,10 @@ If step 5 doesn't work, start with [Troubleshooting](#troubleshooting) and [When
 
 ![Expired window banner](docs/en/expired-window-banner.png)
 
+*Answering a right-of-erasure request: what the module holds about one person, before deciding to erase it:*
+
+![Right of erasure screen](docs/en/erasure-screen.png)
+
 ## Feature scope
 
 Currently covers:
@@ -90,6 +94,7 @@ Currently covers:
 - Since v1.6.0: up to 5 statically-configured recovery templates per account (in addition to the single-template flow from v1.3.0) or any Meta-approved template fetched live via a dynamic picker; inbound stickers and shared contact cards; asynchronous delivery-failure visibility (a note is added if Meta reports a message as failed after initial acceptance); automatic webhook subscription from the account form (no manual Meta Business Manager step).
 - Since v1.6.1, guided reactivation of an inactive account straight from "Test connection", with an audit trail (who/when) on the health panel.
 - Since v1.7.0: inbound WhatsApp text formatting is rendered rather than shown literally; conversations carry the channel, so FreeScout's own WhatsApp tag and Chat Mode button appear; the customer's last message is marked as read after an agent replies; and a failed delivery reopens the conversation with a quoted excerpt of the message that didn't arrive.
+- An administrator screen for answering a right-of-erasure request: search what the module holds about one person by phone number or WhatsApp ID, erase it, and take away a one-time receipt that also states what remains outside the module's reach.
 
 Out of scope:
 
@@ -97,6 +102,15 @@ Out of scope:
 - A cloud storage adapter (S3, etc.) for media — attachments use FreeScout's existing local storage only.
 - Visual `delivered/read` indicators in the conversation (the `read` receipt only opens the thread — see above).
 - Chatbots, advanced automations or shared multichannel integrations.
+- Linking a number through WhatsApp Web's unofficial companion-device protocol, the way some desktop clients do. It needs no Cloud API approval, which is precisely what makes it tempting, and it is out of scope here on purpose: the protocol is reverse-engineered, Meta can break it whenever it likes, and using it can get the number suspended. On a personal account that is the owner's own bet. On a company's support line a suspension stops every conversation at once, so the module will not take that risk on your behalf.
+
+## What's new in v2.2.0
+
+- **A screen for answering a right-of-erasure request.** Search what the module holds about one person by phone number or WhatsApp ID, erase it, and take away a one-time receipt that also states what remains outside the module's reach and where each of those things is removed. A queued message waiting to go to an erased contact is refused rather than delivered, and says so in the conversation. This closes a gap the module had already documented about itself: its own table was never cleaned when a customer or conversation was deleted in FreeScout, so an administrator could believe an erasure request had been answered while the phone number stayed behind.
+- **Starting a conversation is refused in a WhatsApp mailbox** (#44). The sidebar's "New Conversation" button is gone from it, the route behind it is refused, and so is Clone, which creates a conversation without ever showing a form. That form could never work here, since the Cloud API only allows a reply inside the window the customer opened or an approved template; using it produced a conversation that looked saved while nothing was sent and nothing was logged. The refusal now explains itself instead of bouncing in silence.
+- **Fix**: an inbound message no longer lands in a conversation an agent created by hand (#44). The conversation it reuses must now be a chat conversation, which is also what protects installs already carrying one of those.
+- **The automatic notes carry the face of the agent they concern** (#43): a refused reply or a failed delivery now looks like any other note instead of appearing without an avatar. When no author can be resolved the note still appears, exactly as before.
+- The README now says why this module will not link a number through WhatsApp Web's unofficial companion-device protocol, and CONTRIBUTING names who maintains each language.
 
 ## What's new in v2.1.0
 
@@ -107,14 +121,6 @@ Out of scope:
 ## What's new in v2.0.1
 
 - **Fix**: the window countdown from v2.0.0 was unreachable to screen readers, and hidden behind "Show Details" for any conversation with Chat Mode on. Both fixed: it announces the countdown itself instead of only the tooltip, and now renders from a hook Chat Mode never collapses. The existing recovery banner is unaffected either way.
-
-## What's new in v2.0.0
-
-Committed publicly back on 2026-08-25 (issue #2): every open conversation now shows a real, live countdown to Meta's 24-hour customer service window, not just a banner after it has already closed.
-
-- **A small, always-visible indicator counts down the window**, from the customer's last message, switching to a warning style in the last hour. It is purely informational and always reflects Meta's real rule — it is completely independent from the existing recovery threshold below, which keeps deciding when the recovery banner appears exactly as it always has.
-- The indicator carries a small clock icon, inlined from the [Lucide](https://lucide.dev) set, no external request. The first icon this module ships beyond FreeScout's own Glyphicons — a round-number release earns a bit more care in how something looks, not only what it does.
-- First major version bump since 1.0.0. Nothing breaks and no setting changes meaning — it is tied to this being a notable, publicly-promised feature, which is what round numbers are for in this project.
 
 Older releases are listed on the [releases page](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -275,7 +281,7 @@ Media is stored using FreeScout's existing local attachment storage — no separ
 
 ## Personal data
 
-[What this module stores about your customers, where, and what is removed when you delete a customer or a conversation](docs/personal-data.md). It also states the gaps plainly, including the one place erasure cannot reach: the detailed log file.
+[What this module stores about your customers, where, and what is removed when you delete a customer or a conversation](docs/personal-data.md). It also states the gaps plainly, including the three places erasure cannot reach: the detailed log file, the core's job queue, and the two channel columns FreeScout writes on a customer and never clears.
 
 ## Known limitations
 

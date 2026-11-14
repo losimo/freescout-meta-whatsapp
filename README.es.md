@@ -74,6 +74,10 @@ Si el paso 5 no funciona, empieza por [Resolución de problemas](#resolución-de
 
 ![Aviso de ventana caducada](docs/es/expired-window-banner.png)
 
+*Atendiendo una solicitud de derecho de supresión: lo que el módulo guarda de una persona, antes de decidir eliminarlo:*
+
+![Pantalla de derecho de supresión](docs/es/erasure-screen.png)
+
 ## Alcance de funcionalidades
 
 Actualmente cubre:
@@ -90,6 +94,7 @@ Actualmente cubre:
 - Desde la v1.6.0: hasta 5 plantillas de recuperación configuradas estáticamente por cuenta (además del flujo de una sola plantilla de la v1.3.0), o cualquier plantilla aprobada por Meta obtenida en vivo mediante un selector dinámico; stickers y tarjetas de contacto entrantes; visibilidad de fallos de entrega asíncronos (se añade una nota si Meta informa de que un mensaje ha fallado tras haber sido aceptado inicialmente); registro automático del webhook desde el formulario de la cuenta (sin paso manual en Meta Business Manager).
 - Desde la v1.6.1, reactivación guiada de una cuenta inactiva directamente desde "Test connection", con trazabilidad (quién/cuándo) en el panel de estado.
 - Desde la v1.7.0: el formato de texto entrante de WhatsApp se renderiza en lugar de mostrarse literal; las conversaciones llevan el canal informado, de modo que aparecen la etiqueta de WhatsApp y el botón de Chat Mode propios de FreeScout; el último mensaje del cliente se marca como leído cuando un agente responde; y un fallo de entrega reabre la conversación citando un extracto del mensaje que no ha llegado.
+- Una pantalla de administrador para atender una solicitud de derecho de supresión: buscar lo que el módulo guarda de una persona por el número de teléfono o por el ID de WhatsApp, eliminarlo, y llevarse un comprobante de un solo uso que también indica qué queda fuera del alcance del módulo.
 
 Queda fuera de alcance:
 
@@ -97,6 +102,15 @@ Queda fuera de alcance:
 - Un adaptador de almacenamiento en la nube (S3, etc.) para multimedia — los adjuntos usan el almacenamiento local ya existente de FreeScout.
 - Indicadores visuales de `delivered/read` en la conversación (el `read` solo abre el thread — ver arriba).
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
+- Vincular un número por el protocolo no oficial de dispositivo acompañante de WhatsApp Web, como hacen algunos clientes de escritorio. No necesita aprobación de la Cloud API, que es justo lo que lo hace tentador, y queda fuera de alcance a propósito: el protocolo está hecho por ingeniería inversa, Meta puede romperlo cuando quiera, y usarlo puede acabar con el número suspendido. En una cuenta personal esa es la apuesta de quien la asume. En la línea de atención de una empresa, una suspensión detiene todas las conversaciones a la vez, así que el módulo no va a correr ese riesgo en su nombre.
+
+## Novedades en la v2.2.0
+
+- **Una pantalla para atender una solicitud de derecho de supresión.** Busque lo que el módulo guarda de una persona por número de teléfono o por ID de WhatsApp, elimínelo, y llévese un comprobante de un solo uso que además indica qué queda fuera del alcance del módulo y dónde se elimina cada una de esas cosas. Un mensaje en cola pendiente de enviarse a un contacto eliminado se rechaza en lugar de entregarse, y lo deja dicho en la conversación. Esto cierra un agujero que el propio módulo ya documentaba: su tabla nunca se limpiaba al borrar un cliente o una conversación en FreeScout, así que un administrador podía creer que había atendido una solicitud de supresión mientras el número de teléfono seguía ahí.
+- **Iniciar una conversación se rechaza en un buzón de WhatsApp** (#44). El botón "New Conversation" de la barra lateral ya no aparece en él, la ruta que hay detrás se rechaza, y Clone también, que crea una conversación sin llegar a mostrar ningún formulario. Ese formulario nunca podía funcionar aquí, porque la Cloud API solo permite responder dentro de la ventana que abrió el cliente o enviar una plantilla aprobada; usarlo producía una conversación que parecía guardada mientras no se enviaba nada ni se registraba nada. Ahora el rechazo se explica en lugar de rebotar en silencio.
+- **Corrección**: un mensaje entrante ya no acaba dentro de una conversación creada a mano por un agente (#44). La conversación que se reutiliza tiene que ser de chat, que es también lo que protege a las instalaciones que ya arrastran una de esas.
+- **Las notas automáticas llevan la cara del agente al que se refieren** (#43): una respuesta rechazada o una entrega fallida se ven como cualquier otra nota en lugar de aparecer sin avatar. Cuando no hay autor resoluble, la nota sigue apareciendo igual que antes.
+- El README ahora explica por qué este módulo no vinculará un número por el protocolo no oficial de dispositivo acompañante de WhatsApp Web, y CONTRIBUTING indica quién mantiene cada idioma.
 
 ## Novedades en la v2.1.0
 
@@ -107,14 +121,6 @@ Queda fuera de alcance:
 ## Novedades en la v2.0.1
 
 - **Corrección**: la cuenta atrás de la v2.0.0 era inalcanzable para lectores de pantalla, y quedaba oculta tras "Show Details" en cualquier conversación con el Chat Mode activado. Ambas arregladas: ahora anuncia la cuenta atrás en sí en lugar de solo el tooltip, y se renderiza desde un punto que el Chat Mode nunca colapsa. El banner de recuperación existente no se ve afectado.
-
-## Novedades en la v2.0.0
-
-Comprometido públicamente el 2026-08-25 (issue #2): cada conversación abierta muestra ahora una cuenta atrás real y en vivo hasta la ventana de servicio de 24 horas de Meta, no solo un banner una vez ya se ha cerrado.
-
-- **Un indicador pequeño y siempre visible cuenta atrás la ventana**, desde el último mensaje del cliente, y cambia a estilo de aviso durante la última hora. Es puramente informativo y siempre refleja la regla real de Meta — es totalmente independiente del umbral de recuperación de más abajo, que sigue decidiendo cuándo aparece el banner de recuperación exactamente como siempre.
-- El indicador lleva un pequeño icono de reloj, incrustado del conjunto [Lucide](https://lucide.dev), sin ninguna petición externa. El primer icono que este módulo incorpora más allá de los Glyphicons propios de FreeScout — una versión de número redondo se merece algo más de cuidado en cómo se ve, no solo en qué hace.
-- Primer salto de versión mayor desde la 1.0.0. No se rompe nada ni cambia el significado de ninguna opción — va ligado a ser una mejora notable y comprometida públicamente, que es para lo que sirven los números redondos en este proyecto.
 
 Las versiones anteriores están en la [página de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -270,7 +276,7 @@ El multimedia se almacena con el almacenamiento local ya existente de FreeScout 
 
 ## Datos personales
 
-[Qué guarda este módulo de vuestros clientes, dónde lo guarda, y qué se borra cuando eliminéis un cliente o una conversación](docs/personal-data.md). También dice claramente los huecos que tiene, incluido el único sitio donde el borrado no llega: el archivo de registro detallado. El documento está en inglés.
+[Qué guarda este módulo de vuestros clientes, dónde lo guarda, y qué se borra cuando eliminéis un cliente o una conversación](docs/personal-data.md). También dice claramente los huecos que tiene, incluidos los tres sitios donde el borrado no llega: el archivo de registro detallado, la cola de trabajos del core, y las dos columnas de canal que FreeScout escribe en un cliente y nunca limpia. El documento está en inglés.
 
 ## Limitaciones conocidas
 

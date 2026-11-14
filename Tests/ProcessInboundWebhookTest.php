@@ -325,6 +325,63 @@ class ProcessInboundWebhookTest extends TestCase
         $this->assertEquals(2, Thread::where('conversation_id', $m1->conversation_id)->count());
     }
 
+    /**
+     * Issue #44. FreeScout's sidebar offers a "New Conversation" button even
+     * on a WhatsApp mailbox, and an agent who uses it gets an email-type
+     * conversation the module can never send through. The reporter then saw
+     * the customer's next inbound message land inside that conversation
+     * instead of the chat one, because the reuse query orders by created_at
+     * and the agent's conversation is the newer row.
+     *
+     * The module owns chat conversations and nothing else: line 298 of the
+     * job is the only place in production code that creates one, and it
+     * always stamps TYPE_CHAT, so restricting the reuse query to chat
+     * conversations can only ever skip a row the module did not create.
+     *
+     * This is the half that protects installs which already have such
+     * conversations, since hiding the button and refusing the route only
+     * stop new ones from appearing.
+     */
+    public function test_an_inbound_message_never_lands_in_an_agent_created_email_conversation()
+    {
+        $account = $this->createTestAccount();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.in3a', '34611222333', 'first'));
+        $chatConversation = WhatsAppMessage::where('wamid', 'wamid.in3a')->first()->conversation_id;
+
+        // What the agent gets by clicking the sidebar button: same customer,
+        // same mailbox, email type, and newer than the chat conversation.
+        $customer = Customer::getCustomerByChannel(WhatsAppAccount::CHANNEL, '+34611222333');
+        $agentConversation                 = new Conversation();
+        $agentConversation->type           = Conversation::TYPE_EMAIL;
+        $agentConversation->state          = Conversation::STATE_PUBLISHED;
+        $agentConversation->subject        = 'Created from the sidebar button';
+        $agentConversation->mailbox_id     = $account->mailbox_id;
+        $agentConversation->customer_id    = $customer->id;
+        $agentConversation->customer_email = '';
+        $agentConversation->status         = Conversation::STATUS_ACTIVE;
+        $agentConversation->source_via     = Conversation::PERSON_USER;
+        $agentConversation->source_type    = Conversation::SOURCE_TYPE_WEB;
+        $agentConversation->preview        = 'x';
+        $agentConversation->save();
+        // Set explicitly: both rows are created inside the same second, so
+        // without this the ordering the bug depends on is a coin toss.
+        $agentConversation->created_at = $chatConversation
+            ? Conversation::find($chatConversation)->created_at->copy()->addMinute()
+            : null;
+        $agentConversation->save();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.in3b', '34611222333', 'second'));
+
+        $landedIn = WhatsAppMessage::where('wamid', 'wamid.in3b')->first()->conversation_id;
+        $this->assertEquals(
+            $chatConversation,
+            $landedIn,
+            'the inbound message was filed into the agent-created email conversation'
+        );
+        $this->assertEquals(0, Thread::where('conversation_id', $agentConversation->id)->count());
+    }
+
     public function test_status_actualitza_la_fila_best_effort()
     {
         $account = $this->createTestAccount();
@@ -402,6 +459,123 @@ class ProcessInboundWebhookTest extends TestCase
         // Issue #19: extracte del missatge, no el wamid cru.
         $this->assertStringContainsString('"Hola, tens un missatge pendent"', $note->body);
         $this->assertStringNotContainsString('wamid.out-fail1', $note->body);
+    }
+
+    /**
+     * Issue #43. The reporter asked for the module's automatic notes to look
+     * like a user's note, with an avatar and the name on the left instead of
+     * the right. The core decides both with Thread::getPerson(), which reads
+     * created_by_user_cached for a note, and the module was leaving that
+     * column empty.
+     *
+     * The note is always about one agent's message, so there is nobody to
+     * invent: the agent who wrote the message that failed to deliver.
+     */
+    public function test_a_delivery_failure_note_is_attributed_to_the_agent_whose_message_failed()
+    {
+        $agent = new User();
+        $agent->first_name = 'Agent';
+        $agent->last_name  = 'OfRecord';
+        $agent->email      = 'agent-' . uniqid() . '@example.com';
+        $agent->password   = bcrypt('secret');
+        $agent->role       = User::ROLE_USER;
+        $agent->save();
+
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.attr-in1', '34611222333', 'hola'));
+        $conversation = Conversation::find(
+            WhatsAppMessage::where('wamid', 'wamid.attr-in1')->first()->conversation_id
+        );
+
+        $outboundThread = new Thread();
+        $outboundThread->conversation_id     = $conversation->id;
+        $outboundThread->type                = Thread::TYPE_MESSAGE;
+        $outboundThread->status              = $conversation->status;
+        $outboundThread->state               = Thread::STATE_PUBLISHED;
+        $outboundThread->body                = 'A reply that Meta will reject';
+        $outboundThread->source_via          = Thread::PERSON_USER;
+        $outboundThread->source_type         = Thread::SOURCE_TYPE_WEB;
+        $outboundThread->customer_id         = $conversation->customer_id;
+        $outboundThread->created_by_user_id  = $agent->id;
+        $outboundThread->save();
+
+        WhatsAppMessage::create([
+            'wamid'           => 'wamid.attr-out1',
+            'account_id'      => $account->id,
+            'conversation_id' => $conversation->id,
+            'thread_id'       => $outboundThread->id,
+            'contact_phone'   => '+34611222333',
+            'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+            'status'          => WhatsAppMessage::STATUS_SENT,
+        ]);
+
+        $statusPayload = $this->inboundPayload($account, 'x', 'x', 'x');
+        $statusPayload['entry'][0]['changes'][0]['value'] = [
+            'messaging_product' => 'whatsapp',
+            'metadata'          => ['phone_number_id' => $account->phone_number_id],
+            'statuses'          => [[
+                'id'     => 'wamid.attr-out1',
+                'status' => 'failed',
+                'errors' => [['code' => 131047, 'title' => 'Re-engagement message']],
+            ]],
+        ];
+        $this->runJob($account, $statusPayload);
+
+        $note = Thread::where('conversation_id', $conversation->id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->where('body', 'like', '[WhatsApp delivery failed]%')
+            ->first();
+        $this->assertNotNull($note);
+        $this->assertEquals(
+            $agent->id,
+            $note->created_by_user_id,
+            'the note must name the agent whose message failed, so the core gives it a face'
+        );
+    }
+
+    /**
+     * Issue #43, the degradation path. An old row, a deleted user or a
+     * template the system sent leaves no resolvable author, and the note
+     * still has to be written: it carries the only visible trace of the
+     * failure. It renders as it did before, without a face.
+     */
+    public function test_a_delivery_failure_note_with_no_resolvable_agent_is_still_written()
+    {
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.attr-in2', '34611222333', 'hola'));
+        $conversation = Conversation::find(
+            WhatsAppMessage::where('wamid', 'wamid.attr-in2')->first()->conversation_id
+        );
+
+        // No thread_id at all: the thread the message belonged to is gone.
+        WhatsAppMessage::create([
+            'wamid'           => 'wamid.attr-out2',
+            'account_id'      => $account->id,
+            'conversation_id' => $conversation->id,
+            'thread_id'       => null,
+            'contact_phone'   => '+34611222333',
+            'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
+            'status'          => WhatsAppMessage::STATUS_SENT,
+        ]);
+
+        $statusPayload = $this->inboundPayload($account, 'x', 'x', 'x');
+        $statusPayload['entry'][0]['changes'][0]['value'] = [
+            'messaging_product' => 'whatsapp',
+            'metadata'          => ['phone_number_id' => $account->phone_number_id],
+            'statuses'          => [[
+                'id'     => 'wamid.attr-out2',
+                'status' => 'failed',
+                'errors' => [['code' => 131047, 'title' => 'Re-engagement message']],
+            ]],
+        ];
+        $this->runJob($account, $statusPayload);
+
+        $note = Thread::where('conversation_id', $conversation->id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->where('body', 'like', '[WhatsApp delivery failed]%')
+            ->first();
+        $this->assertNotNull($note, 'the note must survive an unresolvable author');
+        $this->assertNull($note->created_by_user_id);
     }
 
     public function test_status_failed_asincron_no_duplica_la_nota_en_rebre_el_webhook_dues_vegades()

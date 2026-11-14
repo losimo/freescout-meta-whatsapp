@@ -33,6 +33,10 @@ class TemplateRecoveryTest extends TestCase
         $customer = new Customer();
         $customer->first_name = '+34611222333';
         $customer->save();
+        // Real conversations only reach a reply because the customer
+        // already has a contact route; without this, OutboundGuard's
+        // erasure guard (hasContactRoute()) would refuse every send below.
+        $customer->addChannel(WhatsAppAccount::CHANNEL, '+34611222333');
 
         $conversation = new Conversation();
         $conversation->type        = Conversation::TYPE_CHAT;
@@ -358,6 +362,52 @@ class TemplateRecoveryTest extends TestCase
             $threadsBefore,
             Thread::where('conversation_id', $thread->conversation_id)->count(),
             'No ha de crear cap thread d\'auditoria nou sense telèfon resoluble.'
+        );
+    }
+
+    /**
+     * The stale-banner case, walked through the real HTTP door rather than
+     * read about: the recovery banner rendered while the window was still
+     * open and the customer's identity intact; an administrator answered a
+     * right-of-erasure request before the agent got to click; only then
+     * does the POST land. resolveModuleConversation() must find no phone
+     * to resolve, the same door sendDynamicTemplate() shares.
+     */
+    public function test_a_stale_banner_does_not_send_after_an_erasure()
+    {
+        $account = $this->createTestAccount();
+        $account->templates = [[
+            'id' => 'recover_conversation', 'language' => 'es_ES',
+            'display_name' => 'recover_conversation', 'recovery_text' => null,
+        ]];
+        $account->save();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.erasure-template', '34611222444', 'hola'));
+        $msg          = WhatsAppMessage::where('wamid', 'wamid.erasure-template')->first();
+        $conversation = Conversation::find($msg->conversation_id);
+        // Age the inbound so the window counts as expired (recovery banner
+        // open), same as the rest of this suite.
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay()]);
+
+        \Modules\MetaWhatsApp\Support\PersonalDataErasure::erase('+34611222444');
+
+        Queue::fake();
+        $admin = $this->makeAdminUser();
+
+        $threadsBefore = Thread::where('conversation_id', $conversation->id)->count();
+
+        $response = $this->actingAs($admin)
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/conversation/' . $conversation->id . '/send-template'));
+
+        $response->assertStatus(302);
+        $response->assertSessionHasErrors();
+
+        Queue::assertNotPushed(SendWhatsAppTemplate::class);
+        $this->assertEquals(
+            $threadsBefore,
+            Thread::where('conversation_id', $conversation->id)->count(),
+            'an erased contact should not get a fresh audit thread or a queued send'
         );
     }
 

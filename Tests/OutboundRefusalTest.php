@@ -83,6 +83,45 @@ class OutboundRefusalTest extends TestCase
     }
 
     /**
+     * Issue #43. Thread::getPerson() reads created_by_user_cached for a note,
+     * so a note without that column renders faceless with the name on the
+     * right. The refusal note always concerns one agent's reply, and that
+     * agent is already resolved to pick the note's user_id.
+     *
+     * The test uses an agent of its own rather than the helper's hardcoded
+     * user 1, so the assertion proves the value travels instead of matching
+     * a default by coincidence.
+     */
+    public function test_a_refusal_note_is_attributed_to_the_agent_whose_reply_was_refused()
+    {
+        $agent = new \App\User();
+        $agent->first_name = 'Refused';
+        $agent->last_name  = 'Author';
+        $agent->email      = 'refused-' . uniqid() . '@example.com';
+        $agent->password   = bcrypt('secret');
+        $agent->role       = \App\User::ROLE_USER;
+        $agent->save();
+
+        $account = $this->createTestAccount();
+        [$conversation, $thread] = $this->makeReplyWithoutRecipientPhone($account);
+        $thread->created_by_user_id = $agent->id;
+        $thread->save();
+
+        $this->dispatchReplies($conversation, [$thread]);
+
+        $note = Thread::where('conversation_id', $conversation->id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->first();
+
+        $this->assertNotNull($note);
+        $this->assertEquals(
+            $agent->id,
+            $note->created_by_user_id,
+            'the refusal note must name the agent whose reply was refused'
+        );
+    }
+
+    /**
      * An internal note or a withdrawn thread was never going to be sent, so
      * refusing to send it is not news and must not produce a note of its own.
      */

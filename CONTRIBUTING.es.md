@@ -84,6 +84,8 @@ Si el cambio altera alguna limitación o expectativa documentada, la documentaci
 
 Las cadenas nuevas llegan primero en inglés, y un idioma que todavía no las tenga muestra el inglés en pantalla, nunca la clave cruda. Así que una traducción nunca bloquea ni queda rota, solo menos completa de lo que podría ser.
 
+**Quién mantiene cada idioma.** El inglés, el catalán y el castellano los mantienen los autores del módulo. El neerlandés lo mantiene [@jeroenedig](https://github.com/jeroenedig). No escribimos traducciones de un idioma que mantiene otra persona, ni una sola cadena aunque estemos dentro del fichero: quien lo habla decide cómo se lee. Si te haces cargo de un idioma, tu nombre aparece aquí.
+
 El código anterior lleva comentarios y nombres de test en catalán, de antes de que el proyecto tuviera colaboradores externos. Se van sustituyendo a medida que se tocan los ficheros, no de golpe, así que durante un tiempo convivirán ambos. El código nuevo debe ser en inglés.
 
 ## Política de discusiones

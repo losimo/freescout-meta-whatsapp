@@ -17,6 +17,13 @@ Route::group([
     Route::get('/settings', 'MetaWhatsAppController@settings')->name('metawhatsapp.settings');
     Route::get('/settings/create', 'MetaWhatsAppController@create')->name('metawhatsapp.create');
     Route::get('/settings/events', 'MetaWhatsAppController@accountEvents')->name('metawhatsapp.account_events');
+
+    // Right of erasure (GDPR / RGPD): search and erasure of what the
+    // module holds about one person. The search is POST on purpose, see
+    // the controller.
+    Route::get('/erasure', 'MetaWhatsAppController@erasure')->name('metawhatsapp.erasure');
+    Route::post('/erasure/search', 'MetaWhatsAppController@erasureSearch')->name('metawhatsapp.erasure_search');
+    Route::post('/erasure/erase', 'MetaWhatsAppController@erasureErase')->name('metawhatsapp.erasure_erase');
     Route::post('/settings', 'MetaWhatsAppController@store')->name('metawhatsapp.store');
     Route::post('/diagnostics', 'MetaWhatsAppController@updateDiagnostics')->name('metawhatsapp.diagnostics');
     Route::get('/settings/{id}/edit', 'MetaWhatsAppController@edit')->name('metawhatsapp.edit');

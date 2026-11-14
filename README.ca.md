@@ -74,6 +74,10 @@ Si el pas 5 no funciona, comença per [Resolució de problemes](#resolució-de-p
 
 ![Avís de finestra caducada](docs/ca/expired-window-banner.png)
 
+*Atenent una petició de dret de supressió: el que el mòdul guarda d'una persona, abans de decidir eliminar-ho:*
+
+![Pantalla de dret de supressió](docs/ca/erasure-screen.png)
+
 ## Abast de funcionalitats
 
 Actualment cobreix:
@@ -90,6 +94,7 @@ Actualment cobreix:
 - Des de la v1.6.0: fins a 5 plantilles de recuperació configurades estàticament per compte (a més del flux d'una sola plantilla de la v1.3.0), o qualsevol plantilla aprovada per Meta obtinguda en viu via un selector dinàmic; stickers i targetes de contacte entrants; visibilitat de fallades de lliurament asíncrones (s'afegeix una nota si Meta informa que un missatge ha fallat després d'haver estat acceptat inicialment); registre automàtic del webhook des del formulari del compte (sense pas manual al Meta Business Manager).
 - Des de la v1.6.1, reactivació guiada d'un compte inactiu directament des de "Test connection", amb traçabilitat (qui/quan) al panell d'estat.
 - Des de la v1.7.0: el format de text entrant de WhatsApp es renderitza en lloc de mostrar-se literal; les converses porten el canal informat, de manera que apareixen l'etiqueta de WhatsApp i el botó de Chat Mode propis de FreeScout; l'últim missatge del client es marca com a llegit quan un agent respon; i una fallida de lliurament reobre la conversa citant un extracte del missatge que no ha arribat.
+- Una pantalla d'administrador per atendre una petició de dret de supressió: cercar el que el mòdul guarda d'una persona pel número de telèfon o per l'ID de WhatsApp, eliminar-ho, i endur-se'n un comprovant d'un sol ús que també diu què queda fora de l'abast del mòdul.
 
 Queda fora d'abast:
 
@@ -97,6 +102,15 @@ Queda fora d'abast:
 - Un adaptador d'emmagatzematge al núvol (S3, etc.) per a multimèdia — els adjunts usen l'emmagatzematge local ja existent de FreeScout.
 - Indicadors visuals de `delivered/read` a la conversa (el `read` només obre el thread — vegeu més amunt).
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
+- Vincular un número pel protocol no oficial de dispositiu acompanyant del WhatsApp Web, tal com fan alguns clients d'escriptori. No necessita cap aprovació de la Cloud API, que és justament el que el fa llaminer, i queda fora d'abast a posta: el protocol està fet per enginyeria inversa, Meta el pot trencar quan vulgui, i fer-lo servir pot acabar amb el número suspès. En un compte personal aquella és l'aposta de qui l'assumeix. En la línia d'atenció d'una empresa, una suspensió atura totes les converses de cop, així que el mòdul no correrà aquell risc en nom vostre.
+
+## Novetats a la v2.2.0
+
+- **Una pantalla per atendre una petició de dret de supressió.** Cerqueu el que el mòdul guarda d'una persona pel número de telèfon o per l'ID de WhatsApp, elimineu-ho, i endueu-vos-en un comprovant d'un sol ús que a més diu què queda fora de l'abast del mòdul i on s'elimina cadascuna d'aquelles coses. Un missatge a la cua pendent d'enviar-se a un contacte eliminat es refusa en lloc de lliurar-se, i ho deixa dit a la conversa. Això tanca un forat que el mòdul mateix ja documentava: la seva taula no es netejava mai en esborrar un client o una conversa al FreeScout, així que un administrador podia creure que havia atès una petició de supressió mentre el número de telèfon seguia allà.
+- **Iniciar una conversa es refusa en una bústia de WhatsApp** (#44). El botó "New Conversation" de la barra lateral ja no hi surt, la ruta que hi ha darrere es refusa, i el Clone també, que crea una conversa sense arribar a ensenyar cap formulari. Aquell formulari no podia funcionar mai aquí, perquè la Cloud API només permet respondre dins de la finestra que va obrir el client o enviar una plantilla aprovada; fer-lo servir produïa una conversa que semblava desada mentre no s'enviava res ni es registrava res. Ara el refús s'explica en lloc de rebotar en silenci.
+- **Correcció**: un missatge entrant ja no acaba dins d'una conversa creada a mà per un agent (#44). La conversa que es reutilitza ha de ser de xat, cosa que és també el que protegeix les instal·lacions que ja arrosseguen una d'aquelles.
+- **Les notes automàtiques porten la cara de l'agent de qui parlen** (#43): una resposta refusada o un lliurament fallit es veuen com qualsevol altra nota en lloc de sortir sense avatar. Quan no hi ha autor resoluble, la nota segueix sortint igual que abans.
+- El README ara explica per què aquest mòdul no vincularà un número pel protocol no oficial de dispositiu acompanyant del WhatsApp Web, i el CONTRIBUTING diu qui manté cada idioma.
 
 ## Novetats a la v2.1.0
 
@@ -107,14 +121,6 @@ Queda fora d'abast:
 ## Novetats a la v2.0.1
 
 - **Correcció**: el compte enrere de la v2.0.0 era inabastable per a lectors de pantalla, i quedava amagat rere "Show Details" en qualsevol conversa amb el Chat Mode activat. Tots dos arreglats: ara anuncia el compte enrere mateix en lloc de només el tooltip, i es renderitza des d'un punt que el Chat Mode mai amaga. El banner de recuperació existent no es veu afectat.
-
-## Novetats a la v2.0.0
-
-Compromès públicament el 2026-08-25 (issue #2): cada conversa oberta ara mostra un compte enrere real i en viu fins a la finestra de servei de 24 hores de Meta, no només un banner un cop ja s'ha tancat.
-
-- **Un indicador petit i sempre visible compta enrere la finestra**, des de l'últim missatge del client, i canvia a estil d'avís durant l'última hora. És purament informatiu i sempre reflecteix la regla real de Meta — és totalment independent del llindar de recuperació de més avall, que segueix decidint quan apareix el banner de recuperació exactament com sempre.
-- L'indicador porta una petita icona de rellotge, incrustada del joc [Lucide](https://lucide.dev), sense cap petició externa. La primera icona que aquest mòdul incorpora més enllà dels Glyphicons propis del FreeScout — una versió de número rodó es mereix una mica més de cura en com es veu, no només en què fa.
-- Primer bump de versió major des de la 1.0.0. No es trenca res ni canvia el significat de cap opció — va lligat a ser una millora notable i compromesa públicament, que és per a què serveixen els números rodons en aquest projecte.
 
 Les versions anteriors són a la [pàgina de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -270,7 +276,7 @@ El multimèdia s'emmagatzema amb l'emmagatzematge local ja existent de FreeScout
 
 ## Dades personals
 
-[Què guarda aquest mòdul dels vostres clients, on ho guarda, i què s'esborra quan elimineu un client o una conversa](docs/personal-data.md). També hi diu clarament els forats que té, inclòs l'únic lloc on l'esborrat no arriba: el fitxer de registre detallat. El document és en anglès.
+[Què guarda aquest mòdul dels vostres clients, on ho guarda, i què s'esborra quan elimineu un client o una conversa](docs/personal-data.md). També hi diu clarament els forats que té, inclosos els tres llocs on l'esborrat no arriba: el fitxer de registre detallat, la cua de treballs del core, i les dues columnes de canal que el FreeScout escriu en un client i no neteja mai. El document és en anglès.
 
 ## Limitacions conegudes
 

@@ -135,6 +135,61 @@ class MetaWhatsAppController extends Controller
         return view('metawhatsapp::account_events', compact('events', 'accountNames'));
     }
 
+    /**
+     * Right of erasure (GDPR / RGPD): what the module holds about one
+     * person, and taking it out.
+     *
+     * The screen names the request an administrator is answering, never
+     * the outcome: nothing here says, or implies, that clicking leaves an
+     * installation compliant. They comply; we hand them the tool and a
+     * receipt they can show.
+     */
+    public function erasure()
+    {
+        $this->requireAdmin();
+
+        return view('metawhatsapp::erasure');
+    }
+
+    /**
+     * POST and not GET on purpose: with GET the identifier would travel
+     * in the query string and from there into the web server's access
+     * log, proxies and browser history, which is the durable copy the
+     * receipt works to avoid creating.
+     */
+    public function erasureSearch(\Illuminate\Http\Request $request)
+    {
+        $this->requireAdmin();
+        $request->validate(['identifier' => 'required|string|max:191']);
+
+        return view('metawhatsapp::erasure', [
+            'identifier' => $request->input('identifier'),
+            'summary'    => \Modules\MetaWhatsApp\Support\PersonalDataErasure::summary(
+                $request->input('identifier')
+            ),
+            'searched'   => true,
+        ]);
+    }
+
+    /**
+     * Renders the receipt straight from the POST response: no redirect
+     * and no Session::flash(), because with flash the text would pass
+     * through the session store even for one request. It is the only
+     * place in this design that names the person, so it must not persist.
+     */
+    public function erasureErase(\Illuminate\Http\Request $request)
+    {
+        $this->requireAdmin();
+        $request->validate(['identifier' => 'required|string|max:191']);
+
+        return view('metawhatsapp::erasure', [
+            'identifier' => $request->input('identifier'),
+            'receipt'    => \Modules\MetaWhatsApp\Support\PersonalDataErasure::erase(
+                $request->input('identifier')
+            ),
+        ]);
+    }
+
     public function create()
     {
         $this->requireAdmin();

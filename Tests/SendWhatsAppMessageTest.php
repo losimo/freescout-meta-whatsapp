@@ -24,6 +24,10 @@ class SendWhatsAppMessageTest extends TestCase
         $customer = new Customer();
         $customer->first_name = '+34611222333';
         $customer->save();
+        // Real conversations only reach a reply because the customer
+        // already has a contact route; without this, OutboundGuard's
+        // erasure guard (hasContactRoute()) would refuse every send below.
+        $customer->addChannel(WhatsAppAccount::CHANNEL, '+34611222333');
 
         $conversation = new Conversation();
         $conversation->type        = Conversation::TYPE_CHAT;

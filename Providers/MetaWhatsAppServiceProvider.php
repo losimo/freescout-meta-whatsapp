@@ -15,7 +15,23 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
         $this->registerViews();
         $this->registerTranslations();
         $this->loadMigrationsFrom(__DIR__ . '/../Database/Migrations');
+        $this->registerMiddleware();
         $this->hooks();
+    }
+
+    /**
+     * Issue #44. The core has no Eventy hook inside
+     * ConversationsController@create and no filter on its route, so the only
+     * way to refuse starting a conversation in a WhatsApp mailbox is from the
+     * middleware stack. Pushed onto the `web` group rather than declared on a
+     * route, because the route being guarded belongs to the core.
+     */
+    protected function registerMiddleware()
+    {
+        $this->app['router']->pushMiddlewareToGroup(
+            'web',
+            \Modules\MetaWhatsApp\Http\Middleware\RefuseNewConversation::class
+        );
     }
 
     public function register()
@@ -72,6 +88,7 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 echo '<style>#toggle-cc, .sidebar-title-email { display: none !important; }</style>';
                 echo '<style>.metawhatsapp-window-clock-open { color: #767676; } '
                     .'.metawhatsapp-window-clock-warning { color: #8a6d3b; }</style>';
+                echo $this->hideSidebarNewConversationCss();
             }
 
             if (\Route::currentRouteName() == 'dashboard') {
@@ -195,6 +212,39 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
 
         return $mailboxId
             && WhatsAppAccount::where('mailbox_id', $mailboxId)->exists();
+    }
+
+    /**
+     * Issue #44. The core gates its "New Conversation" button differently in
+     * two places: the dashboard requires both the `mailbox.show_buttons`
+     * filter and `$mailbox->isActive()`
+     * (resources/views/secure/dashboard.blade.php), while the sidebar checks
+     * only the filter (resources/views/mailboxes/sidebar_menu_view.blade.php).
+     * A WhatsApp mailbox has no incoming e-mail server on purpose, so
+     * isActive() is false and the dashboard hides the button on its own,
+     * which is why the reporter saw it in one place and not the other.
+     *
+     * The filter is reachable here, but it wraps the whole `.sidebar-buttons`
+     * block, so returning false from it would also take away the Mailbox
+     * Settings button next to it. Hiding one link instead of three quarters
+     * of the sidebar's controls is worth doing in CSS.
+     *
+     * Done without adding an element: the container is a Bootstrap
+     * `btn-group-justified`, which lays its children out as table cells, so a
+     * marker element would claim a column of its own and skew the row. The
+     * rule keys on markup the core already writes.
+     *
+     * Deliberately only this one link. Hiding the whole strip when it has
+     * nothing left (an agent without permission to see the settings button)
+     * would be one more rule, and it cannot be written safely:
+     * `mailbox.sidebar.buttons` is a public hook, so another module may have
+     * put its own button in that strip, and a rule broad enough to catch the
+     * empty case would take that button with it. An empty strip is a cosmetic
+     * problem; removing another module's button is a functional one.
+     */
+    protected function hideSidebarNewConversationCss(): string
+    {
+        return '<style>.sidebar-buttons a[href*="/new-ticket"] { display: none !important; }</style>';
     }
 
     /**

@@ -91,6 +91,7 @@
                     <button type="submit" class="btn btn-primary">{{ __('metawhatsapp::metawhatsapp.save') }}</button>
                     <a href="{{ route('logs.app') }}" class="btn btn-link">{{ __('metawhatsapp::metawhatsapp.diagnostics_view_log') }}</a>
                     <a href="{{ route('metawhatsapp.account_events') }}" class="btn btn-link">{{ __('metawhatsapp::metawhatsapp.account_events_link') }}</a>
+                    <a href="{{ route('metawhatsapp.erasure') }}" class="btn btn-link">{{ __('metawhatsapp::metawhatsapp.erasure_link') }}</a>
                 </div>
             </div>
         </form>
