@@ -15,6 +15,7 @@ use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 use Modules\MetaWhatsApp\Support\AccountEventLog;
 use Modules\MetaWhatsApp\Support\CoreCompat;
 use Modules\MetaWhatsApp\Support\DebugLog;
+use Modules\MetaWhatsApp\Support\NoteAuthor;
 
 class MetaWhatsAppController extends Controller
 {
@@ -73,6 +74,32 @@ class MetaWhatsAppController extends Controller
             'debug_window'    => 'nullable|in:off,1,3,7,30,always',
             'debug_retention' => 'required|integer|min:0|max:365',
         ]);
+
+        // Who signs the module's automatic notes (issue #43). Empty means the
+        // agent the note is about, which is the behaviour the module shipped
+        // with and stays the default.
+        //
+        // The check is here rather than an `exists:users,id` rule because the
+        // answer has to be narrower than a row in that table: FreeScout
+        // deletes a user by marking the row, and storing a deleted one would
+        // save a setting that silently never applies. It also lets the screen
+        // say what was wrong instead of bouncing back with nothing. Nothing is
+        // written until it passes, so a bad id leaves every other field alone.
+        $noteAuthor = trim((string) $request->input('note_author', ''));
+
+        if ($noteAuthor !== '' && !NoteAuthor::isSelectable((int) $noteAuthor)) {
+            \Session::flash('flash_error_floating', __('metawhatsapp::metawhatsapp.note_author_unknown'));
+
+            return redirect()->route('metawhatsapp.settings');
+        }
+
+        // The dropdown always travels, so an absent field is not somebody
+        // choosing the empty option: it is a request that never carried this
+        // setting, and clearing it then would undo a choice nobody touched.
+        // An empty value that did arrive does mean "back to the agent".
+        if ($request->has('note_author')) {
+            NoteAuthor::setUserId($noteAuthor !== '' ? (int) $noteAuthor : null);
+        }
 
         DebugLog::setRetentionDays((int) $request->debug_retention);
 

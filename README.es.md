@@ -66,7 +66,7 @@ Si el paso 5 no funciona, empieza por [Resolución de problemas](#resolución-de
 
 ![Panel de salud de la cuenta](docs/es/account-health.png)
 
-*Registro detallado, que se enciende durante una ventana y se conserva unos días, desde la pantalla de configuración:*
+*Ajustes del módulo: el registro detallado que se enciende durante una ventana y se conserva unos días, y de quién vienen las notas automáticas:*
 
 ![Panel del registro detallado](docs/es/detailed-log.png)
 
@@ -104,6 +104,12 @@ Queda fuera de alcance:
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 - Vincular un número por el protocolo no oficial de dispositivo acompañante de WhatsApp Web, como hacen algunos clientes de escritorio. No necesita aprobación de la Cloud API, que es justo lo que lo hace tentador, y queda fuera de alcance a propósito: el protocolo está hecho por ingeniería inversa, Meta puede romperlo cuando quiera, y usarlo puede acabar con el número suspendido. En una cuenta personal esa es la apuesta de quien la asume. En la línea de atención de una empresa, una suspensión detiene todas las conversaciones a la vez, así que el módulo no va a correr ese riesgo en su nombre.
 
+## Novedades en la v2.3.0
+
+- **Corrección: los agentes ahora reciben aviso de los mensajes entrantes** (#46). No lo recibían en ninguna versión de este módulo. Ni correo, ni campana, ni aviso del navegador, y nada en el registro que lo dijera. El listener de FreeScout solo guarda el evento en un búfer, y el core vacía ese búfer en dos sitios, ninguno de los cuales corre dentro de un worker de colas, que es donde este módulo procesa los webhooks. Reportado con el diagnóstico completo por [@MarkoD](https://github.com/MarkoD).
+- **Podéis elegir de quién vienen las notas automáticas del módulo** (#43). Dejadlo sin marcar y no cambia nada: la nota lleva el agente del que habla. Elegid un usuario, por ejemplo uno que creéis y llaméis Sistema o WhatsApp, y las notas llevarán ese usuario, lo que evita que FreeScout le enseñe esa nota a un agente como si la hubiera escrito él mismo. Si borráis ese usuario más adelante, las notas vuelven a llevar el agente.
+- El aviso de ventana caducada ya no dice que Meta no admita enviar una plantilla a un contacto del que solo se conoce su ID de WhatsApp. Meta lo acepta como destinatario; este módulo todavía no lo ha construido, y ahora dice cuál de los dos es el límite.
+
 ## Novedades en la v2.2.0
 
 - **Una pantalla para atender una solicitud de derecho de supresión.** Busque lo que el módulo guarda de una persona por número de teléfono o por ID de WhatsApp, elimínelo, y llévese un comprobante de un solo uso que además indica qué queda fuera del alcance del módulo y dónde se elimina cada una de esas cosas. Un mensaje en cola pendiente de enviarse a un contacto eliminado se rechaza en lugar de entregarse, y lo deja dicho en la conversación. Esto cierra un agujero que el propio módulo ya documentaba: su tabla nunca se limpiaba al borrar un cliente o una conversación en FreeScout, así que un administrador podía creer que había atendido una solicitud de supresión mientras el número de teléfono seguía ahí.
@@ -117,10 +123,6 @@ Queda fuera de alcance:
 - **El contador de la ventana y el banner de recuperación ahora se actualizan en vivo** mientras la conversación permanece abierta: una respuesta del cliente o el cierre de la ventana se reflejan automáticamente, sin recargar la página (#41, #42).
 - **Se reconoce el estado `played` de Meta** para notas de voz: una nota de voz escuchada recibe ahora el mismo tratamiento "abierto" que ya tenía un mensaje de texto leído.
 - **La retención del registro detallado admite ahora `0` para "conservarlo todo para siempre"**, con el límite subido de 90 a 365 días (#10).
-
-## Novedades en la v2.0.1
-
-- **Corrección**: la cuenta atrás de la v2.0.0 era inalcanzable para lectores de pantalla, y quedaba oculta tras "Show Details" en cualquier conversación con el Chat Mode activado. Ambas arregladas: ahora anuncia la cuenta atrás en sí en lugar de solo el tooltip, y se renderiza desde un punto que el Chat Mode nunca colapsa. El banner de recuperación existente no se ve afectado.
 
 Las versiones anteriores están en la [página de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 

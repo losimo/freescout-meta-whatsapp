@@ -13,6 +13,8 @@
     <div class="panel-heading">{{ __('metawhatsapp::metawhatsapp.diagnostics_title') }}</div>
     <div class="panel-body">
 
+        <h4 style="margin-top:0">{{ __('metawhatsapp::metawhatsapp.diagnostics_section_log') }}</h4>
+
         <p class="help-block" style="margin-bottom:15px">
             {{ __('metawhatsapp::metawhatsapp.diagnostics_help') }}
         </p>
@@ -83,6 +85,35 @@
                         </label>
                     </div>
                     <p class="help-block">{{ __('metawhatsapp::metawhatsapp.account_events_enable_help') }}</p>
+                </div>
+            </div>
+
+            {{-- Issue #43. Who signs the module's automatic notes.
+
+                 Read from the helper rather than from a view variable, like
+                 the account events checkbox just above, so this partial can
+                 still be rendered on its own in a test with only $debug.
+
+                 The first option is the behaviour from before this dropdown
+                 existed, and it is also what shows as selected when the chosen
+                 user has been deleted since: the list only offers live users,
+                 so the screen shows what actually happens in a conversation. --}}
+            @php($noteAuthorSelected = \Modules\MetaWhatsApp\Support\NoteAuthor::configuredUserId())
+            <h4>{{ __('metawhatsapp::metawhatsapp.diagnostics_section_notes') }}</h4>
+
+            <div class="form-group">
+                <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.note_author') }}</label>
+                <div class="col-sm-8">
+                    <select name="note_author" class="form-control" style="max-width:320px">
+                        <option value="">{{ __('metawhatsapp::metawhatsapp.note_author_agent') }}</option>
+                        @foreach(\Modules\MetaWhatsApp\Support\NoteAuthor::selectableUsers() as $noteAuthorUser)
+                            <option value="{{ $noteAuthorUser->id }}"
+                                {{ $noteAuthorSelected === (int) $noteAuthorUser->id ? 'selected' : '' }}>
+                                {{ $noteAuthorUser->getFullName() }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="help-block">{{ __('metawhatsapp::metawhatsapp.note_author_help') }}</p>
                 </div>
             </div>
 

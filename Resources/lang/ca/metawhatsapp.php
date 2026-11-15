@@ -98,14 +98,16 @@ return [
     'template_sent'                => 'Missatge de plantilla encuat per enviar.',
     'template_not_configured'      => 'Aquest compte de WhatsApp no té cap plantilla de recuperació configurada.',
     'template_no_phone'            => 'No s\'ha pogut resoldre cap número de telèfon per a aquesta conversa.',
-    'template_no_phone_notice'     => 'Aquest contacte no té telèfon registrat (els contactes només amb ID de WhatsApp encara no admeten l\'enviament de plantilles - previst per a la fase 2b).',
+    'template_no_phone_notice'     => 'Aquest contacte no té telèfon registrat, només el seu ID de WhatsApp. Meta accepta un ID de WhatsApp com a destinatari d\'un missatge; aquest mòdul de moment només envia a números de telèfon, així que la plantilla de recuperació no pot sortir des d\'aquí.',
     'template_window_open'         => 'La finestra del client ha tornat a obrir-se: envia una resposta normal en comptes d\'una plantilla de pagament.',
     'template_already_sent'        => 'Ja s\'ha enviat una plantilla fa uns moments per a aquesta conversa.',
 
     'account_inactive_notice'          => 'Aquest canal de WhatsApp està inactiu, així que no es pot enviar res. Obre la configuració del canal per comprovar la connexió i reactivar-lo.',
     'not_sent_channel_inactive'   => 'No s\'ha enviat res a WhatsApp: aquest canal està inactiu. Quan un administrador restableixi la connexió, caldrà tornar a enviar el missatge.',
     'core_outdated'               => 'Aquest mòdul es desenvolupa i es prova amb el FreeScout :minimum o superior, i aquí teniu la versió :current. Continua funcionant, però no s\'ha provat en aquesta versió, i les versions posteriors han anat tancant problemes de seguretat. Val la pena actualitzar el FreeScout.',
-    'diagnostics_title'           => 'Registre detallat',
+    'diagnostics_title'           => 'Ajustos del mòdul',
+    'diagnostics_section_log'     => 'Registre detallat',
+    'diagnostics_section_notes'   => 'Notes que escriu el mòdul',
     'diagnostics_help'            => 'Registra les càrregues senceres de WhatsApp, o sigui el text dels missatges dels vostres clients i els seus telèfons. És una segona còpia d\'aquelles converses, en un fitxer que esborrar un client o una conversa no pot reescriure. Manteniu la finestra el temps que us calgui per diagnosticar i ni un dia més. Només els administradors la poden llegir.',
     'diagnostics_forced_env'      => 'El registre detallat també l\'activa METAWHATSAPP_DEBUG al .env del FreeScout, que mana per damunt del que poseu aquí.',
     'diagnostics_state'           => 'Ara mateix',
@@ -193,6 +195,15 @@ return [
     'account_events_channel'  => 'Canal',
     'account_events_enable'      => 'Registra el que Meta reporta sobre el compte',
     'account_events_enable_help' => 'Canvis d\'estat de plantilles, canvis de categoria (que en decideixen el preu), valoracions de qualitat i restriccions, conservats 90 dies i llegibles des de l\'enllaç de sota. Només fets del compte: aquí no s\'hi registra res de cap client. Apagat si no el voleu.',
+
+    // Author of the module's automatic notes (issue #43). The note is about an
+    // agent, and FreeScout writes "you" when the author is the person reading,
+    // so by default the agent is told in their own voice something the module
+    // wrote about them.
+    'note_author'          => 'Notes automàtiques escrites per',
+    'note_author_agent'    => 'L\'agent de qui parla la nota',
+    'note_author_help'     => 'Per defecte una nota automàtica porta l\'agent de qui parla, i el FreeScout la hi ensenya com si l\'hagués escrita ell mateix. Trieu aquí un usuari, per exemple un que creeu i anomeneu Sistema o WhatsApp, i les notes portaran aquest usuari; si l\'esborreu més endavant, tornen a portar l\'agent. Abans de crear-lo: és un usuari normal del FreeScout, així que se li poden assignar converses i rebrà correus de notificació si no li buideu les subscripcions, i el canvi només afecta les notes que s\'escriguin a partir d\'ara.',
+    'note_author_unknown'  => 'Aquest usuari no existeix, així que no s\'ha desat res.',
 
     // Comprovacions d'entorn: coses que impedeixen que el mòdul funcioni i que
     // no són del mòdul, dites perquè l'administrador sàpiga què mirar.

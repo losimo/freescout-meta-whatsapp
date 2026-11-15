@@ -5,12 +5,17 @@ namespace Modules\MetaWhatsApp\Tests;
 use App\Conversation;
 use App\Customer;
 use App\CustomerChannel;
+use App\Jobs\SendNotificationToUsers;
+use App\Notifications\WebsiteNotification;
+use App\Subscription;
 use App\Thread;
 use App\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Modules\MetaWhatsApp\Jobs\ProcessInboundWebhook;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
@@ -1982,5 +1987,112 @@ class ProcessInboundWebhookTest extends TestCase
         // La fila aliena tampoc no s'ha tocat en el rollback.
         $this->assertEquals(1, DB::table('customer_channel')
             ->where('channel', 100)->where('channel_id', 'telegram-777')->count());
+    }
+
+    /**
+     * Subscribes an admin (admins have access to every mailbox) to new
+     * conversations through the email medium, which is also the medium that
+     * feeds the notifications menu.
+     */
+    protected function subscribeToNewConversations(User $user): void
+    {
+        Subscription::create([
+            'user_id' => $user->id,
+            'medium'  => Subscription::MEDIUM_EMAIL,
+            'event'   => Subscription::EVENT_NEW_CONVERSATION,
+        ]);
+
+        // The buffer is a static array shared by the whole PHP process, so
+        // another test in this run may have left events in it. Starting from
+        // empty is what makes the assertions below mean something.
+        Subscription::$occurred_events = [];
+    }
+
+    /**
+     * Issue #46: no agent ever got a notification for an inbound message, by
+     * any medium. The core listener does not notify anyone, it only appends
+     * the event to Subscription's static buffer, and the two places where
+     * core flushes that buffer (the TerminateHandler middleware and the
+     * FetchEmails command) never run inside a queue worker. Our job runs on
+     * the queue, so every registered event died in the worker's memory.
+     *
+     * This asserts what the agent ends up with rather than that the flush was
+     * called: a subscribed admin gets the website notification and the email
+     * job, and the buffer is empty by the time the job returns.
+     */
+    public function test_an_inbound_message_notifies_the_subscribed_agents()
+    {
+        $account = $this->createTestAccount();
+        $admin   = $this->makeAdminUser();
+        $this->subscribeToNewConversations($admin);
+
+        Queue::fake();
+        Notification::fake();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.notify1', '34611222333', 'hola'));
+
+        $this->assertSame(
+            [],
+            Subscription::$occurred_events,
+            'The job returned with events still buffered, so nothing flushed them.'
+        );
+
+        Notification::assertSentTo($admin, WebsiteNotification::class);
+
+        $conversationId = (int) WhatsAppMessage::where('wamid', 'wamid.notify1')->first()->conversation_id;
+        Queue::assertPushed(SendNotificationToUsers::class, function ($job) use ($admin, $conversationId) {
+            $userIds = [];
+            foreach ($job->users as $user) {
+                $userIds[] = (int) $user->id;
+            }
+
+            return (int) $job->conversation->id === $conversationId
+                && in_array((int) $admin->id, $userIds, true);
+        });
+    }
+
+    /**
+     * The other half of issue #46. Registration happens inside the
+     * DB::transaction() of processMessage() and the buffer is a static array,
+     * which no rollback touches. An exception thrown after the event was
+     * registered (here, another module hooking
+     * conversation.created_by_customer) leaves the buffer holding an event
+     * for a conversation that was never committed, and the next flush, this
+     * job's or another job's on the same worker, would notify about it.
+     */
+    public function test_a_rolled_back_message_leaves_nothing_behind_to_notify_about()
+    {
+        $account = $this->createTestAccount();
+        $admin   = $this->makeAdminUser();
+        $this->subscribeToNewConversations($admin);
+
+        Queue::fake();
+        Notification::fake();
+
+        // Runs right after event(new CustomerCreatedConversation()), so the
+        // event is already buffered when the transaction rolls back.
+        \Eventy::addAction('conversation.created_by_customer', function () {
+            throw new \RuntimeException('a module threw after the event was registered');
+        }, 20, 3);
+
+        $thrown = null;
+        try {
+            $this->runJob($account, $this->inboundPayload($account, 'wamid.notify2', '34611222333', 'hola'));
+        } catch (\RuntimeException $e) {
+            $thrown = $e;
+        }
+
+        $this->assertNotNull($thrown, 'The job swallowed the exception, so the queue would never retry it.');
+        $this->assertNull(
+            WhatsAppMessage::where('wamid', 'wamid.notify2')->first(),
+            'The message was committed, so this no longer tests a rollback.'
+        );
+        $this->assertSame(
+            [],
+            Subscription::$occurred_events,
+            'A rolled back event stayed in the buffer and would be flushed by the next job.'
+        );
+        Notification::assertNotSentTo($admin, WebsiteNotification::class);
+        Queue::assertNotPushed(SendNotificationToUsers::class);
     }
 }

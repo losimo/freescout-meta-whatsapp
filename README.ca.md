@@ -66,7 +66,7 @@ Si el pas 5 no funciona, comença per [Resolució de problemes](#resolució-de-p
 
 ![Panell de salut del compte](docs/ca/account-health.png)
 
-*Registre detallat, que s'encén durant una finestra i es conserva uns dies, des de la pantalla de configuració:*
+*Ajustos del mòdul: el registre detallat que s'encén durant una finestra i es conserva uns dies, i de qui vénen les notes automàtiques:*
 
 ![Panell del registre detallat](docs/ca/detailed-log.png)
 
@@ -104,6 +104,12 @@ Queda fora d'abast:
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 - Vincular un número pel protocol no oficial de dispositiu acompanyant del WhatsApp Web, tal com fan alguns clients d'escriptori. No necessita cap aprovació de la Cloud API, que és justament el que el fa llaminer, i queda fora d'abast a posta: el protocol està fet per enginyeria inversa, Meta el pot trencar quan vulgui, i fer-lo servir pot acabar amb el número suspès. En un compte personal aquella és l'aposta de qui l'assumeix. En la línia d'atenció d'una empresa, una suspensió atura totes les converses de cop, així que el mòdul no correrà aquell risc en nom vostre.
 
+## Novetats a la v2.3.0
+
+- **Correcció: els agents ara reben avís dels missatges entrants** (#46). No el rebien en cap versió d'aquest mòdul. Ni correu, ni campaneta, ni avís del navegador, i res al registre que ho digués. El listener del FreeScout només desa l'esdeveniment en un búfer, i el core buida aquell búfer en dos llocs, i cap dels dos corre dins d'un worker de cues, que és on aquest mòdul processa els webhooks. Reportat amb el diagnòstic sencer per [@MarkoD](https://github.com/MarkoD).
+- **Podeu triar de qui vénen les notes automàtiques del mòdul** (#43). Deixeu-ho sense marcar i no canvia res: la nota porta l'agent de qui parla. Trieu un usuari, per exemple un que creeu i anomeneu Sistema o WhatsApp, i les notes portaran aquell usuari, cosa que evita que el FreeScout ensenyi aquella nota a un agent com si l'hagués escrita ell mateix. Si esborreu aquell usuari més endavant, les notes tornen a portar l'agent.
+- L'avís de finestra caducada ja no diu que Meta no admeti enviar una plantilla a un contacte de qui només se'n sap l'ID de WhatsApp. Meta l'accepta com a destinatari; aquest mòdul encara no ho ha construït, i ara diu quin dels dos és el límit.
+
 ## Novetats a la v2.2.0
 
 - **Una pantalla per atendre una petició de dret de supressió.** Cerqueu el que el mòdul guarda d'una persona pel número de telèfon o per l'ID de WhatsApp, elimineu-ho, i endueu-vos-en un comprovant d'un sol ús que a més diu què queda fora de l'abast del mòdul i on s'elimina cadascuna d'aquelles coses. Un missatge a la cua pendent d'enviar-se a un contacte eliminat es refusa en lloc de lliurar-se, i ho deixa dit a la conversa. Això tanca un forat que el mòdul mateix ja documentava: la seva taula no es netejava mai en esborrar un client o una conversa al FreeScout, així que un administrador podia creure que havia atès una petició de supressió mentre el número de telèfon seguia allà.
@@ -117,10 +123,6 @@ Queda fora d'abast:
 - **El compte enrere de la finestra i el banner de recuperació ara s'actualitzen en viu** mentre la conversa es manté oberta: una resposta del client o el tancament de la finestra es reflecteixen automàticament, sense recarregar la pàgina (#41, #42).
 - **Es reconeix l'estat `played` de Meta** per a notes de veu: una nota de veu escoltada rep ara el mateix tractament "obert" que ja tenia un missatge de text llegit.
 - **La retenció del registre detallat admet ara `0` per a "conservar-ho tot per sempre"**, amb el límit pujat de 90 a 365 dies (#10).
-
-## Novetats a la v2.0.1
-
-- **Correcció**: el compte enrere de la v2.0.0 era inabastable per a lectors de pantalla, i quedava amagat rere "Show Details" en qualsevol conversa amb el Chat Mode activat. Tots dos arreglats: ara anuncia el compte enrere mateix en lloc de només el tooltip, i es renderitza des d'un punt que el Chat Mode mai amaga. El banner de recuperació existent no es veu afectat.
 
 Les versions anteriors són a la [pàgina de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 

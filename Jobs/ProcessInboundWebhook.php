@@ -7,6 +7,7 @@ use App\Customer;
 use App\CustomerChannel;
 use App\Events\CustomerCreatedConversation;
 use App\Events\CustomerReplied;
+use App\Subscription;
 use App\Thread;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,6 +21,7 @@ use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 use Modules\MetaWhatsApp\Support\CoreCompat;
 use Modules\MetaWhatsApp\Support\DeliveryFailure;
 use Modules\MetaWhatsApp\Support\Logger as MetaWhatsAppLogger;
+use Modules\MetaWhatsApp\Support\NoteAuthor;
 use Modules\MetaWhatsApp\Support\WebhookEventRouter;
 use Modules\MetaWhatsApp\Support\WhatsAppTextFormatter;
 
@@ -49,12 +51,96 @@ class ProcessInboundWebhook implements ShouldQueue
             Log::warning('[MetaWhatsApp] ProcessInboundWebhook: account missing or inactive', [
                 'account_id' => $this->accountId,
             ]);
+            // No flush on this path on purpose: nothing above this line can
+            // register a subscription event, so there is nothing of ours in
+            // the buffer. If something else is in there it belongs to
+            // whatever ran before us in this worker process, and flushing or
+            // clearing another job's events is not ours to decide.
             return;
         }
 
         Log::info('[MetaWhatsApp] Processing inbound webhook', ['account_id' => $account->id]);
         MetaWhatsAppLogger::debugData('[MetaWhatsApp] Inbound webhook payload', ['account_id' => $account->id, 'payload' => $this->payload]);
 
+        // Whatever is in the buffer before we start is not ours. The buffer is
+        // static and lives as long as the worker process, so a job that ran
+        // before us in the same process could have left something in it. The
+        // early-return path above says that flushing or clearing another job's
+        // events is not ours to decide, and the failure path below has to obey
+        // the same rule rather than clear the lot.
+        $preexisting = Subscription::$occurred_events;
+
+        try {
+            $this->processPayload($account);
+        } catch (\Throwable $e) {
+            // Issue #46, failure half. The buffer is a static array, so it is
+            // NOT rolled back with the transaction that registered into it.
+            // An exception thrown inside the DB::transaction() of
+            // processMessage() after firePostEvents() has run (another
+            // module's listener on conversation.created_by_customer, a failed
+            // commit) leaves an event in there for a conversation or thread
+            // that no longer exists.
+            //
+            // Not a finally: flushing after a rollback is worse than not
+            // flushing. On a reopened conversation the row survives the
+            // rollback and only the new thread disappears, so processEvents()
+            // would pick the previous thread and notify the whole mailbox
+            // about a message the agents already read, three times over
+            // because the job retries.
+            //
+            // Accepted case: when a batch carries several messages and a
+            // later one throws, the events already registered by the earlier,
+            // committed ones are discarded with it, and the retry will not
+            // register them again (the wamid is already stored, so they are a
+            // no-op). Those agents get no notification for messages that are
+            // in their mailbox. It is the quieter of the two failures, and it
+            // needs both a multi-message batch and an exception to happen at
+            // all.
+            // And it says so. A dropped notification that leaves no trace is
+            // the same shape of defect as the one this whole change fixes:
+            // something reaches the mailbox and nobody is told.
+            //
+            // The number is buffer entries, and it is named that way because
+            // it is not a count of messages: Subscription::registerEvent()
+            // appends a second EVENT_TYPE_UPDATED entry for every event that
+            // is not NEW, so one customer reply leaves two. Reporting it as
+            // "notifications" would be off by roughly double. Entries only,
+            // never the events themselves, which would put a customer's
+            // conversation in the log for no operational gain.
+            $ours = count(Subscription::$occurred_events) - count($preexisting);
+            if ($ours > 0) {
+                Log::warning('[MetaWhatsApp] Inbound batch failed: agent notifications discarded', [
+                    'account_id'       => $account->id,
+                    'buffered_entries' => $ours,
+                    'error'            => $e->getMessage(),
+                ]);
+            }
+
+            // Only what we added. registerEvent() appends, so everything past
+            // the point we started is ours and the rest goes back untouched.
+            Subscription::$occurred_events = $preexisting;
+            throw $e;
+        }
+
+        // Issue #46. The core listener (App\Listeners\SendNotificationToUsers)
+        // does not notify anyone: it only appends to Subscription's static
+        // buffer, and core flushes that buffer in exactly two places, the
+        // TerminateHandler middleware and the FetchEmails command. Neither one
+        // runs in a queue worker, so every event our job registered used to
+        // die in the worker's memory and no agent ever heard about an inbound
+        // message.
+        //
+        // Here and not inside firePostEvents(): that runs inside
+        // DB::transaction(), and flushing there would dispatch notifications
+        // for a transaction that can still roll back. Here and not per
+        // message: this is also where FetchEmails flushes, once per run, so
+        // several messages for the same conversation coalesce into one
+        // notification instead of one per message.
+        Subscription::processEvents();
+    }
+
+    protected function processPayload(WhatsAppAccount $account)
+    {
         foreach ($this->payload['entry'] ?? [] as $entry) {
             foreach ($entry['changes'] ?? [] as $change) {
                 $value = $change['value'] ?? [];
@@ -935,6 +1021,12 @@ class ProcessInboundWebhook implements ShouldQueue
         // n'hi ha cap de resoluble (thread esborrat, usuari esborrat,
         // plantilla enviada pel sistema), cas en què es veu com fins ara.
         //
+        // Naming that agent is what the administrator can now override, for
+        // the reason in NoteAuthor: the core renders the author as "you" to
+        // whoever is reading, so the agent saw a note about their own failed
+        // message as if they had written it. With no chosen user, or one
+        // since deleted, this is exactly the attribution above.
+        //
         // user_id es queda com estava, amb l'usuari del sistema: aquí no vol
         // dir qui ha escrit la nota sinó a qui queda lligada, i canviar-ho
         // seria decidir una assignació per l'equip.
@@ -946,7 +1038,7 @@ class ProcessInboundWebhook implements ShouldQueue
         $thread = new Thread();
         $thread->conversation_id = $conversation->id;
         $thread->user_id         = optional($this->resolveSystemUser($account, $conversation))->id;
-        $thread->created_by_user_id = $agentId ?: null;
+        $thread->created_by_user_id = NoteAuthor::forNote($agentId ?: null);
         $thread->type            = Thread::TYPE_NOTE;
         $thread->status          = $conversation->status;
         $thread->state           = Thread::STATE_PUBLISHED;

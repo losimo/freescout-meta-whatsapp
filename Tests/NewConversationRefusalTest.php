@@ -68,6 +68,27 @@ class NewConversationRefusalTest extends TestCase
     }
 
     /**
+     * Built from the core's own route rather than from a path string, and
+     * with a token this test plants in the session first.
+     *
+     * FreeScout 1.8.251 added a {token} segment to this route and checks it
+     * against csrf_token(). A hardcoded URL started returning 404, which
+     * made the test pass nothing rather than fail loudly: the guard was
+     * fine, the test had stopped reaching it. route() follows whatever
+     * shape the core gives the route, which is the half we do not own.
+     */
+    const CLONE_TOKEN = 'clone-token-for-tests';
+
+    private function cloneUrl(int $mailboxId, int $threadId): string
+    {
+        return route('conversations.clone_conversation', [
+            'mailbox_id'     => $mailboxId,
+            'from_thread_id' => $threadId,
+            'token'          => self::CLONE_TOKEN,
+        ]);
+    }
+
+    /**
      * The second door, found by review after the first was closed. FreeScout's
      * Clone action is a GET that builds the conversation itself rather than
      * showing a form (ConversationsController::cloneConversation), and it
@@ -89,7 +110,8 @@ class NewConversationRefusalTest extends TestCase
         $before = Conversation::where('customer_id', $customer->id)->count();
 
         $response = $this->actingAs($this->makeAdminUser())
-            ->get($this->url('/mailbox/' . $account->mailbox_id . '/clone-ticket/' . $thread->id));
+            ->withSession(['_token' => self::CLONE_TOKEN])
+            ->get($this->cloneUrl($account->mailbox_id, $thread->id));
 
         $response->assertStatus(302);
         $response->assertRedirect(route('mailboxes.view', ['id' => $account->mailbox_id]));
@@ -100,7 +122,11 @@ class NewConversationRefusalTest extends TestCase
         );
     }
 
-    /** Clone has to keep working everywhere else; it is a core feature. */
+    /**
+     * Clone has to keep working everywhere else; it is a core feature. This
+     * is also what proves the test above still reaches the route at all: if
+     * the URL were wrong, this one would fail too.
+     */
     public function test_cloning_is_left_alone_in_a_mailbox_without_whatsapp()
     {
         $account = $this->createTestAccount();
@@ -114,7 +140,8 @@ class NewConversationRefusalTest extends TestCase
         $before = Conversation::where('customer_id', $customer->id)->count();
 
         $this->actingAs($this->makeAdminUser())
-            ->get($this->url('/mailbox/' . $plain->id . '/clone-ticket/' . $thread->id));
+            ->withSession(['_token' => self::CLONE_TOKEN])
+            ->get($this->cloneUrl($plain->id, $thread->id));
 
         $this->assertGreaterThan(
             $before,

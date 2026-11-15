@@ -201,7 +201,7 @@ class PersonalDataErasureTest extends TestCase
         $this->assertContains('+34611000021', $summary['identifiers']);
     }
 
-    public function phoneSpellings(): array
+    public static function phoneSpellings(): array
     {
         return [
             'parentheses'          => ['+34 (611) 000 021'],

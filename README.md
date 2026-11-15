@@ -66,7 +66,7 @@ If step 5 doesn't work, start with [Troubleshooting](#troubleshooting) and [When
 
 ![Account health panel](docs/en/account-health.png)
 
-*Detailed logging, switched on for a window and kept for a number of days, from the settings page:*
+*Module settings: detailed logging switched on for a window and kept for a number of days, and who the module's automatic notes come from:*
 
 ![Detailed logging panel](docs/en/detailed-log.png)
 
@@ -104,6 +104,12 @@ Out of scope:
 - Chatbots, advanced automations or shared multichannel integrations.
 - Linking a number through WhatsApp Web's unofficial companion-device protocol, the way some desktop clients do. It needs no Cloud API approval, which is precisely what makes it tempting, and it is out of scope here on purpose: the protocol is reverse-engineered, Meta can break it whenever it likes, and using it can get the number suspended. On a personal account that is the owner's own bet. On a company's support line a suspension stops every conversation at once, so the module will not take that risk on your behalf.
 
+## What's new in v2.3.0
+
+- **Fix: agents now get notified about inbound messages** (#46). They never were, in any version of this module. No email, no bell, no browser push, and nothing in the log to say so. FreeScout's listener only buffers the notification event, and the core flushes that buffer in two places, neither of which runs inside a queue worker, which is where this module processes webhooks. Reported with the complete diagnosis by [@MarkoD](https://github.com/MarkoD).
+- **You can choose who the module's automatic notes come from** (#43). Leave it unset and nothing changes: a note carries the agent it concerns. Pick a user, for example one you create and call System or WhatsApp, and the notes carry that user instead, which stops FreeScout showing such a note to an agent as though they had written it themselves. Delete that user later and the notes go back to the agent.
+- The expired-window banner no longer claims Meta does not support sending a template to a contact known only by their WhatsApp ID. Meta accepts a WhatsApp ID as a recipient; this module has not built it yet, and now says which of the two is the limit.
+
 ## What's new in v2.2.0
 
 - **A screen for answering a right-of-erasure request.** Search what the module holds about one person by phone number or WhatsApp ID, erase it, and take away a one-time receipt that also states what remains outside the module's reach and where each of those things is removed. A queued message waiting to go to an erased contact is refused rather than delivered, and says so in the conversation. This closes a gap the module had already documented about itself: its own table was never cleaned when a customer or conversation was deleted in FreeScout, so an administrator could believe an erasure request had been answered while the phone number stayed behind.
@@ -117,10 +123,6 @@ Out of scope:
 - **The window countdown and the recovery banner now update live** while a conversation stays open: a customer reply or the window closing is reflected automatically, with no page reload needed (#41, #42).
 - **Recognizes Meta's `played` webhook status** for voice notes: a played voice note now gets the same "opened" treatment a read text message already had.
 - **Debug log retention now accepts `0` for "keep every file forever"**, with the ceiling raised from 90 to 365 days (#10).
-
-## What's new in v2.0.1
-
-- **Fix**: the window countdown from v2.0.0 was unreachable to screen readers, and hidden behind "Show Details" for any conversation with Chat Mode on. Both fixed: it announces the countdown itself instead of only the tooltip, and now renders from a hook Chat Mode never collapses. The existing recovery banner is unaffected either way.
 
 Older releases are listed on the [releases page](https://github.com/losimo/freescout-meta-whatsapp/releases).
 

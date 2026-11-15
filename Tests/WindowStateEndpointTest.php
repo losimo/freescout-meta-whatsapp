@@ -116,7 +116,8 @@ class WindowStateEndpointTest extends TestCase
         $this->makeInbound($account, 555043, now()->subHours(23));
         $conversation = $this->fakeConversation(555043);
 
-        $firstResponse = $this->actingAs($this->makeAdminUser())
+        $admin = $this->makeAdminUser();
+        $firstResponse = $this->actingAs($admin)
             ->get($this->url('/meta-whatsapp/conversation/555043/window-state'));
         $firstJson = json_decode($firstResponse->getContent(), true);
         $this->assertStringContainsString('metawhatsapp-window-clock-warning', $firstJson['clock']);
@@ -124,7 +125,7 @@ class WindowStateEndpointTest extends TestCase
         // A fresh reply arrives — the real window resets to ~24h.
         $this->makeInbound($account, 555043, now());
 
-        $secondResponse = $this->actingAs($this->makeAdminUser())
+        $secondResponse = $this->actingAs($admin)
             ->get($this->url('/meta-whatsapp/conversation/555043/window-state'));
         $secondJson = json_decode($secondResponse->getContent(), true);
         $this->assertStringNotContainsString('metawhatsapp-window-clock-warning', $secondJson['clock']);

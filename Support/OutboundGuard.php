@@ -186,10 +186,14 @@ class OutboundGuard
         // Issue #43. El core decideix l'avatar i la disposició de la nota amb
         // Thread::getPerson(), que per a notes llegeix created_by_user_cached.
         // Sense aquest camp la nota sortia sense cara i amb el nom a la dreta.
-        // S'hi posa el mateix agent perquè és veritat sobre a qui concerneix,
-        // i es deixa nul quan no n'hi ha cap de resoluble (files velles,
-        // usuari esborrat), cas en què es veu com fins ara.
-        $note->created_by_user_id = $agentId ?: null;
+        //
+        // Who it names is now the administrator's to choose, because naming
+        // the agent made FreeScout render the note as "you" to the very
+        // person it was written about. NoteAuthor answers with the chosen
+        // user when there is one, and otherwise with this agent, which is
+        // the behaviour this module shipped with. user_id stays as it was:
+        // there it means who the note is tied to, not who wrote it.
+        $note->created_by_user_id = NoteAuthor::forNote($agentId ?: null);
         $note->type            = Thread::TYPE_NOTE;
         $note->status          = $conversation->status;
         $note->state           = Thread::STATE_PUBLISHED;

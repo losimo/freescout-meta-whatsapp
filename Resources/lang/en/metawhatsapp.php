@@ -98,7 +98,7 @@ return [
     'template_sent'                => 'Template message queued for sending.',
     'template_not_configured'      => 'No recovery template is configured for this WhatsApp account.',
     'template_no_phone'            => 'No phone number could be resolved for this conversation.',
-    'template_no_phone_notice'     => 'This contact has no phone number on file (WhatsApp ID-only contacts are not yet supported for template sending - planned for phase 2b).',
+    'template_no_phone_notice'     => 'This contact has no phone number on file, only their WhatsApp ID. Meta accepts a WhatsApp ID as a message recipient; this module only sends to phone numbers so far, so the recovery template cannot go out from here.',
     'template_window_open'         => 'The customer window is open again - send a normal reply instead of a paid template.',
     'template_already_sent'        => 'A template was already sent moments ago for this conversation.',
 
@@ -106,7 +106,9 @@ return [
     'account_inactive_notice'          => 'This WhatsApp channel is currently inactive, so nothing can be sent. Open the channel settings to check the connection and reactivate it.',
     'not_sent_channel_inactive'   => 'Nothing was sent to WhatsApp: this channel is inactive. Once an administrator restores the connection, the message has to be sent again.',
     'core_outdated'               => 'This module is built and tested against FreeScout :minimum and newer, and you are running :current. It keeps working here, but it is not tested on this version, and later FreeScout versions have closed security issues. Updating FreeScout is worth doing.',
-    'diagnostics_title'           => 'Detailed logging',
+    'diagnostics_title'           => 'Module settings',
+    'diagnostics_section_log'     => 'Detailed logging',
+    'diagnostics_section_notes'   => 'Notes the module writes',
     'diagnostics_help'            => 'Records complete WhatsApp payloads, which means the text of your customers\' messages and their phone numbers. It is a second copy of those conversations, in a file that deleting a customer or a conversation cannot rewrite. Keep the window as long as your diagnosis needs and no longer. Only administrators can read it.',
     'diagnostics_forced_env'      => 'Detailed logging is also switched on by METAWHATSAPP_DEBUG in FreeScout\'s .env, which overrides whatever you set here.',
     'diagnostics_state'           => 'Currently',
@@ -196,6 +198,15 @@ return [
     'account_events_channel'  => 'Channel',
     'account_events_enable'      => 'Record what Meta reports about the account',
     'account_events_enable_help' => 'Template status changes, category changes (which set a template\'s price), quality ratings and restrictions, kept for 90 days and readable from the link below. Account facts only: nothing about any customer is recorded here. Off unless you want it.',
+
+    // Author of the module's automatic notes (issue #43). The note is about an
+    // agent, and FreeScout writes "you" when the author is the person reading,
+    // so by default the agent is told in their own voice something the module
+    // wrote about them.
+    'note_author'          => 'Automatic notes written by',
+    'note_author_agent'    => 'The agent the note is about',
+    'note_author_help'     => 'By default an automatic note carries the agent it concerns, and FreeScout shows it to that agent as if they had written it themselves. Pick a user here, for example one you create and call System or WhatsApp, and the notes carry that user instead; delete it later and they go back to the agent. Before you create one: it is an ordinary FreeScout user, so it can be assigned conversations and will get notification email unless you clear its subscriptions, and the change only applies to notes written from now on.',
+    'note_author_unknown'  => 'That user does not exist, so nothing was saved.',
 
     // Environment checks: things that stop the module working and are not the
     // module's, surfaced so an administrator knows what to look at.

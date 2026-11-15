@@ -4,6 +4,12 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 2.3.0 (2026-11-15)
+
+- **Fix**: agents never received a notification for an inbound WhatsApp message, in any version of this module (#46). No email, no bell, no push. FreeScout's listener only buffers the event and the core flushes that buffer in two places, neither of which runs inside a queue worker, which is where this module processes webhooks. Reported with the full diagnosis by [@MarkoD](https://github.com/MarkoD).
+- **New**: an administrator can choose which user the module's automatic notes are attributed to, from the settings page (#43). Leave it unset and nothing changes: the note carries the agent it concerns, as in 2.2.0. Pick a user, for example one named System or WhatsApp, and the notes carry that one instead, which avoids FreeScout showing the note to an agent as though they had written it. If that user is later deleted, the notes go back to the agent.
+- The expired-window banner no longer says that sending a template to a contact known only by their WhatsApp ID is unsupported by Meta. Meta accepts a WhatsApp ID as a message recipient; this module has not built it yet, and now says so.
+
 ## 2.2.0 (2026-11-14)
 
 - **New**: an administrator screen for answering a right-of-erasure request. Search what the module holds about one person by phone number or WhatsApp ID, erase it, and take away a one-time receipt that also states, honestly, what remains outside the module's reach and where each of those things is removed. A queued message waiting to be sent to an erased contact is refused instead of delivered, and says so in the conversation. This closes a gap the module had documented about itself: `meta_whatsapp_messages` was never cleaned when a customer or a conversation was deleted in FreeScout, so an administrator could believe they had answered an erasure request while the phone number and the WhatsApp ID stayed behind.
