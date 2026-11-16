@@ -321,21 +321,75 @@ class NoteAuthorTest extends TestCase
      */
     public function test_choosing_a_user_does_not_change_what_the_note_is_tied_to()
     {
-        $agent  = $this->makeUser('Refused');
-        $system = $this->makeUser('Systemuser');
+        $agent    = $this->makeUser('Refused');
+        $system   = $this->makeUser('Systemuser');
+        $assignee = $this->makeUser('Assignee');
         NoteAuthor::setUserId($system->id);
 
         $account = $this->createTestAccount();
         [$conversation, $thread] = $this->makeRefusedReply($account, $agent);
+        $conversation->user_id = $assignee->id;
+        $conversation->save();
 
         $this->dispatchReplies($conversation, [$thread]);
 
         $note = $this->refusalNote($conversation);
         $this->assertNotNull($note);
         $this->assertEquals(
-            $agent->id,
+            $assignee->id,
             $note->user_id,
-            'user_id says who the note is tied to, and reassigning it would decide an assignment for the team'
+            'choosing a note author changed what the note is tied to'
         );
+        $this->assertEquals($system->id, $note->created_by_user_id);
+    }
+
+    /**
+     * Reported in #43 after the setting shipped. `threads.user_id` is not
+     * the author and not something this module gets to choose: the core
+     * mirrors the conversation's assignee onto every thread it writes
+     * (Conversation::createUserThread does `$thread->user_id = $this->user_id`),
+     * and FreeScout prints that name on the right of the note.
+     *
+     * Our notes carried an agent in one writer and whichever user happened
+     * to have access to the mailbox in the other, so the same name appeared
+     * on every note no matter whose message had failed. On an unassigned
+     * conversation the right value is null, which is what this asserts,
+     * since a wrong non-null value is exactly what was shipped.
+     */
+    public function test_a_refusal_note_mirrors_the_conversations_assignee_and_not_an_agent()
+    {
+        $account = $this->createTestAccount();
+        $agent   = $this->makeUser('Agent whose reply failed');
+        [$conversation, $thread] = $this->makeRefusedReply($account, $agent);
+
+        $this->assertNull($conversation->user_id, 'fixture precondition: nobody assigned');
+
+        $this->dispatchReplies($conversation, [$thread]);
+
+        $note = $this->refusalNote($conversation);
+        $this->assertNotNull($note);
+        $this->assertNull(
+            $note->user_id,
+            'the note claims an assignee the conversation does not have'
+        );
+    }
+
+    /** And when somebody IS assigned, that is the name the note carries. */
+    public function test_a_refusal_note_carries_the_assignee_when_there_is_one()
+    {
+        $account = $this->createTestAccount();
+        $agent   = $this->makeUser('Agent whose reply failed');
+        [$conversation, $thread] = $this->makeRefusedReply($account, $agent);
+
+        $assignee = $this->makeUser('The assignee');
+        $conversation->user_id = $assignee->id;
+        $conversation->save();
+
+        $this->dispatchReplies($conversation, [$thread]);
+
+        $note = $this->refusalNote($conversation);
+        $this->assertNotNull($note);
+        $this->assertEquals($assignee->id, $note->user_id);
+        $this->assertNotEquals($agent->id, $note->user_id, 'the note carried the agent, not the assignee');
     }
 }

@@ -182,7 +182,14 @@ class OutboundGuard
 
         $note = new Thread();
         $note->conversation_id = $conversation->id;
-        $note->user_id         = $agentId;
+        // Not the author and not a choice: the core mirrors the
+        // conversation's assignee onto every thread it writes
+        // (Conversation::createUserThread sets $thread->user_id =
+        // $this->user_id), and FreeScout reads it to decide the name it
+        // prints on the right of a note. Putting an agent here showed that
+        // agent's name on every note regardless of who the note was about,
+        // and on an unassigned conversation the right answer is null.
+        $note->user_id         = $conversation->user_id;
         // Issue #43. El core decideix l'avatar i la disposició de la nota amb
         // Thread::getPerson(), que per a notes llegeix created_by_user_cached.
         // Sense aquest camp la nota sortia sense cara i amb el nom a la dreta.
@@ -191,8 +198,7 @@ class OutboundGuard
         // the agent made FreeScout render the note as "you" to the very
         // person it was written about. NoteAuthor answers with the chosen
         // user when there is one, and otherwise with this agent, which is
-        // the behaviour this module shipped with. user_id stays as it was:
-        // there it means who the note is tied to, not who wrote it.
+        // the behaviour this module shipped with.
         $note->created_by_user_id = NoteAuthor::forNote($agentId ?: null);
         $note->type            = Thread::TYPE_NOTE;
         $note->status          = $conversation->status;

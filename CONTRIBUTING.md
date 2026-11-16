@@ -103,6 +103,12 @@ This keeps conversations tidy and speeds up decision-making.
 
 Reviews will be clear, frank and product-oriented. Proposals are accepted on impact, not on effort invested. Disagreements can be discussed, but new and concrete arguments are required.
 
+## Version numbers
+
+This module follows [semantic versioning](https://semver.org): the first number changes when something you depend on stops working the way it did, the second when functionality is added without breaking what was there, the third for backwards-compatible fixes.
+
+Semver leaves room in the middle, and the question we use to settle it is what the number tells somebody deciding whether to update: *if I update, what happens to me?* Nothing you will notice goes in the third, something that will look or behave differently goes in the second, and something you rely on possibly being gone goes in the first. A fix can earn the second number that way. If a bug made the wrong name appear on screen, removing it is a fix, and you will still see the difference.
+
 ## Tests
 
 The suite can be run with:

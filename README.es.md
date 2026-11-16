@@ -2,26 +2,13 @@
 
 [Català](README.ca.md) · [English](README.md) · [Castellano](README.es.md) · [Nederlands](README.nl.md)
 
-> [!IMPORTANT]
-> **A partir del 1 de octubre de 2026, Meta cobra los mensajes de servicio.**
->
-> Hasta ahora, responder con texto libre dentro de la ventana de 24 horas no tenía coste. A partir de esa fecha se factura por mensaje entregado, y las plantillas de utilidad enviadas dentro de la ventana también pasan a ser de pago. Meta ya lo dice en [su propia página](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages): "Effective October 1, 2026, Meta will charge for service messages, which have not been charged since November 2024."
->
-> Lo que Meta no publica en ninguna parte es la franquicia. La cifra de **1.000 mensajes de servicio por número de teléfono y mes**, que se reinicia cada mes y no se acumula, la dan coincidiendo las fuentes del sector, y os la trasladamos exactamente como eso.
->
-> Dos páginas de Meta se contradicen mientras escribimos esto. La enlazada arriba lleva la fecha; la [página de tarifas](https://whatsappbusiness.com/products/platform-pricing/#rates) todavía dice que las conversaciones de servicio son gratis, y las plantillas de utilidad dentro de la ventana también. Usad la primera para saber qué cambia y la segunda para las tarifas de vuestro mercado y vuestra moneda, donde cada categoría tiene un precio distinto.
->
-> Vienen semanas de cambios por parte de Meta. Aquí iremos trasladando lo que afecte a este módulo, dicho como lo diga Meta, y sin añadir nada que no podamos sostener.
->
-> Es un cambio de tarifas de Meta, no del módulo. El módulo no cobra nada ni recibe ninguna comisión, y sus guardas de idempotencia evitan que un reintento de la cola vuelva a enviar un mensaje que ya había salido.
-
 > [!NOTE]
-> **Conviene comprobarlo: ¿su cuenta de WhatsApp Business tiene un método de pago dado de alta?**
->
-> Fuentes del sector afirman que las cuentas que no lo tengan dejan de tener los mensajes de servicio **entregados**, en lugar de recibir la factura después. Como la cifra de mil de más arriba, esto no aparece en ninguna página de Meta, y no es algo que este módulo pueda comprobar por usted. Se menciona aquí porque el fallo sería silencioso: los clientes siguen escribiendo y las respuestas dejan de llegar.
+> **Comprobad que vuestra cuenta de WhatsApp Business tenga un método de pago dado de alta.** Fuentes del sector afirman que las cuentas que no lo tengan dejan de tener sus mensajes de servicio entregados, en lugar de recibir la factura después. No aparece en ninguna página de Meta, este módulo no lo puede comprobar por vosotros, y el fallo es silencioso: los clientes siguen escribiendo y las respuestas dejan de llegar. Ver [Qué cobra Meta](#qué-cobra-meta).
 
-<!-- Retirar ambos avisos cuando la página de precios de Meta recoja el cambio con
-     normalidad y hayan pasado unas cuantas versiones desde el 1 de octubre de 2026. -->
+<!-- Revisar cuando Meta publique la franquicia, o deje de contradecirse entre
+     la página de tarifas y el changelog. En noviembre de 2026 el changelog
+     sigue diciendo que las conversaciones de servicio son gratis desde
+     noviembre de 2024. -->
 
 Módulo para FreeScout que integra **WhatsApp Business directamente con la Meta Cloud API**, sin intermediarios de pago como 1msg.io o Twilio. Los mensajes van de Meta a tu instalación de FreeScout, con control completo de credenciales, datos y flujo operativo.
 
@@ -43,7 +30,7 @@ Cinco pasos desde una instalación de FreeScout nueva hasta tener un canal de Wh
 1. **Instala el módulo.** Activa **MetaWhatsApp** desde Manage → Modules (o los tres comandos `artisan` si trabajas desde la línea de comandos). Ver [Instalación](#instalación).
 2. **Prepara Meta.** Necesitas una App de tipo Business con el producto WhatsApp añadido, un número de teléfono registrado, y cuatro valores del App Dashboard: **Phone Number ID**, **WABA ID**, **Access Token**, **App Secret**. Ver [Requisitos previos en Meta](#requisitos-previos-en-meta) — en particular, genera un token permanente en lugar del de 24 horas que Meta muestra por defecto.
 3. **Añade el canal en FreeScout.** Manage → WhatsApp → Add account, pega los cuatro valores, guarda. Ver [Configuración del canal → En FreeScout](#en-freescout).
-4. **Apunta Meta hacia el webhook.** Pega la URL del webhook y el verify token que la página de la cuenta te acaba de dar en la pantalla de configuración de Webhook de Meta, y activa el campo `messages`. Ver [Configuración del canal → En Meta](#en-meta).
+4. **Apunta Meta hacia el webhook.** Pega la URL del webhook y el verify token que la página de la cuenta te acaba de dar en la pantalla de configuración de Webhook de Meta, y activa el campo `messages`. Si además quieres que se llene el panel de eventos de la cuenta, activa ahí también `message_template_status_update` y `template_category_update`: sin ellos Meta no envía nada y ese panel se queda vacío por mucho que lo activéis en FreeScout. Ver [Configuración del canal → En Meta](#en-meta).
 5. **Envía un mensaje real** al número y confirma que crea una conversación en FreeScout, luego responde desde FreeScout y confirma que llega al teléfono.
 
 Si el paso 5 no funciona, empieza por [Resolución de problemas](#resolución-de-problemas) y [Cuando no es cosa del módulo](#cuando-no-es-cosa-del-módulo) antes de asumir que el problema es del módulo — un worker de colas detenido, una URL de webhook que no coincide del todo, o un problema de certificado explican la mayoría de incidencias del primer día.
@@ -104,6 +91,15 @@ Queda fuera de alcance:
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 - Vincular un número por el protocolo no oficial de dispositivo acompañante de WhatsApp Web, como hacen algunos clientes de escritorio. No necesita aprobación de la Cloud API, que es justo lo que lo hace tentador, y queda fuera de alcance a propósito: el protocolo está hecho por ingeniería inversa, Meta puede romperlo cuando quiera, y usarlo puede acabar con el número suspendido. En una cuenta personal esa es la apuesta de quien la asume. En la línea de atención de una empresa, una suspensión detiene todas las conversaciones a la vez, así que el módulo no va a correr ese riesgo en su nombre.
 
+## Novedades en la v2.4.0
+
+- **El nombre del buzón en la barra lateral ahora lleva debajo el número de teléfono del canal**, donde un buzón de WhatsApp no mostraba nada (#45). El módulo ocultaba la dirección técnica con CSS, y eso encogía la cabecera 27px, lo que dejaba medio tapado el icono del módulo oficial Mailbox Icons al pasar el ratón. Reportado con capturas de antes y después por [@MarkoD](https://github.com/MarkoD).
+- **Corrección**: las notas automáticas llevaban el nombre equivocado a la derecha, el mismo en todas sin importar de quién fuera el mensaje fallido (#43). Esa columna es el asignado de la conversación reflejado en el hilo, que es lo que escribe ahí el propio FreeScout.
+- **Corrección**: la sección de instalación decía que el módulo crea dos tablas y listaba dos. Crea tres (#47).
+- **El inicio rápido y la página de ajustes ahora dicen qué campos de webhook necesita Meta** antes de que el panel de eventos de la cuenta pueda llenarse (#47). Sin `message_template_status_update` y `template_category_update` activados en Meta, ese interruptor no hace nada y antes tampoco lo decía.
+- El cambio de precios de octubre está escrito como historia y no como aviso, en su propia sección junto a la ventana de 24 horas. La nota del método de pago se queda arriba, más corta: una cuenta sin él deja de tener los mensajes entregados, y ese fallo es silencioso.
+- CONTRIBUTING ahora dice qué significan los números de versión.
+
 ## Novedades en la v2.3.0
 
 - **Corrección: los agentes ahora reciben aviso de los mensajes entrantes** (#46). No lo recibían en ninguna versión de este módulo. Ni correo, ni campana, ni aviso del navegador, y nada en el registro que lo dijera. El listener de FreeScout solo guarda el evento en un búfer, y el core vacía ese búfer en dos sitios, ninguno de los cuales corre dentro de un worker de colas, que es donde este módulo procesa los webhooks. Reportado con el diagnóstico completo por [@MarkoD](https://github.com/MarkoD).
@@ -117,12 +113,6 @@ Queda fuera de alcance:
 - **Corrección**: un mensaje entrante ya no acaba dentro de una conversación creada a mano por un agente (#44). La conversación que se reutiliza tiene que ser de chat, que es también lo que protege a las instalaciones que ya arrastran una de esas.
 - **Las notas automáticas llevan la cara del agente al que se refieren** (#43): una respuesta rechazada o una entrega fallida se ven como cualquier otra nota en lugar de aparecer sin avatar. Cuando no hay autor resoluble, la nota sigue apareciendo igual que antes.
 - El README ahora explica por qué este módulo no vinculará un número por el protocolo no oficial de dispositivo acompañante de WhatsApp Web, y CONTRIBUTING indica quién mantiene cada idioma.
-
-## Novedades en la v2.1.0
-
-- **El contador de la ventana y el banner de recuperación ahora se actualizan en vivo** mientras la conversación permanece abierta: una respuesta del cliente o el cierre de la ventana se reflejan automáticamente, sin recargar la página (#41, #42).
-- **Se reconoce el estado `played` de Meta** para notas de voz: una nota de voz escuchada recibe ahora el mismo tratamiento "abierto" que ya tenía un mensaje de texto leído.
-- **La retención del registro detallado admite ahora `0` para "conservarlo todo para siempre"**, con el límite subido de 90 a 365 días (#10).
 
 Las versiones anteriores están en la [página de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -156,10 +146,11 @@ php artisan module:migrate MetaWhatsApp
 php artisan freescout:clear-cache
 ```
 
-El módulo crea dos tablas propias:
+El módulo crea tres tablas propias:
 
 - `meta_whatsapp_accounts`
 - `meta_whatsapp_messages`
+- `meta_whatsapp_account_events`
 
 No hace ningún `ALTER` sobre tablas del core de FreeScout.
 
@@ -240,6 +231,16 @@ Si se intenta responder fuera de ventana:
 - El cliente no recibe ninguna respuesta.
 
 Desde la v1.3.0, una ventana caducada se puede recuperar manualmente con una plantilla HSM preaprobada — ver más abajo.
+
+### Qué cobra Meta
+
+Desde el 1 de octubre de 2026 Meta factura los mensajes de servicio, es decir, cada respuesta de texto libre enviada dentro de esa ventana de 24 horas. Las plantillas de utilidad enviadas dentro de la ventana también vuelven a facturarse, tras quince meses siendo gratuitas. Lo dice Meta en [su página de precios para mensajes que no son plantilla](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages): "Effective October 1, 2026, Meta will charge for service messages, which have not been charged since November 2024."
+
+Lo que Meta sigue sin publicar en ninguna parte es la franquicia. La cifra de **1.000 mensajes de servicio por número de teléfono y mes**, que se reinicia cada mes y no se acumula, la dan coincidiendo las fuentes del sector, y os la trasladamos exactamente como eso y nada más.
+
+Dos páginas de Meta siguen contradiciéndose. La enlazada arriba lleva la fecha; la [página de tarifas](https://whatsappbusiness.com/products/platform-pricing/#rates) continúa diciendo que las conversaciones de servicio son gratis, y las plantillas de utilidad dentro de la ventana también. Usad la primera para saber qué cambió y la segunda para las tarifas de vuestro mercado y vuestra moneda, donde cada categoría tiene un precio distinto.
+
+Nada de esto es un cambio del módulo. El módulo no cobra nada ni recibe ninguna comisión, y sus guardas de idempotencia evitan que un reintento de la cola vuelva a enviar un mensaje que ya había salido.
 
 ### Cuenta atrás de la ventana (v2.0.0)
 

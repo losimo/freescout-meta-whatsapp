@@ -194,7 +194,7 @@ return [
     'account_events_link'     => 'Esdeveniments del compte',
     'account_events_channel'  => 'Canal',
     'account_events_enable'      => 'Registra el que Meta reporta sobre el compte',
-    'account_events_enable_help' => 'Canvis d\'estat de plantilles, canvis de categoria (que en decideixen el preu), valoracions de qualitat i restriccions, conservats 90 dies i llegibles des de l\'enllaç de sota. Només fets del compte: aquí no s\'hi registra res de cap client. Apagat si no el voleu.',
+    'account_events_enable_help' => 'Canvis d\'estat de plantilles, canvis de categoria (que en decideixen el preu), valoracions de qualitat i restriccions, conservats 90 dies i llegibles des de l\'enllaç de sota. Només fets del compte: aquí no s\'hi registra res de cap client. Apagat si no el voleu. Una cosa que aquest interruptor no pot fer tot sol: Meta només envia aquests esdeveniments si a la configuració de webhook de la vostra app hi ha activats `message_template_status_update` i `template_category_update`, a més de `messages`. Des d\'aquí no podem veure si hi són, així que si el registre es queda buit, aquell és el primer lloc on mirar.',
 
     // Author of the module's automatic notes (issue #43). The note is about an
     // agent, and FreeScout writes "you" when the author is the person reading,

@@ -73,19 +73,23 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
             $this->handleOutboundReplies($conversation, $replies);
         }, 20, 3);
 
-        // Neteja UX a les pàgines de canals WhatsApp: amaga els artefactes
-        // d'email del core (toggle Cc/Bcc al reply, email tècnic al sidebar).
-        // Només s'aplica si la pàgina pertany a una bústia amb compte WhatsApp.
+        // UX clean-up on WhatsApp channel pages: the core's e-mail artefacts
+        // (the Cc/Bcc toggle in the reply form, the technical address under
+        // the mailbox name in the sidebar) say nothing on a channel that has
+        // no e-mail. Only applied when the page belongs to a mailbox that has
+        // a WhatsApp account.
         //
-        // S'injecta a layout.head (dins <head>, abans que el navegador
-        // comenci a pintar el <body>) i no a layout.body_bottom (just abans
-        // de </body>): amb body_bottom hi havia una finestra real on el
-        // Cc/Bcc i els comptadors del dashboard es podien veure sense
-        // amagar un instant, un flash, abans que arribés l'<style> del
-        // final de la pàgina (detectat arran de la issue #17).
+        // Injected at layout.head (inside <head>, before the browser starts
+        // painting the <body>) and not at layout.body_bottom (just before
+        // </body>): with body_bottom there was a real window in which the
+        // Cc/Bcc toggle and the dashboard counters could be seen unhidden for
+        // an instant, a flash, before the <style> at the end of the page
+        // arrived (found through issue #17).
         \Eventy::addAction('layout.head', function () {
             if ($this->currentPageIsWhatsAppMailbox()) {
-                echo '<style>#toggle-cc, .sidebar-title-email { display: none !important; }</style>';
+                echo '<style>#toggle-cc { display: none !important; }</style>';
+                echo $this->sidebarMailboxEmailCss();
+                echo $this->sidebarPhoneMeta();
                 echo '<style>.metawhatsapp-window-clock-open { color: #767676; } '
                     .'.metawhatsapp-window-clock-warning { color: #8a6d3b; }</style>';
                 echo $this->hideSidebarNewConversationCss();
@@ -149,9 +153,16 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
         // page too (currentPageIsWhatsAppMailbox() also returns true
         // there) — the script's own early-return guard finds no wrapper
         // elements on that page and exits immediately.
+        //
+        // Second file in the same filter (#45): the sidebar phone number, see
+        // sidebarMailboxEmailCss() below. Kept apart from window-state.js
+        // rather than appended to it because that one early-returns on any
+        // page without a conversation_id, and the mailbox list page is
+        // precisely one of the pages this has to work on.
         \Eventy::addFilter('javascripts', function ($scripts) {
             if ($this->currentPageIsWhatsAppMailbox()) {
                 $scripts[] = '/modules/metawhatsapp/js/window-state.js';
+                $scripts[] = '/modules/metawhatsapp/js/sidebar-phone.js';
             }
             return $scripts;
         }, 20, 1);
@@ -191,9 +202,27 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
 
     protected function currentPageIsWhatsAppMailbox(): bool
     {
+        return (bool) $this->currentPageWhatsAppAccount();
+    }
+
+    /**
+     * The WhatsApp account the current page belongs to, or null when the page
+     * is not one of the module's or its mailbox has no account.
+     *
+     * Split out of currentPageIsWhatsAppMailbox() for issue #45, which needs
+     * the row itself (the phone number) and not just the yes/no answer. The
+     * two must keep agreeing, so one is written in terms of the other rather
+     * than repeating the route switch.
+     *
+     * Deliberately not memoised: the same provider instance serves several
+     * requests inside one PHP process under phpunit, so a cached answer from
+     * the previous request would leak into the next one.
+     */
+    protected function currentPageWhatsAppAccount(): ?WhatsAppAccount
+    {
         $route = \Route::current();
         if (!$route) {
-            return false;
+            return null;
         }
 
         $mailboxId = null;
@@ -202,16 +231,100 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                 $conversation = \App\Conversation::find($route->parameter('id'));
                 $mailboxId    = $conversation->mailbox_id ?? null;
                 break;
+            case 'conversations.chats':
+                // The empty state of a brand new channel. This route usually
+                // redirects to the first chat, which lands on
+                // conversations.view above, but with no conversations yet it
+                // renders itself, and that is exactly the page somebody sees
+                // right after configuring the channel. Carries mailbox_id
+                // rather than id.
+                $mailboxId = $route->parameter('mailbox_id');
+                break;
             case 'mailboxes.view':
             case 'mailboxes.view.folder':
                 $mailboxId = $route->parameter('id');
                 break;
             default:
-                return false;
+                return null;
         }
 
-        return $mailboxId
-            && WhatsAppAccount::where('mailbox_id', $mailboxId)->exists();
+        if (!$mailboxId) {
+            return null;
+        }
+
+        return WhatsAppAccount::where('mailbox_id', $mailboxId)->first();
+    }
+
+    /**
+     * Issue #45. `.sidebar-title-email` is the line under the mailbox name in
+     * the left sidebar, and on a WhatsApp mailbox the core fills it with the
+     * technical address of the channel mailbox
+     * (whatsapp-<phone_number_id>@channel.internal), which means nothing to
+     * anyone reading it.
+     *
+     * Until now the module hid it with `display: none`, and that collapsed the
+     * header: `.sidebar-title` measures 51.8px tall normally and 24.4px with
+     * the element taken out of the flow, so everything below shifted up by
+     * 27px and the 50x50 hover icon of the official Mailbox Icons module ended
+     * up covered.
+     *
+     * `visibility: hidden` keeps the box exactly as tall as it was, because
+     * the element still takes part in layout and only its painting is
+     * suppressed, while the address itself is not painted, not selectable and
+     * not exposed to a screen reader. It is also what the official Global
+     * Mailbox module settled on for the same line: leave the element in place
+     * and empty rather than remove it.
+     *
+     * Not `!important` on purpose: sidebar-phone.js turns the element visible
+     * again through an inline style, and an inline style only wins over a
+     * declaration that is not `!important`.
+     *
+     * Why this cannot flash the technical address. The rule travels in the
+     * <head>, so it belongs to the first style resolution the browser does
+     * and applies before the sidebar is painted for the first time: the
+     * address is never painted at all, not even for a frame. The script then
+     * works in the only safe order, text first and visibility second, so
+     * there is no moment at which the element is visible while still holding
+     * the old text. The reverse order, or a rule injected at the end of the
+     * body, is exactly the flash this module already paid for in issue #17.
+     *
+     * If the script never runs, the reader is left with an empty box of the
+     * right height, which is the honest degradation: no technical address and
+     * no 27px collapse either.
+     */
+    protected function sidebarMailboxEmailCss(): string
+    {
+        return '<style>.sidebar-title-email { visibility: hidden; }</style>';
+    }
+
+    /**
+     * Issue #45. The account's phone number, for sidebar-phone.js to put where
+     * the technical address used to be.
+     *
+     * It travels as a <meta> in the <head> and not as a data attribute on an
+     * element inside the sidebar because the core's sidebar view
+     * (resources/views/mailboxes/sidebar_menu_view.blade.php, checked against
+     * FreeScout 1.8.251) has no hook after `.sidebar-title-email`. The only
+     * hook inside that block, `mailbox.view.before_name`, fires before the
+     * mailbox name, so anything echoed through it would be a stray element
+     * sitting in the core's title box. Emitting the value here also means the
+     * number and the rule that hides the address are written under one single
+     * condition and can never disagree.
+     *
+     * Empty string when the account has no number stored. The reader then
+     * keeps the empty box from the rule above, which is the right answer:
+     * there is nothing useful to show, and the technical address was not
+     * useful either.
+     */
+    protected function sidebarPhoneMeta(): string
+    {
+        $account = $this->currentPageWhatsAppAccount();
+        if (!$account || !$account->phone_number) {
+            return '';
+        }
+
+        return '<meta name="metawhatsapp-sidebar-phone" content="'
+            . e($account->phone_number) . '">';
     }
 
     /**

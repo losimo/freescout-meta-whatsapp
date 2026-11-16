@@ -673,7 +673,16 @@ class MetaWhatsAppController extends Controller
     {
         $thread = new Thread();
         $thread->conversation_id    = $conversation->id;
-        $thread->user_id            = auth()->id();
+        // The conversation's assignee, not whoever pressed the button. The
+        // core writes this column that way on every published thread
+        // (ConversationsController line 1117, and Thread::create's own
+        // fallback), and uses the auth user only for drafts. Putting the
+        // sender here named them as the assignee in the thread group label
+        // and could make the next thread look like an assignment change to
+        // Subscription::usersToNotify(). Who sent it is created_by_user_id,
+        // set below. Found by review as the third writer the #43 fix did not
+        // reach; the other two are in OutboundGuard and ProcessInboundWebhook.
+        $thread->user_id            = $conversation->user_id;
         $thread->type               = Thread::TYPE_MESSAGE;
         $thread->status             = $conversation->status;
         $thread->state              = Thread::STATE_PUBLISHED;

@@ -103,6 +103,12 @@ Esto ayuda a mantener las conversaciones ordenadas y agiliza la toma de decision
 
 Las revisiones se harán de manera clara, franca y orientada a producto. Las propuestas se aceptarán por impacto, no por volumen de trabajo. Los desacuerdos se pueden discutir, pero hay que aportar argumentos nuevos y concretos.
 
+## Números de versión
+
+Este módulo sigue el [versionado semántico](https://semver.org): el primer número cambia cuando algo de lo que dependéis deja de funcionar como lo hacía, el segundo cuando se añade funcionalidad sin romper lo que ya había, el tercero para correcciones compatibles.
+
+Semver deja margen en medio, y la pregunta que usamos para decidirlo es qué le dice el número a quien está valorando si actualizar: *si actualizo, ¿qué me pasa?* Lo que no se nota va en el tercero, lo que se verá o se comportará distinto va en el segundo, y lo que puede hacer desaparecer algo de lo que dependéis va en el primero. Una corrección puede ganarse el segundo número así. Si un fallo hacía salir en pantalla un nombre equivocado, quitarlo es una corrección, y aun así notaréis la diferencia.
+
 ## Tests
 
 La suite se puede ejecutar con:

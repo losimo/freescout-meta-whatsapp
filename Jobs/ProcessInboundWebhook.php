@@ -1027,9 +1027,12 @@ class ProcessInboundWebhook implements ShouldQueue
         // message as if they had written it. With no chosen user, or one
         // since deleted, this is exactly the attribution above.
         //
-        // user_id es queda com estava, amb l'usuari del sistema: aquí no vol
-        // dir qui ha escrit la nota sinó a qui queda lligada, i canviar-ho
-        // seria decidir una assignació per l'equip.
+        // user_id is the conversation's assignee mirrored onto the thread,
+        // which is what the core does in Conversation::createUserThread, and
+        // null when nobody is assigned. It used to hold whichever user
+        // happened to have access to the mailbox, so every delivery-failure
+        // note printed that person's name on the right no matter whose
+        // message had failed. Reported in #43.
         $failedThread = $record->thread_id ? Thread::find($record->thread_id) : null;
         $agentId      = $failedThread
             ? ($failedThread->created_by_user_id ?: $failedThread->user_id)
@@ -1037,7 +1040,7 @@ class ProcessInboundWebhook implements ShouldQueue
 
         $thread = new Thread();
         $thread->conversation_id = $conversation->id;
-        $thread->user_id         = optional($this->resolveSystemUser($account, $conversation))->id;
+        $thread->user_id         = $conversation->user_id;
         $thread->created_by_user_id = NoteAuthor::forNote($agentId ?: null);
         $thread->type            = Thread::TYPE_NOTE;
         $thread->status          = $conversation->status;

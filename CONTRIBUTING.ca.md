@@ -103,6 +103,12 @@ Això ajuda a mantenir les converses ordenades i fa més ràpida la presa de dec
 
 Les revisions es faran de manera clara, franca i orientada a producte. Les propostes s'acceptaran per impacte, no per volum de feina. Els desacords es poden discutir, però cal aportar arguments nous i concrets.
 
+## Números de versió
+
+Aquest mòdul segueix el [versionat semàntic](https://semver.org): el primer número canvia quan alguna cosa de la qual depeneu deixa de funcionar com ho feia, el segon quan s'afegeix funcionalitat sense trencar el que ja hi havia, el tercer per a correccions compatibles.
+
+El semver deixa marge al mig, i la pregunta que fem servir per decidir-ho és què li diu el número a qui està valorant si actualitza: *si actualitzo, què em passa?* El que no es nota va al tercer, el que es veurà o es comportarà diferent va al segon, i el que pot fer desaparèixer alguna cosa de la qual depeneu va al primer. Una correcció es pot guanyar el segon número així. Si una errada feia sortir a la pantalla un nom equivocat, treure-la és una correcció, i tot i així en notareu la diferència.
+
 ## Tests
 
 La suite es pot executar amb:

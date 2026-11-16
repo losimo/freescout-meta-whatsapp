@@ -4,6 +4,15 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 2.4.0 (2026-11-16)
+
+- **New**: the mailbox name in the left sidebar now carries the channel's phone number underneath, where a WhatsApp mailbox used to show nothing (#45). The module had been hiding the technical address with CSS, which collapsed that header by 27px and left the official Mailbox Icons module's hover icon partly covered. Reported with before and after screenshots by [@MarkoD](https://github.com/MarkoD).
+- **Fix**: automatic notes carried the wrong name on the right. `threads.user_id` is the conversation's assignee mirrored onto the thread, which is what the core writes there, and this module was putting an agent in one case and whichever user had access to the mailbox in the other, so the same name appeared on every note (#43).
+- **Fix**: the install section said the module creates two tables and listed two; it creates three (#47).
+- The quick start and the settings page now say which webhook fields Meta needs before the account events panel can fill. Without `message_template_status_update` and `template_category_update` enabled at Meta, that switch does nothing and says nothing (#47).
+- The October pricing change is written as history rather than as a warning, in its own section beside the 24-hour window. The payment-method note stays at the top, shorter, because an account without one stops having messages delivered and that failure is a quiet one.
+- CONTRIBUTING now says what the version numbers mean. The rule existed and lived only in the maintainers' heads.
+
 ## 2.3.0 (2026-11-15)
 
 - **Fix**: agents never received a notification for an inbound WhatsApp message, in any version of this module (#46). No email, no bell, no push. FreeScout's listener only buffers the event and the core flushes that buffer in two places, neither of which runs inside a queue worker, which is where this module processes webhooks. Reported with the full diagnosis by [@MarkoD](https://github.com/MarkoD).

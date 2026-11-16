@@ -2,26 +2,12 @@
 
 [Català](README.ca.md) · [English](README.md) · [Castellano](README.es.md) · [Nederlands](README.nl.md)
 
-> [!IMPORTANT]
-> **A partir de l'1 d'octubre del 2026, Meta cobra els missatges de servei.**
->
-> Fins ara, respondre en text lliure dins de la finestra de 24 hores no tenia cost. A partir d'aquesta data es factura per missatge lliurat, i les plantilles d'utilitat enviades dins de la finestra també passen a ser de pagament. Meta ja ho diu a [la seva pàgina](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages): "Effective October 1, 2026, Meta will charge for service messages, which have not been charged since November 2024."
->
-> El que Meta no publica enlloc és la franquícia. La xifra de **1.000 missatges de servei per número de telèfon i mes**, que es reinicia cada mes i no s'acumula, la donen coincidint les fonts del sector, i us la traslladem exactament com això.
->
-> Dues pàgines de Meta es contradiuen mentre escrivim això. La que hem enllaçat a dalt porta la data; la [pàgina de tarifes](https://whatsappbusiness.com/products/platform-pricing/#rates) encara diu que les converses de servei són gratis, i les plantilles d'utilitat dins de la finestra també. Feu servir la primera per saber què canvia i la segona per a les tarifes del vostre mercat i la vostra moneda, on cada categoria té un preu diferent.
->
-> Venen setmanes de canvis per part de Meta. Aquí hi anirem traslladant el que afecti aquest mòdul, dit com ho digui Meta, i sense afegir-hi res que no puguem sostenir.
->
-> És un canvi de tarifes de Meta, no del mòdul. El mòdul no cobra res ni rep cap comissió, i les seves guardes d'idempotència eviten que un reintent de la cua torni a enviar un missatge que ja havia sortit.
-
 > [!NOTE]
-> **Val la pena comprovar-ho: el vostre compte de WhatsApp Business té un mètode de pagament donat d'alta?**
->
-> Fonts del sector diuen que els comptes que no en tinguin deixen de tenir els missatges de servei **entregats**, en comptes de rebre'n la factura després. Com la xifra de mil de més amunt, això no surt a cap pàgina de Meta, i no és una cosa que aquest mòdul us pugui comprovar. Ho esmentem aquí perquè la fallada seria silenciosa: els clients continuen escrivint i les respostes deixen d'arribar.
+> **Comproveu que el vostre compte de WhatsApp Business tingui un mètode de pagament donat d'alta.** Fonts del sector diuen que els comptes que no en tinguin deixen de tenir els missatges de servei entregats, en comptes de rebre'n la factura després. No surt a cap pàgina de Meta, aquest mòdul no ho pot comprovar per vosaltres, i la fallada és silenciosa: els clients continuen escrivint i les respostes deixen d'arribar. Vegeu [Què cobra Meta](#què-cobra-meta).
 
-<!-- Retirar tots dos avisos quan la pàgina de preus de Meta reculli el canvi amb
-     normalitat i hagin passat unes quantes versions des de l'1 d'octubre del 2026. -->
+<!-- Revisar quan Meta publiqui la franquícia, o deixi de contradir-se entre la
+     pàgina de tarifes i el changelog. El novembre del 2026 el changelog encara
+     diu que les converses de servei són gratis des del novembre del 2024. -->
 
 Mòdul per a FreeScout que integra **WhatsApp Business directament amb la Meta Cloud API**, sense intermediaris de pagament com 1msg.io o Twilio. Els missatges van de Meta a la teva instal·lació de FreeScout, amb control complet de credencials, dades i flux operatiu.
 
@@ -43,7 +29,7 @@ Cinc passos des d'una instal·lació de FreeScout nova fins a tenir un canal de 
 1. **Instal·la el mòdul.** Activa **MetaWhatsApp** des de Manage → Modules (o les tres comandes `artisan` si treballes des de la línia de comandes). Vegeu [Instal·lació](#installació).
 2. **Prepara Meta.** Necessites una App de tipus Business amb el producte WhatsApp afegit, un número de telèfon registrat, i quatre valors de l'App Dashboard: **Phone Number ID**, **WABA ID**, **Access Token**, **App Secret**. Vegeu [Requisits previs a Meta](#requisits-previs-a-meta) — en particular, genera un token permanent en lloc del de 24 hores que Meta mostra per defecte.
 3. **Afegeix el canal a FreeScout.** Manage → WhatsApp → Add account, enganxa els quatre valors, desa. Vegeu [Configuració del canal → A FreeScout](#a-freescout).
-4. **Apunta Meta cap al webhook.** Enganxa l'URL del webhook i el verify token que la pàgina del compte t'acaba de donar a la pantalla de configuració de Webhook de Meta, i activa el camp `messages`. Vegeu [Configuració del canal → A Meta](#a-meta).
+4. **Apunta Meta cap al webhook.** Enganxa l'URL del webhook i el verify token que la pàgina del compte t'acaba de donar a la pantalla de configuració de Webhook de Meta, i activa el camp `messages`. Si a més voleu que s'ompli el panell d'esdeveniments del compte, activeu-hi també `message_template_status_update` i `template_category_update`: sense ells Meta no envia res i aquell panell es queda buit per molt que l'activeu al FreeScout. Vegeu [Configuració del canal → A Meta](#a-meta).
 5. **Envia un missatge real** al número i confirma que crea una conversa a FreeScout, després respon des de FreeScout i confirma que arriba al telèfon.
 
 Si el pas 5 no funciona, comença per [Resolució de problemes](#resolució-de-problemes) i [Quan no és cosa del mòdul](#quan-no-és-cosa-del-mòdul) abans de donar per fet que el problema és del mòdul — un worker de cues aturat, un URL de webhook que no coincideix del tot, o un problema de certificat expliquen la majoria d'incidències del primer dia.
@@ -104,6 +90,15 @@ Queda fora d'abast:
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 - Vincular un número pel protocol no oficial de dispositiu acompanyant del WhatsApp Web, tal com fan alguns clients d'escriptori. No necessita cap aprovació de la Cloud API, que és justament el que el fa llaminer, i queda fora d'abast a posta: el protocol està fet per enginyeria inversa, Meta el pot trencar quan vulgui, i fer-lo servir pot acabar amb el número suspès. En un compte personal aquella és l'aposta de qui l'assumeix. En la línia d'atenció d'una empresa, una suspensió atura totes les converses de cop, així que el mòdul no correrà aquell risc en nom vostre.
 
+## Novetats a la v2.4.0
+
+- **El nom de la bústia a la barra lateral ara porta a sota el número de telèfon del canal**, on una bústia de WhatsApp no ensenyava res (#45). El mòdul amagava l'adreça tècnica amb CSS, i això encongia la capçalera 27px, cosa que deixava mig tapada la icona del mòdul oficial Mailbox Icons en passar-hi el ratolí. Reportat amb captures d'abans i després per [@MarkoD](https://github.com/MarkoD).
+- **Correcció**: les notes automàtiques portaven el nom equivocat a la dreta, el mateix a totes sense que importés de qui fos el missatge fallit (#43). Aquella columna és l'assignat de la conversa reflectit al fil, que és el que hi escriu el mateix FreeScout.
+- **Correcció**: la secció d'instal·lació deia que el mòdul crea dues taules i en llistava dues. En crea tres (#47).
+- **L'inici ràpid i la pàgina d'ajustos ara diuen quins camps de webhook necessita Meta** abans que el panell d'esdeveniments del compte es pugui omplir (#47). Sense `message_template_status_update` i `template_category_update` activats a Meta, aquell interruptor no fa res i abans tampoc ho deia.
+- El canvi de preus d'octubre està escrit com a història i no com a avís, a la seva pròpia secció al costat de la finestra de 24 hores. La nota del mètode de pagament es queda a dalt, més curta: un compte sense ell deixa de tenir els missatges entregats, i aquella fallada és silenciosa.
+- El CONTRIBUTING ara diu què volen dir els números de versió.
+
 ## Novetats a la v2.3.0
 
 - **Correcció: els agents ara reben avís dels missatges entrants** (#46). No el rebien en cap versió d'aquest mòdul. Ni correu, ni campaneta, ni avís del navegador, i res al registre que ho digués. El listener del FreeScout només desa l'esdeveniment en un búfer, i el core buida aquell búfer en dos llocs, i cap dels dos corre dins d'un worker de cues, que és on aquest mòdul processa els webhooks. Reportat amb el diagnòstic sencer per [@MarkoD](https://github.com/MarkoD).
@@ -117,12 +112,6 @@ Queda fora d'abast:
 - **Correcció**: un missatge entrant ja no acaba dins d'una conversa creada a mà per un agent (#44). La conversa que es reutilitza ha de ser de xat, cosa que és també el que protegeix les instal·lacions que ja arrosseguen una d'aquelles.
 - **Les notes automàtiques porten la cara de l'agent de qui parlen** (#43): una resposta refusada o un lliurament fallit es veuen com qualsevol altra nota en lloc de sortir sense avatar. Quan no hi ha autor resoluble, la nota segueix sortint igual que abans.
 - El README ara explica per què aquest mòdul no vincularà un número pel protocol no oficial de dispositiu acompanyant del WhatsApp Web, i el CONTRIBUTING diu qui manté cada idioma.
-
-## Novetats a la v2.1.0
-
-- **El compte enrere de la finestra i el banner de recuperació ara s'actualitzen en viu** mentre la conversa es manté oberta: una resposta del client o el tancament de la finestra es reflecteixen automàticament, sense recarregar la pàgina (#41, #42).
-- **Es reconeix l'estat `played` de Meta** per a notes de veu: una nota de veu escoltada rep ara el mateix tractament "obert" que ja tenia un missatge de text llegit.
-- **La retenció del registre detallat admet ara `0` per a "conservar-ho tot per sempre"**, amb el límit pujat de 90 a 365 dies (#10).
 
 Les versions anteriors són a la [pàgina de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -156,10 +145,11 @@ php artisan module:migrate MetaWhatsApp
 php artisan freescout:clear-cache
 ```
 
-El mòdul crea dues taules pròpies:
+El mòdul crea tres taules pròpies:
 
 - `meta_whatsapp_accounts`
 - `meta_whatsapp_messages`
+- `meta_whatsapp_account_events`
 
 No fa cap `ALTER` sobre taules del core de FreeScout.
 
@@ -240,6 +230,16 @@ Si s'intenta respondre fora de finestra:
 - El client no rep cap resposta.
 
 Des de la v1.3.0, una finestra caducada es pot recuperar manualment amb una plantilla HSM pre-aprovada — vegeu més avall.
+
+### Què cobra Meta
+
+Des de l'1 d'octubre del 2026 Meta factura els missatges de servei, és a dir, cada resposta de text lliure enviada dins d'aquella finestra de 24 hores. Les plantilles d'utilitat enviades dins de la finestra també tornen a facturar-se, després de quinze mesos de ser gratuïtes. Ho diu Meta a [la seva pàgina de preus per a missatges que no són plantilla](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages): "Effective October 1, 2026, Meta will charge for service messages, which have not been charged since November 2024."
+
+El que Meta continua sense publicar enlloc és la franquícia. La xifra de **1.000 missatges de servei per número de telèfon i mes**, que es reinicia cada mes i no s'acumula, la donen coincidint les fonts del sector, i us la traslladem exactament com això i res més.
+
+Dues pàgines de Meta continuen contradient-se. La que hem enllaçat a dalt porta la data; la [pàgina de tarifes](https://whatsappbusiness.com/products/platform-pricing/#rates) continua dient que les converses de servei són gratis, i les plantilles d'utilitat dins de la finestra també. Feu servir la primera per saber què va canviar i la segona per a les tarifes del vostre mercat i la vostra moneda, on cada categoria té un preu diferent.
+
+Res d'això és un canvi del mòdul. El mòdul no cobra res ni rep cap comissió, i les seves guardes d'idempotència eviten que un reintent de la cua torni a enviar un missatge que ja havia sortit.
 
 ### Compte enrere de la finestra (v2.0.0)
 

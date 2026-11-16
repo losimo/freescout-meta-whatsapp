@@ -197,7 +197,7 @@ return [
     'account_events_link'     => 'Account events',
     'account_events_channel'  => 'Channel',
     'account_events_enable'      => 'Record what Meta reports about the account',
-    'account_events_enable_help' => 'Template status changes, category changes (which set a template\'s price), quality ratings and restrictions, kept for 90 days and readable from the link below. Account facts only: nothing about any customer is recorded here. Off unless you want it.',
+    'account_events_enable_help' => 'Template status changes, category changes (which set a template\'s price), quality ratings and restrictions, kept for 90 days and readable from the link below. Account facts only: nothing about any customer is recorded here. Off unless you want it. One thing this switch cannot do on its own: Meta only sends these if `message_template_status_update` and `template_category_update` are enabled in your app\'s webhook configuration, alongside `messages`. We cannot see from here whether they are, so if the log stays empty that is the first place to look.',
 
     // Author of the module's automatic notes (issue #43). The note is about an
     // agent, and FreeScout writes "you" when the author is the person reading,
