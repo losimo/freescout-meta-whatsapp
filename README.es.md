@@ -28,7 +28,7 @@ El proyecto es público y lleva en uso real de producción desde la v1.0, iteran
 Cinco pasos desde una instalación de FreeScout nueva hasta tener un canal de WhatsApp funcionando. Cada paso enlaza con el detalle completo más abajo — es el camino más corto, no un sustituto.
 
 1. **Instala el módulo.** Activa **MetaWhatsApp** desde Manage → Modules (o los tres comandos `artisan` si trabajas desde la línea de comandos). Ver [Instalación](#instalación).
-2. **Prepara Meta.** Necesitas una App de tipo Business con el producto WhatsApp añadido, un número de teléfono registrado, y cuatro valores del App Dashboard: **Phone Number ID**, **WABA ID**, **Access Token**, **App Secret**. Ver [Requisitos previos en Meta](#requisitos-previos-en-meta) — en particular, genera un token permanente en lugar del de 24 horas que Meta muestra por defecto.
+2. **Prepara Meta.** Necesitas una App de tipo Business con el producto WhatsApp añadido, un número de teléfono registrado, y cuatro valores del App Dashboard: **Phone Number ID**, **ID de la cuenta de mensajes** (el campo que Meta sigue llamando **WABA ID**), **Access Token**, **App Secret**. Ver [Requisitos previos en Meta](#requisitos-previos-en-meta) — en particular, genera un token permanente en lugar del de 24 horas que Meta muestra por defecto.
 3. **Añade el canal en FreeScout.** Manage → WhatsApp → Add account, pega los cuatro valores, guarda. Ver [Configuración del canal → En FreeScout](#en-freescout).
 4. **Apunta Meta hacia el webhook.** Pega la URL del webhook y el verify token que la página de la cuenta te acaba de dar en la pantalla de configuración de Webhook de Meta, y activa el campo `messages`. Si además quieres que se llene el panel de eventos de la cuenta, activa ahí también `message_template_status_update` y `template_category_update`: sin ellos Meta no envía nada y ese panel se queda vacío por mucho que lo activéis en FreeScout. Ver [Configuración del canal → En Meta](#en-meta).
 5. **Envía un mensaje real** al número y confirma que crea una conversación en FreeScout, luego responde desde FreeScout y confirma que llega al teléfono.
@@ -91,6 +91,21 @@ Queda fuera de alcance:
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 - Vincular un número por el protocolo no oficial de dispositivo acompañante de WhatsApp Web, como hacen algunos clientes de escritorio. No necesita aprobación de la Cloud API, que es justo lo que lo hace tentador, y queda fuera de alcance a propósito: el protocolo está hecho por ingeniería inversa, Meta puede romperlo cuando quiera, y usarlo puede acabar con el número suspendido. En una cuenta personal esa es la apuesta de quien la asume. En la línea de atención de una empresa, una suspensión detiene todas las conversaciones a la vez, así que el módulo no va a correr ese riesgo en su nombre.
 
+## Novedades en la v3.0.0
+
+- **Identificadores que dejan de ser legibles.** Los ids de mensaje de Meta llevan el número de teléfono dentro; ahora una supresión lo sustituye por una huella de un solo sentido, y una migración hace lo mismo con las filas que ya habían borrado versiones anteriores. Por eso se mueve el primer dígito: el significado de datos almacenados ha cambiado. (La pantalla de supresión salió en la v2.2.0.)
+- **La pantalla de supresión alcanza dos cosas que se le escapaban**: los enlaces de contacto que quedan cuando se borra un canal o su buzón, de los que respondía que no había nada, y el número en la lista de teléfonos y en los campos de canal de la ficha del cliente.
+- **La ventana de 24 horas se cuenta desde la hora que Meta registra**, y no desde el momento en que el trabajador de la cola escribió la fila. Cada retraso entre ambas hacía parecer la ventana más abierta de lo que estaba.
+- **Ocho caminos que rechazaban enviar una respuesta no dejaban nada en la conversación.** Todos dejan ahora una nota que el agente puede ver, incluida una respuesta que muere porque el canal está apagado, que antes no dejaba rastro en ningún sitio.
+- **El texto del agente ya no se pierde con el adjunto que lo llevaba**, y un archivo de un subtipo que WhatsApp no acepta se envía como documento, así que llega en lugar de ser rechazado como la imagen o el audio que se iba a enviar.
+- **Un mensaje de WhatsApp de un número que FreeScout ya conoce se archiva bajo ese cliente** en lugar de crear uno segundo, y cuando Meta avisa de que un contacto ha cambiado de número el módulo lo sigue: una respuesta no va a un número que su propietario ha dejado, y un número que la operadora reasigne más tarde no aterriza en la ficha del propietario anterior.
+- **Borrar un canal ya no detiene la entrada de los otros números de la misma cuenta de Meta.** La llamada que quita la suscripción del webhook es de toda la cuenta, así que con dos números bajo una WABA se llevaba el otro en silencio.
+- **Un mensaje de un tipo que el módulo no puede dibujar llega ahora a la conversación** en lugar de caer en el log, y cuenta para la ventana como cualquier otro.
+- **Un interruptor de copia por correo por canal**, desactivado por defecto, para la casilla que FreeScout 1.8.251 añadió y que enviaba la misma respuesta dos veces.
+- Un cliente que crea el módulo se nombra ahora con su número de teléfono, o con su identificador de ámbito de negocio, y nunca con el nombre de perfil de Meta.
+
+La mayor parte de esta versión sale de 41 tickets que abrió [@MarkoD](https://github.com/MarkoD) después de leer el código. La lista completa está en el [CHANGELOG](CHANGELOG.md).
+
 ## Novedades en la v2.4.0
 
 - **El nombre del buzón en la barra lateral ahora lleva debajo el número de teléfono del canal**, donde un buzón de WhatsApp no mostraba nada (#45). El módulo ocultaba la dirección técnica con CSS, y eso encogía la cabecera 27px, lo que dejaba medio tapado el icono del módulo oficial Mailbox Icons al pasar el ratón. Reportado con capturas de antes y después por [@MarkoD](https://github.com/MarkoD).
@@ -105,14 +120,6 @@ Queda fuera de alcance:
 - **Corrección: los agentes ahora reciben aviso de los mensajes entrantes** (#46). No lo recibían en ninguna versión de este módulo. Ni correo, ni campana, ni aviso del navegador, y nada en el registro que lo dijera. El listener de FreeScout solo guarda el evento en un búfer, y el core vacía ese búfer en dos sitios, ninguno de los cuales corre dentro de un worker de colas, que es donde este módulo procesa los webhooks. Reportado con el diagnóstico completo por [@MarkoD](https://github.com/MarkoD).
 - **Podéis elegir de quién vienen las notas automáticas del módulo** (#43). Dejadlo sin marcar y no cambia nada: la nota lleva el agente del que habla. Elegid un usuario, por ejemplo uno que creéis y llaméis Sistema o WhatsApp, y las notas llevarán ese usuario, lo que evita que FreeScout le enseñe esa nota a un agente como si la hubiera escrito él mismo. Si borráis ese usuario más adelante, las notas vuelven a llevar el agente.
 - El aviso de ventana caducada ya no dice que Meta no admita enviar una plantilla a un contacto del que solo se conoce su ID de WhatsApp. Meta lo acepta como destinatario; este módulo todavía no lo ha construido, y ahora dice cuál de los dos es el límite.
-
-## Novedades en la v2.2.0
-
-- **Una pantalla para atender una solicitud de derecho de supresión.** Busque lo que el módulo guarda de una persona por número de teléfono o por ID de WhatsApp, elimínelo, y llévese un comprobante de un solo uso que además indica qué queda fuera del alcance del módulo y dónde se elimina cada una de esas cosas. Un mensaje en cola pendiente de enviarse a un contacto eliminado se rechaza en lugar de entregarse, y lo deja dicho en la conversación. Esto cierra un agujero que el propio módulo ya documentaba: su tabla nunca se limpiaba al borrar un cliente o una conversación en FreeScout, así que un administrador podía creer que había atendido una solicitud de supresión mientras el número de teléfono seguía ahí.
-- **Iniciar una conversación se rechaza en un buzón de WhatsApp** (#44). El botón "New Conversation" de la barra lateral ya no aparece en él, la ruta que hay detrás se rechaza, y Clone también, que crea una conversación sin llegar a mostrar ningún formulario. Ese formulario nunca podía funcionar aquí, porque la Cloud API solo permite responder dentro de la ventana que abrió el cliente o enviar una plantilla aprobada; usarlo producía una conversación que parecía guardada mientras no se enviaba nada ni se registraba nada. Ahora el rechazo se explica en lugar de rebotar en silencio.
-- **Corrección**: un mensaje entrante ya no acaba dentro de una conversación creada a mano por un agente (#44). La conversación que se reutiliza tiene que ser de chat, que es también lo que protege a las instalaciones que ya arrastran una de esas.
-- **Las notas automáticas llevan la cara del agente al que se refieren** (#43): una respuesta rechazada o una entrega fallida se ven como cualquier otra nota en lugar de aparecer sin avatar. Cuando no hay autor resoluble, la nota sigue apareciendo igual que antes.
-- El README ahora explica por qué este módulo no vinculará un número por el protocolo no oficial de dispositivo acompañante de WhatsApp Web, y CONTRIBUTING indica quién mantiene cada idioma.
 
 Las versiones anteriores están en la [página de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -189,13 +196,26 @@ Desde **Gestionar → WhatsApp → Añadir cuenta**:
 
 1. Introduce el **nombre del canal**.
 2. Introduce el **número de teléfono** en formato E.164 (`+34...`).
-3. Rellena **Phone Number ID**, **WABA ID**, **Access Token** y **App Secret**.
+3. Rellena **Phone Number ID**, **ID de la cuenta de mensajes**, **Access Token** y **App Secret**.
+
+> **Sobre el nombre.** Meta está dividiendo la cuenta de WhatsApp Business en una **WhatsApp account**, que contiene un número de teléfono, y una **cuenta de mensajes**, que contiene las plantillas, la facturación y las suscripciones de webhook. Tu WABA ID de siempre continúa como identificador de la cuenta de mensajes: el valor no cambia, y tampoco cambia nada de lo que el módulo hace con él. Las pantallas de Meta siguen diciendo WABA ID, así que es el nombre que se usa más abajo cuando te indica dónde mirar.
 4. Copia el **token de verificación** generado automáticamente.
 5. Copia la **URL del webhook** mostrada por el módulo (siempre tiene la forma `https://tu-dominio/meta-whatsapp/webhook`, compartida por todas las cuentas).
 6. Elige si quieres:
    - crear un buzón nuevo (recomendado), o
    - asociar uno existente compatible (sin servidores de correo configurados y no vinculado a otra cuenta de WhatsApp; el desplegable solo muestra los válidos).
 7. Guarda la cuenta.
+
+### Quitar un canal
+
+Desde **Gestionar → WhatsApp**, eliminar un canal también lo quita del lado de Meta: el módulo pide a Meta que cancele la suscripción del webhook de ese número, y los eventos dejan de llegar. Si Meta lo rechaza, por ejemplo porque el token ha caducado, el canal se elimina igualmente y el módulo te avisa de que quites la suscripción a mano en el App Dashboard.
+
+Dos cosas se van con el canal, y las dos a propósito:
+
+- **Los registros de mensajes del módulo de ese canal.** Contienen el teléfono del contacto y los identificadores de mensaje de Meta, y una vez el canal no está no se puede llegar a ellos desde ninguna pantalla, así que se eliminan en lugar de quedarse. Las conversaciones se quedan en FreeScout, intactas.
+- **Todo lo que el módulo añade al buzón.** El buzón vuelve a ser un buzón normal: vuelven los campos Cc y Bcc, bajo el nombre aparece la dirección técnica en lugar del teléfono, vuelve el botón de conversación nueva, y desaparecen la cuenta atrás de la ventana y el botón de plantillas. No hay nada roto; simplemente ya no es un buzón de WhatsApp.
+
+Eliminar el **buzón** entero, desde la configuración de buzones de FreeScout, elimina el canal con él. Una respuesta que ya estuviera en la cola cuando ocurre cualquiera de las dos cosas no se envía, y el agente recibe una nota en la conversación diciéndolo.
 
 ### En Meta
 
@@ -215,10 +235,28 @@ Cuando la configuración es correcta, un mensaje enviado al número de WhatsApp 
 ## Funcionamiento diario
 
 - Los mensajes entrantes crean una conversación nueva o se añaden a la conversación activa del mismo cliente.
-- La identidad del cliente se resuelve por su teléfono.
+- La identidad del cliente se resuelve por su teléfono, tal como se explica más abajo.
 - Responder desde FreeScout envía la respuesta a WhatsApp **pasados los 15 segundos** de la ventana de deshacer del core.
 - Si el agente deshace la respuesta dentro de ese margen, el mensaje no se envía.
 - Las **notas internas nunca se envían** al cliente.
+
+### A quién se atribuye el mensaje
+
+Un mensaje entrante busca a la persona que hay detrás del número en este orden:
+
+1. Un cliente que ya tenga ese número como canal de WhatsApp.
+2. Un cliente que ya tenga ese número en su ficha, importado o escrito por un agente. El módulo le añade el canal de WhatsApp y no toca nada más de la ficha.
+3. Si no, un cliente nuevo, nombrado con el número de teléfono, o con el identificador de ámbito de negocio cuando Meta no envía número.
+
+El paso 2 compara los dígitos de forma exacta, así que `+34650387943`, `+34 650 38 79 43` y `0034650387943` son el mismo remitente. Un número guardado **sin el prefijo de país no casa, y es deliberado**: `650387943` puede ser ese móvil español o la cola de un número de otro sitio, y colgar una conversación de la persona equivocada es una avería que no se ve. Guarde los números en E.164 (`+34650387943`) si quiere que casen.
+
+FreeScout no exige que los teléfonos sean únicos. Cuando varios clientes tienen el mismo número, la conversación va a la ficha más antigua y una nota interna nombra las demás, para que un agente pueda fusionarlas.
+
+El nombre de perfil de Meta no se usa a propósito. A menudo son iniciales o un apodo, así que parece un nombre real sin serlo, mientras que un cliente que todavía se llama `+34...` se lee de un vistazo como alguien que nadie ha emparejado con ninguna ficha. Un nombre escrito por una persona tampoco se toca nunca: este módulo solo escribe el nombre de un cliente que crea él.
+
+**Si el contacto cambia de número de teléfono**, WhatsApp lo dice y el módulo lo sigue: el enlace y los mensajes de esa persona se mueven al número nuevo, así que su historia se queda en un solo sitio y las respuestas le siguen llegando. Una nota interna se lo dice al agente, sin escribir ninguno de los dos números. Si el número nuevo ya es de otro cliente, no se mueve nada, porque fusionar dos personas no es una decisión que tome un módulo por su cuenta.
+
+**Una persona con dos números de WhatsApp** funciona: los dos números apuntan al mismo cliente y cada uno tiene su conversación. Es lo que evita que una respuesta vaya al número equivocado, porque el destinatario es el último mensaje entrante de la conversación misma. Si un agente responde en una conversación que no tiene ningún mensaje entrante y el cliente tiene varios números, el módulo no adivina: se abstiene y lo dice en la conversación.
 
 ### Ventana de 24 horas
 
@@ -231,6 +269,8 @@ Si se intenta responder fuera de ventana:
 - El cliente no recibe ninguna respuesta.
 
 Desde la v1.3.0, una ventana caducada se puede recuperar manualmente con una plantilla HSM preaprobada — ver más abajo.
+
+La cuenta atrás va con la hora que **Meta** registra del mensaje del cliente, no con la hora en que llegó a FreeScout. Las dos se separan siempre que hay un retraso: la cola parada, un job reintentando, o Meta reentregando después de que su endpoint haya estado inalcanzable. Contar desde la llegada mostraba una ventana más abierta que la real, que es la dirección peligrosa: la cuenta atrás parecía sana y la respuesta volvía con un `131047` sin que el cliente recibiera nada.
 
 ### Qué cobra Meta
 
@@ -277,6 +317,16 @@ El envío saliente de multimedia sigue la misma regla que el texto: solo se env�
 
 El multimedia se almacena con el almacenamiento local ya existente de FreeScout — no se introduce ningún adaptador de almacenamiento nuevo.
 
+### Enviar la respuesta también por correo
+
+FreeScout muestra una casilla, **Enviar también la respuesta al cliente por correo**, en las respuestas escritas en una conversación de chat fuera del modo chat, y llega ya marcada. En un buzón de WhatsApp eso significa que la misma respuesta puede salir dos veces, una por WhatsApp y otra por correo, sin que el agente lo haya elegido.
+
+El módulo lo detiene por defecto y oculta la casilla. Si quieres esa opción en un canal, activa **Copia por correo** en su configuración: el módulo se aparta y la casilla funciona como FreeScout quiere. Sigue viniendo marcada por defecto cuando aparece, así que conviene avisar a los agentes antes de activarlo.
+
+Hay dos condiciones. El interruptor solo tiene efecto a partir de FreeScout 1.8.251, y que la copia llegue realmente depende de la configuración de salida de tu instalación y no de nada que haga este módulo. Y una trampa que conviene saber antes de empezar, señalada por [@MarkoD](https://github.com/MarkoD): el formulario del canal solo ofrece buzones sin conexión de correo configurada, así que si quieres asociar WhatsApp a un buzón desde el que también quieras enviar correo, **asócialo primero y configura la conexión después**, o no lo encontrarás en la lista.
+
+El core está añadiendo sus propios controles para la misma casilla. `APP_CHAT_CONVERSATION_REPLY_BY_EMAIL=false` en el `.env` la quita de todas partes, y el resto de la condición es que la conversación no esté en modo Chat, que el cliente tenga dirección de correo y que el buzón tenga la salida activa. Una versión anterior de esta línea decía que la salida activa significaba tener una conexión de correo configurada; no lo significa, y aquí la diferencia importa: el método de salida por defecto de FreeScout es PHP mail, que cuenta como activo sin configurar nada, así que en un buzón de WhatsApp la casilla sí aparece. El interruptor de este módulo es lo que la quita. El cambio está en la rama master de FreeScout a fecha del 25 de noviembre de 2026, posterior a la 1.8.252, así que llegará en la versión siguiente.
+
 ## Datos personales
 
 [Qué guarda este módulo de vuestros clientes, dónde lo guarda, y qué se borra cuando eliminéis un cliente o una conversación](docs/personal-data.md). También dice claramente los huecos que tiene, incluidos los tres sitios donde el borrado no llega: el archivo de registro detallado, la cola de trabajos del core, y las dos columnas de canal que FreeScout escribe en un cliente y nunca limpia. El documento está en inglés.
@@ -285,7 +335,8 @@ El multimedia se almacena con el almacenamiento local ya existente de FreeScout 
 
 Estas limitaciones son conocidas y aceptadas dentro del alcance actual de funcionalidades:
 
-- Los tipos de mensaje distintos de texto, multimedia (incl. stickers), botón, ubicación, reacción y contactos (p. ej. `order`, respuestas de lista `interactive`) se siguen descartando (se registran en el log, no se muestran en la conversación).
+- Los tipos de mensaje distintos de texto, multimedia (incl. stickers), botón, ubicación, reacción y contactos (p. ej. `order`, respuestas de lista `interactive`, o cualquier cosa que Meta entregue como `unsupported`) no se pueden representar. Desde la v3.0.0 ya no se descartan: el mensaje llega a la conversación como una entrada **Mensaje no compatible**, con el tipo cuando Meta lo nombra, y cuenta para la ventana de 24 horas como cualquier otro. Aparece donde iría el mensaje del cliente, porque es lo que es, así que también reabre una conversación cerrada y avisa al agente asignado. Lo que envió realmente solo se ve en WhatsApp. Los avisos *sobre* un mensaje (borrarlo, editarlo, fijarlo) no se muestran ni reabren nada.
+- Un cliente que escribe con un **nombre de usuario** de WhatsApp y sin teléfono disponible queda archivado correctamente, pero **no se le puede responder**: este módulo envía solo por número de teléfono. La respuesta se rechaza con una nota visible en la conversación. Meta documenta el envío a un identificador de ámbito de negocio; este módulo todavía no lo implementa.
 - La descarga de multimedia entrante no tiene validación de tamaño propia del módulo más allá de la que Meta ya aplica antes de entregar el webhook.
 - No hay vista de galería o carrusel para imágenes/vídeos — cada adjunto aparece como una fila/miniatura independiente, igual que cualquier otro adjunto de FreeScout.
 - Hasta 5 plantillas configuradas estáticamente por cuenta, o cualquier plantilla APPROVED obtenida en vivo mediante el selector dinámico (con variables `{{n}}`); sin sincronización/caché automática de la lista estática desde el catálogo de Meta.
@@ -320,7 +371,7 @@ Antes de pasar de pruebas a producción:
 | Meta no verifica el webhook | URL no accesible públicamente, certificado inválido o verify token incorrecto |
 | Meta recibe 403 en los POST del webhook | `phone_number_id` o WABA desconocido, cuenta inactiva o firma HMAC inválida |
 | Los mensajes entran pero no salen | Error `131047` por ventana de 24 horas o error `190` por token caducado |
-| La cuenta aparece como `⚠ Buzón desvinculado` | El buzón asociado se ha eliminado o ya no es resoluble |
+| La cuenta aparece como `⚠ Buzón desvinculado` | Falta la fila del buzón. Eliminar un buzón ya no deja este estado, porque el canal se va con él, así que solo se verá tras una restauración o un cambio hecho directamente en la base de datos |
 | No se procesa nada | El worker de colas está parado (`php artisan queue:work`) |
 | **Gestionar → WhatsApp** da "página no encontrada" | Las rutas del módulo no llegan a FreeScout. Abrid `/meta-whatsapp/webhook`: si responde, las rutas están vivas y el problema es otro; si también da 404, no llegan. Tened presente que `/meta-whatsapp` es una ruta y no una carpeta, así que no hay nada que buscar en el disco, y que un 404 no se escribe nunca en ningún registro, por lo que un registro vacío no significa nada |
 | Un fix de una actualización del módulo no parece aplicarse | El worker de colas sigue ejecutando código antiguo en memoria. Reiniciar el cron no lo recarga; hace falta `php artisan queue:restart` |

@@ -4,6 +4,63 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 3.0.0 (2026-11-25)
+
+The first digit moves for one reason and it is not the size of the list below: **the meaning of stored data changed.** Answering a right-of-erasure request now rewrites Meta's message identifiers in this module's own table, and a migration does the same to rows erased by earlier versions. Nothing an administrator configured changes, and the FreeScout floor stays at 1.8.234.
+
+Most of this release comes from 41 tickets opened by [@MarkoD](https://github.com/MarkoD) after reading the code, plus what verifying them turned up. Thirty-nine were confirmed.
+
+### Privacy and the right of erasure
+
+- **Fix**: Meta's message identifiers carry the phone number inside them, base64 encoded. An erasure now replaces each one with a one-way fingerprint of itself, which keeps redeliveries recognisable without keeping the number readable. A migration does the same to rows that earlier versions erased. (The erasure screen itself arrived in 2.2.0; a draft of these notes announced it again here, which it should not have.)
+- **Fix**: the search answered "this module holds nothing under that identifier" once the channel or its mailbox had been deleted, because those take the module's message rows with them and leave the contact links in `customer_channel`, which no FreeScout screen reaches either. It reads both now, so the one thing that can remove those rows can still find them.
+- **Fix**: an erasure also takes the number off the customer record itself, in the two places this module is the reason it is there: the entry on the customer's phone list, which is the column FreeScout searches a number by, and the core's denormalised channel copy. Only the number asked about, never another number on the same record, and never the record itself. The receipt counts them.
+- **Fix**: deleting a channel, or the mailbox that holds it, now tells Meta and cleans up after itself, and a mailbox with a WhatsApp channel can be deleted at all.
+- **Fix**: deleting one channel no longer stops the other numbers on the same Meta Messaging account from receiving. The call that removes the webhook subscription is account-wide, not per number, so with two numbers under one WABA, which is what the README recommends, it silently took the sibling down with it. It is sent for the last channel on an account and not before.
+
+### The 24-hour window
+
+- **Fix**: the free reply window is counted from the time **Meta** records for a message rather than from the moment this module's queue worker wrote the row. Every delay between the two used to make the module believe the window was more open than it was.
+
+### Replies that went nowhere
+
+- **Fix**: eight paths that refused to send a reply left nothing in the conversation. Every one of them now leaves a note the agent can see, including a reply that dies because the channel was switched off, which previously left no trace anywhere at all.
+- **Fix**: an agent's text is no longer lost with the attachment that was carrying it. When the file cannot be sent, the words go out on their own.
+- **Fix**: a file in a subtype WhatsApp does not accept is sent as a document rather than as the image or audio it was going to be refused as, so it arrives; and if Meta refuses it anyway, the note the agent reads carries Meta's own reason instead of nothing at all. An earlier draft of this line said the file was no longer sent, which was never what the code did.
+- **Fix**: the refusal note was suppressed for five minutes per conversation, so the second of two failed replies said nothing. One note per reply now, and per reason.
+
+### Inbound messages
+
+- **Fix**: a message whose sender the module could not read took every other message in the same delivery with it. People who write with a WhatsApp username and no phone number available are now filed correctly, which never worked before.
+- **New**: a message of a type this module cannot draw (`order`, an `interactive` list reply, anything Meta delivers as `unsupported`) arrives in the conversation as an **Unsupported message** entry instead of being dropped into the log, and counts for the 24-hour window like any other. Announcements *about* a message, such as a deletion or an edit, are deliberately not shown.
+- **Fix**: the caption survives when the attachment cannot be downloaded. The file is the module's problem; the sentence next to it is the customer's message.
+- **Fix**: a delivery status arriving out of order no longer walks a message backwards, and a failure is final. A late `delivered` on a failed message used to take the breakage off the health panel and count the message as billable.
+- **Fix**: a message Meta could not hand over (error `131060`) is no longer discarded. It is somebody writing in for the first time to a number also in use in the WhatsApp Business app, or from an unsupported companion device, and the module was dropping exactly the first message it had set out to stop losing. It now arrives in the conversation with Meta's own advice on where to read it.
+- **Fix**: the time the 24-hour window counts from is read as a number and bounded at both ends. A payload value that was not one came out as 1970, so the window read as closed on a message that had just arrived and the module offered a paid template in place of the free reply the agent should have written.
+- **New**: somebody opening a chat without writing, which Meta sends as `request_welcome` and typically comes from an ad that clicks to WhatsApp, arrives as a **Chat opened** entry rather than being dropped into the log. It is deliberately not described as a message nobody could show, because nobody sent one, and it counts for the 24-hour window: the event is what lets an agent greet them with a free-form reply.
+- **Fix**: the attachment is no longer downloaded from Meta before checking whether the message had already been processed, which it was on every redelivery.
+- **Fix**: inbound formatting no longer rewrites URLs and e-mail addresses, and invented file names no longer carry media type parameters.
+
+### Who a message belongs to
+
+- **New**: a WhatsApp message from a number that already belongs to a customer in FreeScout is filed under that customer instead of creating a second one. Matching is on the exact digits, through the core's own lookup, with the ITU `00` prefix as the one extra candidate.
+- **New**: when Meta announces that a contact changed their phone number or business-scoped ID, the module follows it: the channel link, this module's own rows and the entry on the customer's phone list move to the new identifier, so an agent's reply does not go to a number its owner has given up, and a number the operator later reassigns does not land in its previous owner's record. Every announcement that concerns a contact also leaves a row in FreeScout's own activity log, under `metawhatsapp_identity`, readable at **Manage » Logs** and without any number in it.
+- **Change**: a customer the module creates is named after their phone number, or after their business-scoped ID when Meta sends no number, and Meta's profile name is not used at all. A profile name is often initials or a nickname, so it looks like a real name without being one, while a customer still called `+34...` reads at a glance as one nobody has matched to a record yet. Asked for and argued by [@MarkoD](https://github.com/MarkoD).
+- **Fix**: one person can hold two WhatsApp numbers without the first one being overwritten, and a conversation belongs to a number, so a reply cannot be delivered to whichever of their numbers wrote last. What the core supports here is an open question, asked in #61.
+
+### Replies and the core's own e-mail copy
+
+- **New**: an **E-mail copy** switch per channel, off by default. FreeScout 1.8.251 added a checkbox that also sends a chat reply by e-mail, already ticked, so an agent who did not notice it sent the same answer twice. With the switch off the module stops the copy and hides the checkbox; with it on the module steps aside entirely. It has an effect on 1.8.251 and later, and whether the copy arrives is the installation's outbound setup.
+
+### Smaller things
+
+- **Fix**: the note on a reply refused because the channel was switched off no longer asks the agent to send it again. That reply is not discarded, so following the note delivered the same answer to the customer twice.
+- **Fix**: the Cc and Bcc fields are hidden, not only the toggle that reveals them.
+- **Fix**: three-letter template language codes such as `fil` are accepted, and the template picker's **Back** link points at the conversation instead of at itself.
+- **Fix**: automatic notes always carry an author the core's print view can read. Printing a conversation that held one used to fail.
+- **Fix**: the module stops firing `conversation.status_changed` when a customer's message reopens a conversation. The core does not fire it for anything a customer does, and firing it meant inventing an agent to attribute it to.
+- **Performance**: an index on `meta_whatsapp_messages.thread_id`.
+
 ## 2.4.0 (2026-11-16)
 
 - **New**: the mailbox name in the left sidebar now carries the channel's phone number underneath, where a WhatsApp mailbox used to show nothing (#45). The module had been hiding the technical address with CSS, which collapsed that header by 27px and left the official Mailbox Icons module's hover icon partly covered. Reported with before and after screenshots by [@MarkoD](https://github.com/MarkoD).
@@ -62,7 +119,7 @@ Out of an audit asking what this module takes for granted about the machine it r
 - **Fix**: one line needed PHP 7.4 while the README promised 7.1, the floor FreeScout itself declares. On 7.1, 7.2 or 7.3 the file that processes webhooks did not parse, so the settings screen worked, the channel saved, Meta's handshake passed, and every inbound message died with a 500 invisible from inside FreeScout.
 - **Fix**: the `wamid` column held 100 characters and Meta documents no maximum. FreeScout turns MySQL's strict mode off, so a longer id was cut and stored rather than refused, receipts stopped matching, and two ids sharing a prefix collided on the unique index, where the error reads as "already processed".
 - **The settings screen now names what is wrong with the environment**, which the module cannot fix but can see: a queue worker that is not running (the worst of them, because a reply looks sent and simply never leaves), the `sync` driver, missing curl, an `APP_URL` that is not https, a log directory that cannot be written, and a memory limit too small for the attachments WhatsApp accepts. Red means the install cannot work; yellow means it works with a caveat.
-- **When FreeScout's `APP_KEY` changes**, on a server move or a `key:generate` taken from a forum, the module says so instead of failing everywhere at once. Credentials are encrypted with that key, and until now the channel list rendered perfectly while every delivery answered 500 and Meta eventually disabled the webhook.
+- **When FreeScout's `APP_KEY` changes**, on a server move or a `key:generate` taken from a forum, the module says so instead of failing everywhere at once. Credentials are encrypted with that key, and until now the channel list rendered perfectly while every delivery answered 500, which Meta retries for up to seven days, so the backlog grew with nothing saying why. (This line said Meta eventually disabled the webhook; Meta's own documentation says it retries, and says nothing about disabling.)
 - **Turning on detailed logging no longer stops the channel** when `storage/logs` is not writable. The log is written before a message is processed, so the diagnostic tool was killing the thing it was meant to diagnose. Turning it off always works.
 - **Oversized incoming media is refused with its numbers** instead of taking the whole message with it. The file was held in memory while downloading, and a document larger than the memory limit killed the worker and lost the message, not just the attachment.
 - **A new README section for what is not the module**, with what to check and what to send us. Some of it can only be fixed by the server's owner, and that is said plainly.

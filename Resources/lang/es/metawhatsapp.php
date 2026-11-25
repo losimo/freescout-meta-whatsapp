@@ -19,8 +19,8 @@ return [
     'phone_number_format'          => 'El número debe tener formato internacional, p. ej. +34600000000.',
     'phone_number_id'              => 'ID de número de teléfono',
     'phone_number_id_help'         => 'Disponible en Meta Business Manager → WhatsApp → Configuración de la API.',
-    'waba_id'                      => 'ID de cuenta de WhatsApp Business',
-    'waba_id_help'                 => 'ID de la cuenta de WhatsApp Business en Meta Business Manager.',
+    'waba_id'                      => 'ID de la cuenta de mensajes (antes WABA ID)',
+    'waba_id_help'                 => 'El valor que Meta sigue llamando WhatsApp Business Account ID en el App Dashboard. Desde septiembre de 2026 el mismo identificador designa la cuenta de mensajes, que contiene las plantillas, la facturación y las suscripciones de webhook. El valor no ha cambiado.',
 
     'access_token'                 => 'Token de acceso',
     'app_secret'                   => 'Secreto de aplicación',
@@ -76,6 +76,7 @@ return [
     'account_updated'              => 'Cuenta de WhatsApp actualizada.',
     'account_deleted'              => 'Cuenta de WhatsApp eliminada.',
     'account_deleted_mailbox_kept' => 'Cuenta de WhatsApp eliminada. El buzón se ha conservado porque contiene conversaciones.',
+    'account_deleted_unsubscribe_failed' => 'No se ha podido decir a Meta que deje de enviar eventos para este número: quita la suscripción a mano en el App Dashboard de Meta. Hasta entonces Meta seguirá entregando eventos que esta instalación rechaza.',
 
     // Botón de prueba de conexión + instantánea de salud de la cuenta.
     'test_connection_button'       => 'Probar conexión',
@@ -104,6 +105,7 @@ return [
 
     'account_inactive_notice'          => 'Este canal de WhatsApp está inactivo, así que no se puede enviar nada. Abre la configuración del canal para comprobar la conexión y reactivarlo.',
     'not_sent_channel_inactive'   => 'No se ha enviado nada a WhatsApp: este canal está inactivo. Cuando un administrador restablezca la conexión, habrá que enviar el mensaje de nuevo.',
+    'not_sent_channel_inactive_kept' => 'No se ha enviado nada a WhatsApp: este canal está inactivo. Un administrador tiene que restablecer la conexión. Esta respuesta no se descarta, así que volver a escribirla la enviaría dos veces cuando la conexión vuelva.',
     'core_outdated'               => 'Este módulo se desarrolla y se prueba con FreeScout :minimum o superior, y aquí tenéis la versión :current. Sigue funcionando, pero no se ha probado en esta versión, y las versiones posteriores han ido cerrando problemas de seguridad. Vale la pena actualizar FreeScout.',
     'diagnostics_title'           => 'Ajustes del módulo',
     'diagnostics_section_log'     => 'Registro detallado',
@@ -137,6 +139,29 @@ return [
     'not_sent_no_phone'           => 'No se ha enviado nada a WhatsApp: este contacto no tiene ningún número de teléfono. La respuesta está aquí en FreeScout, pero el cliente no la ha recibido.',
     'not_sent_attachment_missing' => 'No se ha enviado un archivo a WhatsApp: el adjunto no se ha encontrado. El texto de la misma respuesta puede haber salido igualmente.',
     'not_sent_contact_erased'     => 'No se envió nada a WhatsApp: la identidad de WhatsApp de este contacto se borró mientras la respuesta esperaba para salir. La respuesta está aquí en FreeScout, pero el cliente no la ha recibido.',
+    'failed_note_attachment'      => 'un adjunto',
+    'failed_note_message'         => 'un mensaje sin texto',
+
+    // Issue #59: el numero del remitente esta en mas de una ficha de cliente.
+    'not_sent_several_numbers'    => 'No se ha enviado nada a WhatsApp: este cliente tiene más de un número de WhatsApp en su ficha y esta conversación no tiene ningún mensaje entrante que diga a cuál hay que responder. Su respuesta está aquí en FreeScout, pero el cliente no la ha recibido. Abra la conversación que ha empezado el cliente, o deje solo el número correcto en su ficha.',
+    // Issue #60: Meta dice que el contacto ha cambiado de numero.
+    'contact_number_changed'      => 'WhatsApp nos ha dicho que este contacto ha cambiado de número de teléfono. El enlace del canal y esta conversación se han movido al número nuevo, así que las respuestas de aquí le siguen llegando. Ninguno de los dos números se escribe en esta nota, porque una nota es uno de los pocos sitios donde una petición de supresión no puede llegar.',
+    'customer_matched_several'    => 'Este número de WhatsApp también consta en otras fichas de cliente (:ids). La conversación se ha archivado en la más antigua. Si son la misma persona, fusione las fichas; si no lo son, el número está en una ficha equivocada.',
+    'not_sent_channel_gone'       => 'No se envió nada a WhatsApp: el canal de WhatsApp de este buzón se borró mientras la respuesta esperaba para salir. La respuesta está aquí en FreeScout, pero el cliente no la ha recibido.',
+    // T04. Véase el fichero inglés: los rechazos que vienen de Meta o de los
+    // límites del módulo no dejaban nada que el agente pudiera ver.
+    'not_sent_window_expired'     => 'No se envió nada a WhatsApp: la ventana de atención de 24 horas se ha cerrado y Meta rechaza los mensajes de texto libre. La respuesta está aquí en FreeScout, pero el cliente no la ha recibido. Hasta que vuelva a escribir, la única manera de llegar a él es una plantilla aprobada.',
+    'not_sent_too_large'          => 'Un archivo no se envió a WhatsApp: es más grande de lo que WhatsApp acepta para ese tipo de archivo. El texto de la misma respuesta puede haber salido por su cuenta.',
+    'not_sent_template_not_configured' => 'No se envió nada a WhatsApp: este canal no tiene ninguna plantilla aprobada configurada para este mensaje. La respuesta está aquí en FreeScout, pero el cliente no la ha recibido.',
+    'not_sent_retries_exhausted'  => 'No se envió nada a WhatsApp: el módulo lo intentó varias veces y lo dejó. La respuesta está aquí en FreeScout, pero puede que el cliente no la haya recibido. El registro del servidor dice qué ha pasado.',
+    'not_sent_meta_error'         => 'Meta rechazó entregar esta respuesta, con el error :error. La respuesta está aquí en FreeScout, pero puede que el cliente no la haya recibido entera. El registro del servidor dice qué respondió Meta.',
+    'not_sent_meta_refused'       => 'Meta rechazó entregar esta respuesta sin decir por qué. La respuesta está aquí en FreeScout, pero puede que el cliente no la haya recibido entera. El registro del servidor dice qué respondió Meta.',
+    // Véase el fichero inglés: la nota de un archivo habla del archivo y no
+    // dice nada del resto de la respuesta.
+    'not_sent_file_retries_exhausted' => 'Un archivo no se envió a WhatsApp: el módulo lo intentó varias veces y lo dejó. El registro del servidor dice qué ha pasado.',
+    'not_sent_file_meta_error'    => 'Un archivo no se envió a WhatsApp: Meta lo rechazó con el error :error. El registro del servidor dice qué respondió Meta.',
+    'not_sent_file_meta_refused'  => 'Un archivo no se envió a WhatsApp: Meta lo rechazó sin decir por qué. El registro del servidor dice qué respondió Meta.',
+    'not_sent_file_window_expired' => 'Un archivo no se envió a WhatsApp: la ventana de atención de 24 horas se ha cerrado y Meta lo rechaza. Hasta que el cliente vuelva a escribir, la única manera de llegar a él es una plantilla aprobada.',
     'account_inactive_banner'      => 'Este canal de WhatsApp está inactivo. Las respuestas que escribas aquí no llegarán al cliente hasta que un administrador restablezca la conexión.',
     'templates_section_help' => 'Configura hasta cinco plantillas aprobadas aquí abajo. Con al menos una rellenada, los agentes ven un botón por plantilla y nada más. Sin ninguna, los agentes reciben un enlace para consultar todas las plantillas que Meta tiene aprobadas para esta cuenta. Los administradores conservan siempre ese enlace, porque es una vía más rápida de consultar nombres e idiomas que el WhatsApp Manager.',
     'browse_templates_admin_only' => 'Solo visible para administradores.',
@@ -157,6 +182,10 @@ return [
     'webhook_subscribe_failed'     => 'No se pudo suscribir a los webhooks de Meta: :error',
 
     'media_attachment_unavailable' => 'No se pudo descargar el archivo adjunto de WhatsApp.',
+    'inbound_unrenderable'         => 'Mensaje no compatible',
+    'inbound_unrenderable_named'   => 'Mensaje no compatible (:kind)',
+    'inbound_unavailable'          => 'Mensaje no disponible (error 131060). WhatsApp no nos ha entregado este mensaje; si este número también se usa en la aplicación WhatsApp Business, el consejo de Meta es buscarlo allí.',
+    'inbound_chat_opened'          => 'Conversación abierta, todavía sin mensaje',
     'media_preview_no_caption'     => 'Archivo adjunto (:type)',
     'reaction_text'                => 'Reaccionó: :emoji',
     'reaction_removed'             => 'Eliminó una reacción',
@@ -166,6 +195,9 @@ return [
     'contacts_shared_empty'        => 'Compartió una tarjeta de contacto (sin nombre ni teléfono).',
 
     // Contador mensual de mensajes de servicio (cambio de precios de Meta del 1 de octubre de 2026).
+    'email_copy_title'            => 'Copia por correo',
+    'email_copy_enable'           => 'Permite que los agentes envíen también la respuesta al cliente por correo',
+    'email_copy_enable_help'      => 'Desactivado por defecto. FreeScout ofrece una casilla en las respuestas escritas fuera del modo chat, y llega ya marcada, así que un agente que no se dé cuenta envía la misma respuesta dos veces: una por WhatsApp y otra por correo. Con esto desactivado, el módulo detiene esa copia y oculta la casilla. Actívalo si quieres que esa opción esté disponible en este canal; entonces la casilla funciona como FreeScout quiere, y sigue viniendo marcada por defecto, así que conviene avisar a los agentes. El interruptor solo tiene efecto a partir de FreeScout 1.8.251, y que la copia llegue realmente depende de la configuración de salida de su instalación, no de este módulo.',
     'usage_title'            => 'Mensajes de servicio',
     'usage_enable'           => 'Cuenta los mensajes de servicio enviados desde FreeScout',
     'usage_enable_help'      => 'A partir del 1 de octubre de 2026 Meta factura los mensajes de servicio enviados dentro de la ventana de 24 horas, con una franquicia mensual por número de teléfono. Este contador solo ve lo que ha salido de FreeScout, así que si este número también se usa desde otro sitio, el total real en Meta es más alto.',
@@ -241,17 +273,19 @@ return [
     'erasure_col_channels'                 => 'Canales',
     'erasure_col_first_last'               => 'Primer y último registro',
     'erasure_col_orphaned'                 => 'Registros cuya conversación ya no existe',
+    'erasure_col_channel_rows'             => 'Enlaces de contacto',
+    'erasure_col_records'                  => 'Fichas de cliente que lo conservan',
     'erasure_erase_button'                 => 'Eliminar lo que guardamos',
     'erasure_erase_help'                   => 'Esto no se puede deshacer, y afecta a todos los registros de esta persona, no a una selección.',
     'erasure_confirm'                      => '¿Eliminar la identidad de WhatsApp de todos los registros de esta persona? Esto no se puede deshacer.',
     'erasure_receipt_title'                => 'Comprobante de la eliminación',
     'erasure_receipt_warning'              => 'Esto se muestra una sola vez y no se guarda en ningún sitio. Cópialo o haz una captura ahora: al salir de esta pantalla se pierde definitivamente.',
     'erasure_nothing_to_erase'             => 'No quedaba nada por eliminar con ese identificador.',
-    'erasure_receipt_removed'              => 'Eliminado el :date: esta identidad de WhatsApp (:identifiers) de :messages registro(s) de mensaje, y :channels registro(s) de canal de contacto.',
-    'erasure_receipt_kept'                 => 'Conservado a propósito: los identificadores de mensaje de Meta. Sin ellos, un reenvío de webhook de Meta volvería a crear a esta persona.',
+    'erasure_receipt_removed'              => 'Eliminado el :date: esta identidad de WhatsApp (:identifiers) de :messages registro(s) de mensaje, :channels registro(s) de canal de contacto y :records ficha(s) de cliente.',
+    'erasure_receipt_kept'                 => 'Conservado y hecho ilegible: cada identificador de mensaje de Meta se sustituye por una huella de un solo sentido de sí mismo. Un reenvío de Meta sigue sin poder recrear a esta persona, y el identificador del que sale la huella ya no se puede leer en los registros propios de este módulo.',
     'erasure_receipt_remains_intro'        => 'Fuera del alcance de este módulo, y dónde se quita cada cosa:',
     'erasure_receipt_remains_conversations' => 'Las conversaciones y su contenido siguen en FreeScout, con el teléfono en el título de cada conversación y en el remitente de cada mensaje; se quitan borrando esas conversaciones en FreeScout.',
-    'erasure_receipt_remains_customer'     => 'La ficha del cliente puede conservar el teléfono en dos sitios. El nombre visible en las listas de conversaciones se edita en FreeScout. Los campos de canal de esa ficha no: FreeScout los descarta de su propio formulario de edición, así que no los elimina nada, ni FreeScout ni este módulo.',
+    'erasure_receipt_remains_customer'     => 'El nombre de la ficha del cliente sigue ahí, y es el número de teléfono mismo mientras nadie haya renombrado el contacto, así que aparece en todas las listas de conversaciones. No se toca porque renombrar una ficha es una decisión del administrador y el formulario de edición de FreeScout ya lo hace; el número sí se elimina de la lista de teléfonos y de los campos de canal de la ficha, donde ese formulario no llega.',
     'erasure_receipt_remains_queue'        => 'Los payloads de webhook que hayan acabado en la cola de trabajos fallidos de FreeScout pueden contener el texto del mensaje; se limpian desde la cola.',
     'erasure_receipt_remains_debuglog'     => 'Si el registro detallado ha estado activado alguna vez, el log de depuración del módulo contiene el texto completo de los mensajes y los números de teléfono. Su retención solo borra ficheros antiguos mientras el registro está funcionando, así que los ficheros de un periodo que ya habéis desactivado se quedan hasta que alguien los elimine del servidor a mano, y una retención de 0 conserva todos los ficheros para siempre.',
     'erasure_receipt_remains_portfolios'   => 'Si esta persona escribió desde dos portfolios de Meta distintos sin revelar nunca su número, esto no se puede resolver desde el módulo: no hay ningún registro que conecte los dos, así que solo se ha podido eliminar el lado que identificaste.',

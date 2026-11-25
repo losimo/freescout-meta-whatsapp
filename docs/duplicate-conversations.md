@@ -4,18 +4,31 @@ What makes two conversations exist for one customer in the same WhatsApp
 mailbox, which of them receives the next inbound message, and which of these
 the module can and cannot prevent.
 
-Written in November 2026 out of issue #44 and a review that followed it. The
-paths below were read in FreeScout 1.8.238; verify them again against a newer
-core before relying on the line numbers.
+Written in November 2026 out of issue #44 and a review that followed it, and
+read against the code again for v3.0.0 on 25 November 2026, where the
+selection rule below had changed and this page had not. The core paths were
+read in FreeScout 1.8.252.
 
 ## Why it matters
 
-When a message arrives, `ProcessInboundWebhook` picks the conversation to file
-it into with one query: same mailbox, same customer, `type = CHAT`, status not
-spam, **newest by `created_at` wins**. That mirrors FreeScout's own chat
-behaviour, and it is the right default. It also means that if a second chat
-conversation exists for that customer, the newer one takes every message from
-then on, and the older one stops receiving without anything saying so.
+When a message arrives, `ProcessInboundWebhook` looks for the conversation to
+file it into among the candidates in the same mailbox for the same customer,
+of `type = CHAT`, not spam, and on this module's channel or on none, newest by
+`created_at` first. That mirrors FreeScout's own chat behaviour and it is the
+right default. It also means that if a second chat conversation exists for
+that customer, the newer one takes every message from then on, and the older
+one stops receiving without anything saying so.
+
+Two filters were added in v3.0.0 and both narrow that set. The channel filter
+keeps another chat channel's conversation for the same customer out of the
+candidates, which matters because since issue #59 the customer may be a record
+that existed before WhatsApp; conversations with no channel stamped are still
+candidates, so an upgrade does not split a history. And the candidates are
+walked rather than taken newest-first outright: a conversation that already
+carries inbound messages from a **different** WhatsApp number is skipped,
+because one customer record can hold two numbers and a reply goes to the
+conversation's last inbound number, so filing the second number's message into
+the first one's conversation would deliver the answer to whoever wrote last.
 
 ## What the module prevents
 
@@ -30,7 +43,7 @@ v2.2.0:
 
 And one that does not create a conversation but used to steal messages: a
 conversation an agent created by hand is an email-type one, and the reuse
-query now requires a chat conversation, so it cannot be picked.
+query requires a chat conversation, so it cannot be picked.
 
 Note why the type filter is not enough on its own. A **clone** of a chat
 conversation is itself a chat conversation, so no filter on type could tell it
@@ -48,7 +61,10 @@ are reachable by an ordinary agent.
   afterwards. If both customers had a conversation in the same WhatsApp
   mailbox, the merge leaves two. This is the most likely of the three, because
   merging two cards for one person is exactly the cleanup an agent does when a
-  customer has written from two numbers.
+  customer has written from two numbers. Worth knowing after such a merge: the
+  surviving record now holds two numbers, and the rule above keeps each
+  number's messages in its own conversation rather than pooling them, which is
+  what stops a reply reaching the wrong one of the two.
 - **Changing a conversation's customer**, from the customer sidebar.
 - **Moving a conversation into the mailbox** from somewhere else.
 
@@ -74,3 +90,9 @@ conversation.
 **The only remedy that removes a conversation from the candidate set is
 deleting it permanently.** Merge first if you want to keep the threads, then
 delete the empty shell forever rather than leaving it.
+
+One thing this page does not promise: duplicates that already exist in an
+installation are not merged by the module when it recognises a number. The
+match by number runs only when no conversation of that customer is found at
+all, so two records that are already linked to the same person stay as they
+are, for an agent to merge.

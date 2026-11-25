@@ -1,6 +1,6 @@
 # Capability matrix
 
-**Last updated:** v1.12.0
+**Last updated:** v3.0.0 (25 November 2026). The rows below were read against the code again at that release, after the whole-branch review found this file three major versions out of date in several places. Where a row's wording changed, the reason is in it.
 
 A live map of what this module supports against the Meta WhatsApp Cloud API, kept up to date at every release. Update this file whenever a capability's status changes — it's the reference to check before triaging a new issue, not a one-off spec.
 
@@ -18,9 +18,9 @@ Effort legend (planned items only): S / M / L
 | Reaction (emoji) | ✅ | Reuses the text-message pipeline; an empty emoji (un-react) is worded distinctly. Shipped v1.5. | #14 | – |
 | Sticker | ✅ | Reuses the existing media/image pipeline (WEBP, static or animated). Shipped v1.6.0. | #11, #14 | – |
 | Contacts | ✅ | Name + first phone number of each shared contact, one per line. Shipped v1.6.0. | #14 | – |
-| Order (`type:order`) | ❌ | Not yet supported. | | S |
+| Order (`type:order`) | ⚠️ | The module cannot draw one, and since v3.0.0 it no longer drops it either: the message arrives in the conversation as an **Unsupported message** entry naming the type Meta gave, reopens a closed conversation and counts for the 24-hour window, like any other message the person sent. Reading the order's contents is still not supported. | | S |
 | Group messages (`group_id`) | ❌ | Refused and logged, never filed. A group message carries a `from` that is the participant, not the group, so processing it would create a private conversation with that person and send any reply to them alone. Cloud API groups only exist if the business creates them through the API, which this module never does, so a number in one was put there from elsewhere; the account health panel reports how many, after a connection test. Group management is a chapter of its own, not yet planned. | | L |
-| BSUID-only messages (no phone number) | ✅ | Named after `profile.name`, falling back to `profile.username` prefixed with `@`, and only then the raw ID. Resolves/creates a placeholder customer; merges into the real customer once the phone is revealed. Shipped v1.0.1 / v1.1.0. | #1 | – |
+| BSUID-only messages (no phone number) | ✅ | Named after the raw ID, and after nothing else: Meta's profile name is not read anywhere since v3.0.0, by the reporter's argument on #59 that a nickname looks like a real name without being one while an identifier reads as "not matched to anybody yet". Resolves or creates a customer for that ID and merges it into the real one once a phone number arrives, but only when it is a pure placeholder, meaning its single channel is that ID and it carries no e-mail and no phone. Shipped v1.0.1 / v1.1.0; the naming changed in v3.0.0. | #1, #59 | – |
 
 ## Outbound message types
 
@@ -56,7 +56,7 @@ Effort legend (planned items only): S / M / L
 | Official/registered channel ID | ✅ | `103`/`104`, officially assigned by the FreeScout team. Shipped v1.5.1. | #4 | – |
 | Auto-deactivation on invalid token (error 190) | ✅ | Account is marked inactive so no further calls are burned. | | – |
 | Guided reactivation flow (UI, revalidation, audit trail) | ✅ | Test connection success on an inactive account reactivates it automatically; `reactivated_at`/`reactivated_by` shown on the health snapshot. Shipped v1.6.1. | #9 | – |
-| Automatic webhook subscription | ✅ | `POST /{waba_id}/subscribed_apps` called automatically on account creation (best-effort), with a manual "Subscribe webhook" retry button. Shipped v1.6.0. | | – |
+| Automatic webhook subscription | ✅ | `POST /{waba_id}/subscribed_apps` called automatically on account creation (best-effort), with a manual "Subscribe webhook" retry button. Shipped v1.6.0. The mirror call that removes it is sent when a channel is deleted, and only when it is the last one on that Messaging account: the endpoint is account-wide, so sending it while a sibling number is still there stopped that number's inbound in silence (fixed v3.0.0). | | – |
 
 ## Webhook events other than messages
 
@@ -76,9 +76,9 @@ Subscribing a number to Meta's webhooks subscribes it to every field, so all of 
 
 | Capability | Status | Note | Issue(s) | Effort |
 |---|---|---|---|---|
-| Debug-level payload logging (inbound + outbound) | ✅ | Logged at debug level; enable module-wide via `APP_LOG_LEVEL=debug`, or scoped to this module only via `METAWHATSAPP_DEBUG=true` (own daily-rotated log file, 7-day retention). Shipped v1.4.1, fixed a Monolog depth-truncation bug and added the scoped/rotated log v1.6.0. | #10, #11 | – |
+| Debug-level payload logging (inbound + outbound) | ✅ | Switched on from the module's own settings page, for a window of 1, 3, 7 or 30 days or until it is turned off, with a retention of up to 365 days or `0` for "keep every file forever". `METAWHATSAPP_DEBUG=true` in `.env` still forces it on and overrides the screen; file access is no longer needed either way. Own daily-rotated log file. Shipped v1.4.1, scoped and rotated v1.6.0, moved to the screen and the retention raised in v2.1.0. What it holds, and the trap that retention only deletes while the log is running, are in [personal-data.md](personal-data.md). | #10, #11 | – |
 | Connection test / account health snapshot | ✅ | Shipped v1.5 — one merged panel: live "Test connection" call (Graph API `GET /{phone_number_id}`) plus a snapshot of last inbound, last outbound attempt, and last error, read from existing `meta_whatsapp_messages` rows (no new migration). | #9 | – |
-| Structured audit log (who changed what) | 🕒 | Planned v1.6 (stretch). | #9 | M |
+| Structured audit log (who changed what) | ⚠️ | Two halves, and only one is built. What Meta reports about the account is recorded in `meta_whatsapp_account_events`, off by default and readable from a screen. Every identity change that concerns a contact leaves a row in FreeScout's own activity log under `metawhatsapp_identity` since v3.0.0, readable at **Manage » Logs**. Who changed a channel's own configuration is still not recorded. | #9, #60 | M |
 | Configurable/translatable attachment placeholder text | ✅ | Already translatable via `metawhatsapp::metawhatsapp.media_preview_no_caption` (en/ca/es). Fixed v1.5: an empty translation no longer discards the message/attachment. | #11 | – |
 
 ## Docs / operational support

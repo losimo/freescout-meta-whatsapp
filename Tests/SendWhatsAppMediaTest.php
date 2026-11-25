@@ -299,6 +299,12 @@ class SendWhatsAppMediaTest extends TestCase
         })->once();
     }
 
+    /**
+     * Since T09 the category is decided by the exact subtype and not by the
+     * prefix, so the name of this test no longer describes what it checks.
+     * It stays because every line in it is still true, and the subtype rules
+     * themselves live in MediaSubtypeAllowlistTest.
+     */
     public function test_mediaCategory_mapa_prefixos_de_mime_correctament()
     {
         $this->assertEquals('image', SendWhatsAppMedia::mediaCategory('image/jpeg'));

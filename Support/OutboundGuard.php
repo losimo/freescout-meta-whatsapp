@@ -6,6 +6,7 @@ use App\Conversation;
 use App\CustomerChannel;
 use App\Thread;
 use Illuminate\Support\Facades\Log;
+use Modules\MetaWhatsApp\Support\ConversationReopen;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 
@@ -35,6 +36,33 @@ class OutboundGuard
     const NOTE_MARKER = '[WhatsApp not sent]';
 
     /**
+     * Key under threads.meta holding the id of the reply a note is about.
+     *
+     * Issue #51. The de-duplication used to be "any refusal note in this
+     * conversation in the last five minutes", a stand-in for "the three
+     * attachments of one reply" that also swallowed the second of two
+     * different replies failing minutes apart.
+     */
+    const META_REFUSED_THREAD = 'mwa_refused_thread';
+
+    /**
+     * Key under threads.meta holding which refusal a note reports.
+     *
+     * The de-duplication is per reply and per reason, which is one rule in
+     * place of the three attempts that came before it: a five minute window,
+     * then one note per reply, then one note per reply with an override for
+     * the worse news. The override wrote a second identical note on the
+     * commonest path of all, an inactive channel, because the guard and the
+     * job both report it with the same key.
+     *
+     * Per reply and per reason gives all of it at once: three attachments
+     * failing the same way leave one note, a file-only refusal does not
+     * silence the one that says the whole reply was lost, and nothing can
+     * write the same sentence twice.
+     */
+    const META_REFUSED_REASON = 'mwa_refused_reason';
+
+    /**
      * Returns the account when it is able to send, or null after logging
      * the refusal and leaving a visible note on the conversation.
      */
@@ -52,9 +80,19 @@ class OutboundGuard
             'subject'    => $subject,
         ]);
 
+        // Missing and inactive are not the same thing and the note used
+        // to say they were: an agent whose channel had been deleted was
+        // told to wait for an administrator to restore the connection,
+        // which nobody was going to do. The log line above had the
+        // distinction all along.
         $thread = Thread::find($threadId);
         if ($thread) {
-            self::noteRefusal($thread, 'metawhatsapp::metawhatsapp.not_sent_channel_inactive');
+            self::noteRefusal(
+                $thread,
+                $account
+                    ? 'metawhatsapp::metawhatsapp.not_sent_channel_inactive'
+                    : 'metawhatsapp::metawhatsapp.not_sent_channel_gone'
+            );
         }
 
         return null;
@@ -126,8 +164,23 @@ class OutboundGuard
      * other. The caller must consult this before `recordFailure()`, not
      * after, and skip the recording entirely when it returns true.
      */
-    public static function refuseIfContactErased(int $threadId, string $toPhone): bool
+    public static function refuseIfUnreachable(int $accountId, int $threadId, string $toPhone): bool
     {
+        // The channel itself may be gone. Deleting a channel, or the
+        // mailbox it is attached to, takes its message rows with it
+        // (Support\ChannelTeardown), and a job queued before that still
+        // carries the number: without this branch it reached
+        // recordFailure() and wrote the phone straight back into a new
+        // row, under the id of an account that no longer exists.
+        if (!WhatsAppAccount::where('id', $accountId)->exists()) {
+            self::noteRefusal(
+                Thread::find($threadId),
+                'metawhatsapp::metawhatsapp.not_sent_channel_gone'
+            );
+
+            return true;
+        }
+
         if (self::stillHoldsPhone($toPhone)) {
             return false;
         }
@@ -152,28 +205,45 @@ class OutboundGuard
      * what produced #28 and #29.
      *
      * @param string $translationKey full key, so the caller states its reason
+     * @param array  $replace        values for the key's own placeholders
      */
-    public static function noteRefusal(?Thread $thread, string $translationKey): void
+    public static function noteRefusal(?Thread $thread, string $translationKey, array $replace = []): void
     {
         if (!$thread || !$thread->conversation_id) {
             return;
         }
 
-        // One note per thread, not one per reason and not one per attachment:
-        // a reply carrying three files dispatches three jobs, and three
-        // identical notes would be worse than none.
-        $alreadyNoted = Thread::where('conversation_id', $thread->conversation_id)
-            ->where('type', Thread::TYPE_NOTE)
-            ->where('body', 'like', self::NOTE_MARKER . '%')
-            ->where('created_at', '>=', now()->subMinutes(5))
-            ->exists();
-
-        if ($alreadyNoted) {
+        $conversation = Conversation::find($thread->conversation_id);
+        if (!$conversation) {
             return;
         }
 
-        $conversation = Conversation::find($thread->conversation_id);
-        if (!$conversation) {
+        // One note per reply and per reason: a reply carrying three files
+        // dispatches three jobs, and three identical notes would be worse
+        // than none, while a note about one file must not silence the one
+        // that says the whole reply was lost.
+        //
+        // Keyed on the reply's own id (issue #51), which replaced a five
+        // minute window that also suppressed the second of two different
+        // replies failing minutes apart. Two consequences worth stating: a
+        // second reply gets its own note, and the suppression of a repeated
+        // note no longer expires.
+        //
+        // Both values go in as strings and are matched with their quotes,
+        // because the JSON of "mwa_refused_thread":1 is a prefix of
+        // "mwa_refused_thread":123 and thread 1's note would have silenced
+        // thread 123's. Laravel 5.5 encodes the cast array with a plain
+        // json_encode, no spaces, and threads.meta is a text column, so the
+        // stored form is exactly what is matched here.
+        $alreadyNoted = Thread::where('conversation_id', $thread->conversation_id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->where('meta', 'like', '%"' . self::META_REFUSED_THREAD . '":"' . $thread->id . '"%')
+            ->where('meta', 'like', '%"' . self::META_REFUSED_REASON . '":"' . $translationKey . '"%')
+            ->exists();
+
+        if ($alreadyNoted) {
+            self::bringBack($conversation);
+
             return;
         }
 
@@ -203,10 +273,43 @@ class OutboundGuard
         $note->type            = Thread::TYPE_NOTE;
         $note->status          = $conversation->status;
         $note->state           = Thread::STATE_PUBLISHED;
-        $note->body            = self::NOTE_MARKER . ' ' . __($translationKey);
+        $note->body            = self::NOTE_MARKER . ' ' . __($translationKey, $replace);
         $note->source_via      = Thread::PERSON_USER;
         $note->source_type     = Thread::SOURCE_TYPE_WEB;
         $note->customer_id     = $conversation->customer_id;
+        $note->setMeta(self::META_REFUSED_THREAD, (string) $thread->id);
+        $note->setMeta(self::META_REFUSED_REASON, $translationKey);
         $note->save();
+
+        self::bringBack($conversation);
+
+        // The status the note carries is the one the core prints beside it,
+        // and it was read before the reopening, so a note that brought a
+        // closed conversation back was labelled closed. Written only when
+        // the reopening actually changed something, which is the rare case.
+        if ((int) $note->status !== (int) $conversation->status) {
+            $note->status = $conversation->status;
+            $note->save();
+        }
+    }
+
+    /**
+     * The conversation goes back into view after every refusal, noted or
+     * suppressed.
+     *
+     * Two review rounds shaped this. It used to live in OutboundFailure, so
+     * only the job-side refusals reopened and an agent who replied and closed
+     * in one action never saw the others. Moving it into the note put it
+     * behind the one-note-per-reply guard instead, so a second file failing
+     * on a conversation closed in between kept its note and lost its
+     * reopening. It now runs on both paths, and after the note rather than
+     * before it: writing the trace is the part that must not be lost to a
+     * core hook throwing during a status change.
+     */
+    protected static function bringBack(Conversation $conversation): void
+    {
+        // Idempotent by design: ConversationReopen returns early on a
+        // conversation that is already active, which is the common case.
+        ConversationReopen::afterFailure($conversation);
     }
 }

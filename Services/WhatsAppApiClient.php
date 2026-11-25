@@ -462,15 +462,59 @@ class WhatsAppApiClient
     }
 
     /**
+     * Removes this app's webhook subscription for the account
+     * (DELETE /{waba_id}/subscribed_apps), the mirror of
+     * subscribeWebhook(). Called when a channel is taken down, so that
+     * Meta stops delivering events for a number this installation no
+     * longer answers: without it every delivery is refused with a 403 by
+     * the webhook route, and Meta retries each refused delivery with
+     * decreasing frequency for up to seven days, to every app subscribed
+     * to that account (`webhooks_overview`, corpus of 2026-11-22).
+     *
+     * Account-wide and not per number, which is why ChannelTeardown only
+     * sends it for the last channel on a Messaging account.
+     *
+     * The endpoint is the same one, with the verb changed:
+     * `GET`, `POST` and `DELETE` on `/<WHATSAPP_BUSINESS_ACCOUNT_ID>/subscribed_apps`.
+     */
+    public function unsubscribeWebhook(): array
+    {
+        $url = rtrim(config('metawhatsapp.api_base', 'https://graph.facebook.com'), '/')
+            . '/' . self::API_VERSION . '/' . $this->account->waba_id . '/subscribed_apps';
+
+        return $this->curlDeleteSimple($url, ['Authorization: Bearer ' . $this->accessToken]);
+    }
+
+    /**
      * POST genèric sense body JSON (Meta accepta els subscribed_apps sense
      * payload), amb el mateix format de retorn estructurat que curlGet().
      */
     protected function curlPostSimple(string $url, array $headers): array
     {
+        return $this->curlSimple('POST', $url, $headers);
+    }
+
+    /**
+     * DELETE without a body, the mirror of curlPostSimple(). Meta accepts
+     * the subscribed_apps calls with no payload in either direction.
+     */
+    protected function curlDeleteSimple(string $url, array $headers): array
+    {
+        return $this->curlSimple('DELETE', $url, $headers);
+    }
+
+    /**
+     * The one implementation behind both. Written as one method on
+     * purpose: the same guard copied into three jobs is what produced the
+     * bug reported four times as #18, #25, #28 and #29, and a second copy
+     * of this error handling would drift from the first the same way.
+     */
+    protected function curlSimple(string $method, string $url, array $headers): array
+    {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
+            CURLOPT_CUSTOMREQUEST  => $method,
             CURLOPT_POSTFIELDS     => '',
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_SSL_VERIFYPEER => true,

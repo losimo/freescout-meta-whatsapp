@@ -19,8 +19,8 @@ return [
     'phone_number_format'          => 'El número ha de tenir format internacional, p. ex. +34600000000.',
     'phone_number_id'              => 'ID de número de telèfon',
     'phone_number_id_help'         => 'Disponible a Meta Business Manager → WhatsApp → Configuració de l\'API.',
-    'waba_id'                      => 'ID de compte de WhatsApp Business',
-    'waba_id_help'                 => 'ID del compte de WhatsApp Business a Meta Business Manager.',
+    'waba_id'                      => 'ID del compte de missatgeria (abans WABA ID)',
+    'waba_id_help'                 => 'El valor que Meta encara anomena WhatsApp Business Account ID a l\'App Dashboard. Des del setembre del 2026 el mateix identificador designa el compte de missatgeria, que conté les plantilles, la facturació i les subscripcions de webhook. El valor no ha canviat.',
 
     'access_token'                 => 'Token d\'accés',
     'app_secret'                   => 'Secret d\'aplicació',
@@ -76,6 +76,7 @@ return [
     'account_updated'              => 'Compte de WhatsApp actualitzat.',
     'account_deleted'              => 'Compte de WhatsApp eliminat.',
     'account_deleted_mailbox_kept' => 'Compte de WhatsApp eliminat. La bústia s\'ha conservat perquè conté converses.',
+    'account_deleted_unsubscribe_failed' => 'No s\'ha pogut dir a Meta que deixi d\'enviar esdeveniments per a aquest número: treu la subscripció a mà al App Dashboard de Meta. Fins aleshores Meta seguirà entregant esdeveniments que aquesta instal·lació rebutja.',
 
     // Botó de prova de connexió + instantània de salut del compte.
     'test_connection_button'       => 'Provar connexió',
@@ -104,6 +105,7 @@ return [
 
     'account_inactive_notice'          => 'Aquest canal de WhatsApp està inactiu, així que no es pot enviar res. Obre la configuració del canal per comprovar la connexió i reactivar-lo.',
     'not_sent_channel_inactive'   => 'No s\'ha enviat res a WhatsApp: aquest canal està inactiu. Quan un administrador restableixi la connexió, caldrà tornar a enviar el missatge.',
+    'not_sent_channel_inactive_kept' => 'No s\'ha enviat res a WhatsApp: aquest canal està inactiu. Cal que un administrador restableixi la connexió. Aquesta resposta no es descarta, així que tornar-la a escriure l\'enviaria dues vegades quan la connexió torni.',
     'core_outdated'               => 'Aquest mòdul es desenvolupa i es prova amb el FreeScout :minimum o superior, i aquí teniu la versió :current. Continua funcionant, però no s\'ha provat en aquesta versió, i les versions posteriors han anat tancant problemes de seguretat. Val la pena actualitzar el FreeScout.',
     'diagnostics_title'           => 'Ajustos del mòdul',
     'diagnostics_section_log'     => 'Registre detallat',
@@ -137,6 +139,29 @@ return [
     'not_sent_no_phone'           => 'No s\'ha enviat res al WhatsApp: aquest contacte no té cap número de telèfon. La resposta és aquí al FreeScout, però el client no l\'ha rebuda.',
     'not_sent_attachment_missing' => 'No s\'ha enviat un fitxer al WhatsApp: l\'adjunt no s\'ha trobat. El text de la mateixa resposta pot haver sortit igualment.',
     'not_sent_contact_erased'     => 'No s\'ha enviat res al WhatsApp: la identitat de WhatsApp d\'aquest contacte s\'ha esborrat mentre la resposta esperava per sortir. La resposta és aquí al FreeScout, però el client no l\'ha rebuda.',
+    'failed_note_attachment'      => 'un adjunt',
+    'failed_note_message'         => 'un missatge sense text',
+
+    // Issue #59: el numero del remitent es a mes d'una fitxa de client.
+    'not_sent_several_numbers'    => 'No s\'ha enviat res a WhatsApp: aquest client té més d\'un número de WhatsApp a la seva fitxa i aquesta conversa no té cap missatge entrant que digui a quin cal respondre. La vostra resposta és aquí al FreeScout, però el client no l\'ha rebuda. Obriu la conversa que ha començat el client, o deixeu només el número correcte a la seva fitxa.',
+    // Issue #60: Meta diu que el contacte ha canviat de numero.
+    'contact_number_changed'      => 'WhatsApp ens ha dit que aquest contacte ha canviat de número de telèfon. L\'enllaç del canal i aquesta conversa s\'han mogut al número nou, així que les respostes d\'aquí li continuen arribant. Cap dels dos números no s\'escriu en aquesta nota, perquè una nota és un dels pocs llocs on una petició d\'esborrat no pot arribar.',
+    'customer_matched_several'    => 'Aquest número de WhatsApp també consta en altres fitxes de client (:ids). La conversa ha anat a la més antiga. Si són la mateixa persona, fusioneu les fitxes; si no ho són, el número és en una fitxa equivocada.',
+    'not_sent_channel_gone'       => 'No s\'ha enviat res al WhatsApp: el canal de WhatsApp d\'aquesta bústia s\'ha esborrat mentre la resposta esperava per sortir. La resposta és aquí al FreeScout, però el client no l\'ha rebuda.',
+    // T04. Vegeu el fitxer anglès: els refusos que venen de Meta o dels
+    // límits del mòdul no deixaven res que l'agent pogués veure.
+    'not_sent_window_expired'     => 'No s\'ha enviat res al WhatsApp: la finestra d\'atenció de 24 hores s\'ha tancat i Meta refusa els missatges de text lliure. La resposta és aquí al FreeScout, però el client no l\'ha rebuda. Fins que no torni a escriure, l\'única manera d\'arribar-hi és una plantilla aprovada.',
+    'not_sent_too_large'          => 'Un fitxer no s\'ha enviat al WhatsApp: és més gran del que el WhatsApp accepta per a aquesta mena de fitxer. El text de la mateixa resposta pot haver sortit pel seu compte.',
+    'not_sent_template_not_configured' => 'No s\'ha enviat res al WhatsApp: aquest canal no té cap plantilla aprovada configurada per a aquest missatge. La resposta és aquí al FreeScout, però el client no l\'ha rebuda.',
+    'not_sent_retries_exhausted'  => 'No s\'ha enviat res al WhatsApp: el mòdul ho ha provat diverses vegades i ho ha deixat. La resposta és aquí al FreeScout, però pot ser que el client no l\'hagi rebuda. El registre del servidor diu què ha passat.',
+    'not_sent_meta_error'         => 'Meta ha refusat de lliurar aquesta resposta, amb l\'error :error. La resposta és aquí al FreeScout, però pot ser que el client no l\'hagi rebuda sencera. El registre del servidor diu què ha respost Meta.',
+    'not_sent_meta_refused'       => 'Meta ha refusat de lliurar aquesta resposta sense dir per què. La resposta és aquí al FreeScout, però pot ser que el client no l\'hagi rebuda sencera. El registre del servidor diu què ha respost Meta.',
+    // Vegeu el fitxer anglès: la nota d'un fitxer parla del fitxer i no diu
+    // res de la resta de la resposta.
+    'not_sent_file_retries_exhausted' => 'Un fitxer no s\'ha enviat al WhatsApp: el mòdul ho ha provat diverses vegades i ho ha deixat. El registre del servidor diu què ha passat.',
+    'not_sent_file_meta_error'    => 'Un fitxer no s\'ha enviat al WhatsApp: Meta l\'ha refusat amb l\'error :error. El registre del servidor diu què ha respost Meta.',
+    'not_sent_file_meta_refused'  => 'Un fitxer no s\'ha enviat al WhatsApp: Meta l\'ha refusat sense dir per què. El registre del servidor diu què ha respost Meta.',
+    'not_sent_file_window_expired' => 'Un fitxer no s\'ha enviat al WhatsApp: la finestra d\'atenció de 24 hores s\'ha tancat i Meta el refusa. Fins que el client no torni a escriure, l\'única manera d\'arribar-hi és una plantilla aprovada.',
     'account_inactive_banner'      => 'Aquest canal de WhatsApp està inactiu. Les respostes que escriguis aquí no arribaran al client fins que un administrador restableixi la connexió.',
     'templates_section_help' => 'Configura fins a cinc plantilles aprovades aquí sota. Amb almenys una de plena, els agents veuen un botó per plantilla i res més. Sense cap, els agents reben un enllaç per consultar totes les plantilles que Meta té aprovades per a aquest compte. Els administradors conserven sempre aquest enllaç, perquè és una via més ràpida de consultar noms i idiomes que no pas el WhatsApp Manager.',
     'browse_templates_admin_only' => 'Només visible per a administradors.',
@@ -157,6 +182,10 @@ return [
     'webhook_subscribe_failed'     => 'No s\'ha pogut subscriure als webhooks de Meta: :error',
 
     'media_attachment_unavailable' => 'No s\'ha pogut descarregar el fitxer adjunt de WhatsApp.',
+    'inbound_unrenderable'         => 'Missatge no compatible',
+    'inbound_unrenderable_named'   => 'Missatge no compatible (:kind)',
+    'inbound_unavailable'          => 'Missatge no disponible (error 131060). El WhatsApp no ens ha lliurat aquest missatge; si aquest número també es fa servir a l\'aplicació WhatsApp Business, el consell de Meta és buscar-lo allà.',
+    'inbound_chat_opened'          => 'Conversa oberta, encara sense missatge',
     'media_preview_no_caption'     => 'Fitxer adjunt (:type)',
     'reaction_text'                => 'Ha reaccionat: :emoji',
     'reaction_removed'             => 'Ha eliminat una reacció',
@@ -166,6 +195,9 @@ return [
     'contacts_shared_empty'        => 'Ha compartit una targeta de contacte (sense nom ni telèfon).',
 
     // Comptador mensual de missatges de servei (canvi de preus de Meta de l'1 d'octubre del 2026).
+    'email_copy_title'            => 'Còpia per correu',
+    'email_copy_enable'           => 'Permet que els agents enviïn també la resposta al client per correu',
+    'email_copy_enable_help'      => 'Desactivat per defecte. El FreeScout ofereix una casella a les respostes escrites fora del mode xat, i arriba ja marcada, així que un agent que no se n\'adoni envia la mateixa resposta dues vegades: una per WhatsApp i una per correu. Amb això desactivat, el mòdul atura aquella còpia i amaga la casella. Activa-ho si vols que aquesta opció estigui disponible en aquest canal; llavors la casella funciona com el FreeScout vol, i segueix venint marcada per defecte, o sigui que val més avisar els agents. L\'interruptor només té efecte a partir del FreeScout 1.8.251, i que la còpia arribi de debò depèn de la configuració de sortida de la vostra instal·lació, no d\'aquest mòdul.',
     'usage_title'            => 'Missatges de servei',
     'usage_enable'           => 'Compta els missatges de servei enviats des del FreeScout',
     'usage_enable_help'      => 'A partir de l\'1 d\'octubre del 2026 Meta factura els missatges de servei enviats dins de la finestra de 24 hores, amb una franquícia mensual per número de telèfon. Aquest comptador només veu el que ha sortit del FreeScout, o sigui que si aquest número també s\'usa des d\'una altra banda, el total real a Meta és més alt.',
@@ -241,17 +273,19 @@ return [
     'erasure_col_channels'                 => 'Canals',
     'erasure_col_first_last'               => 'Primer i últim registre',
     'erasure_col_orphaned'                 => 'Registres amb la conversa ja inexistent',
+    'erasure_col_channel_rows'             => 'Enllaços de contacte',
+    'erasure_col_records'                  => 'Fitxes de client que el conserven',
     'erasure_erase_button'                 => 'Elimina el que guardem',
     'erasure_erase_help'                   => 'Això no es pot desfer, i afecta tots els registres d\'aquesta persona, no una selecció.',
     'erasure_confirm'                      => 'Voleu eliminar la identitat de WhatsApp de tots els registres d\'aquesta persona? Això no es pot desfer.',
     'erasure_receipt_title'                => 'Comprovant de l\'eliminació',
     'erasure_receipt_warning'              => 'Això es mostra un sol cop i no es desa enlloc. Copieu-ho o feu-ne una captura ara: en sortir d\'aquesta pantalla es perd definitivament.',
     'erasure_nothing_to_erase'             => 'No quedava res per eliminar amb aquest identificador.',
-    'erasure_receipt_removed'              => 'Eliminat el :date: aquesta identitat de WhatsApp (:identifiers) de :messages registre(s) de missatge, i :channels registre(s) de canal de contacte.',
-    'erasure_receipt_kept'                 => 'Conservat a posta: els identificadors de missatge de Meta. Sense ells, una reentrega de webhook de Meta tornaria a crear aquesta persona.',
+    'erasure_receipt_removed'              => 'Eliminat el :date: aquesta identitat de WhatsApp (:identifiers) de :messages registre(s) de missatge, :channels registre(s) de canal de contacte i :records fitxa/fitxes de client.',
+    'erasure_receipt_kept'                 => 'Conservat i fet il·legible: cada identificador de missatge de Meta se substitueix per una empremta d\'un sol sentit d\'ell mateix. Una reentrega de Meta segueix sense poder recrear aquesta persona, i l\'identificador del qual surt l\'empremta ja no es pot llegir als registres propis d\'aquest mòdul.',
     'erasure_receipt_remains_intro'        => 'Fora de l\'abast d\'aquest mòdul, i on es treu cada cosa:',
     'erasure_receipt_remains_conversations' => 'Les converses i el seu contingut segueixen al FreeScout, amb el telèfon al títol de cada conversa i al remitent de cada missatge; es treuen esborrant aquelles converses des del FreeScout.',
-    'erasure_receipt_remains_customer'     => 'La fitxa del client pot conservar el telèfon en dos llocs. El nom visible a les llistes de converses s\'edita des del FreeScout. Els camps de canal d\'aquella fitxa no: el FreeScout els descarta del seu propi formulari d\'edició, així que no els elimina res, ni el FreeScout ni aquest mòdul.',
+    'erasure_receipt_remains_customer'     => 'El nom de la fitxa del client hi continua, i és el número de telèfon mateix sempre que ningú no hagi reanomenat el contacte, així que surt a totes les llistes de converses. No s\'hi toca perquè reanomenar una fitxa és una decisió de l\'administrador i el formulari d\'edició del FreeScout ja ho fa; el número sí que s\'elimina de la llista de telèfons i dels camps de canal de la fitxa, on aquell formulari no arriba.',
     'erasure_receipt_remains_queue'        => 'Els payloads de webhook que hagin acabat a la cua de treballs fallits del FreeScout poden contenir el text del missatge; es netegen des de la cua.',
     'erasure_receipt_remains_debuglog'     => 'Si el registre detallat ha estat activat alguna vegada, el log de depuració del mòdul conté el text sencer dels missatges i els números de telèfon. La seva retenció només esborra fitxers antics mentre el registre està funcionant, així que els fitxers d\'un període que ja heu desactivat es queden fins que algú els elimini del servidor a mà, i una retenció de 0 conserva tots els fitxers per sempre.',
     'erasure_receipt_remains_portfolios'   => 'Si aquesta persona va escriure des de dos portfolios de Meta diferents sense revelar mai el número, això no es pot resoldre des del mòdul: no hi ha cap registre que connecti els dos, així que només s\'ha pogut eliminar el costat que vau identificar.',

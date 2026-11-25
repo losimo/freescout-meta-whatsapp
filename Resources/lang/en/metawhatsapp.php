@@ -19,8 +19,8 @@ return [
     'phone_number_format'          => 'The phone number must be in international format, e.g. +34600000000.',
     'phone_number_id'              => 'Phone Number ID',
     'phone_number_id_help'         => 'Found in Meta Business Manager → WhatsApp → API Setup.',
-    'waba_id'                      => 'WhatsApp Business Account ID',
-    'waba_id_help'                 => 'WhatsApp Business Account ID from Meta Business Manager.',
+    'waba_id'                      => 'Messaging account ID (formerly WABA ID)',
+    'waba_id_help'                 => 'The value Meta still labels WhatsApp Business Account ID in the App Dashboard. Since September 2026 the same ID identifies your Messaging account, which holds templates, billing and webhook subscriptions. The value has not changed.',
 
     'access_token'                 => 'Access token',
     'app_secret'                   => 'App secret',
@@ -76,6 +76,7 @@ return [
     'account_updated'              => 'WhatsApp account updated.',
     'account_deleted'              => 'WhatsApp account deleted.',
     'account_deleted_mailbox_kept' => 'WhatsApp account deleted. The mailbox was kept because it contains conversations.',
+    'account_deleted_unsubscribe_failed' => 'Meta was not told to stop sending events for this number, so remove the subscription by hand in the Meta App Dashboard. Until then Meta keeps delivering events that this installation refuses.',
 
     // Test connection button + account health snapshot.
     'test_connection_button'       => 'Test connection',
@@ -105,6 +106,7 @@ return [
     // Picker dinàmic de plantilles (issue #2, punt 2 complet).
     'account_inactive_notice'          => 'This WhatsApp channel is currently inactive, so nothing can be sent. Open the channel settings to check the connection and reactivate it.',
     'not_sent_channel_inactive'   => 'Nothing was sent to WhatsApp: this channel is inactive. Once an administrator restores the connection, the message has to be sent again.',
+    'not_sent_channel_inactive_kept' => 'Nothing was sent to WhatsApp: this channel is inactive. An administrator has to restore the connection. This reply is not discarded, so writing it again would send it twice once the connection is back.',
     'core_outdated'               => 'This module is built and tested against FreeScout :minimum and newer, and you are running :current. It keeps working here, but it is not tested on this version, and later FreeScout versions have closed security issues. Updating FreeScout is worth doing.',
     'diagnostics_title'           => 'Module settings',
     'diagnostics_section_log'     => 'Detailed logging',
@@ -138,6 +140,33 @@ return [
     'not_sent_no_phone'           => 'Nothing was sent to WhatsApp: this contact has no phone number on file. The reply is here in FreeScout, but the customer has not received it.',
     'not_sent_attachment_missing' => 'A file was not sent to WhatsApp: the attachment could not be found. Any text in the same reply may have gone out on its own.',
     'not_sent_contact_erased'     => 'Nothing was sent to WhatsApp: this contact\'s WhatsApp identity was erased while the reply was waiting to go out. The reply is here in FreeScout, but the customer has not received it.',
+    'failed_note_attachment'      => 'an attachment',
+    'failed_note_message'         => 'a message with no text',
+
+    // Issue #59: the sender's number is on more than one customer record.
+    'not_sent_several_numbers'    => 'Nothing was sent to WhatsApp: this customer has more than one WhatsApp number on their record and this conversation has no incoming message to say which one to answer. Your reply is here in FreeScout, but the customer has not received it. Open the conversation the customer started, or leave only the right number on their record.',
+    // Issue #60: Meta says the contact changed their phone number.
+    'contact_number_changed'      => 'WhatsApp has told us this contact changed their phone number. The channel link and this conversation have been moved to the new one, so replies here still reach them. Neither number is written in this note, because a note is one of the few places a right-of-erasure request cannot reach.',
+    'customer_matched_several'    => 'This WhatsApp number is also on other customer records (:ids). The conversation was filed under the oldest one. If they are the same person, merge the records; if they are not, the number is on the wrong one.',
+    'not_sent_channel_gone'       => 'Nothing was sent to WhatsApp: the WhatsApp channel of this mailbox was deleted while the reply was waiting to go out. The reply is here in FreeScout, but the customer has not received it.',
+    // T04. Refusals that come back from Meta, or from the module's own
+    // limits, used to leave a row and a log line and nothing the agent
+    // could see. Deliberately not the async_delivery_failed wording, which
+    // says the message was accepted for sending first: for these it was not.
+    'not_sent_window_expired'     => 'Nothing was sent to WhatsApp: the 24-hour customer service window has closed, so Meta refuses free-form messages. Your reply is here in FreeScout, but the customer has not received it. An approved template is the only way to reach them until they write again.',
+    'not_sent_too_large'          => 'A file was not sent to WhatsApp: it is larger than WhatsApp accepts for that kind of file. Any text in the same reply may have gone out on its own.',
+    'not_sent_template_not_configured' => 'Nothing was sent to WhatsApp: this channel has no approved template set up for this message. Your reply is here in FreeScout, but the customer has not received it.',
+    'not_sent_retries_exhausted'  => 'Nothing was sent to WhatsApp: the module kept trying and gave up. Your reply is here in FreeScout, but the customer may not have received it. The server log says what went wrong.',
+    'not_sent_meta_error'         => 'Meta refused to deliver this reply, with error :error. Your reply is here in FreeScout, but the customer may not have received all of it. The server log says what Meta answered.',
+    'not_sent_meta_refused'       => 'Meta refused to deliver this reply without saying why. Your reply is here in FreeScout, but the customer may not have received all of it. The server log says what Meta answered.',
+    // A media failure speaks about the file and says nothing about the rest
+    // of the reply, because what happened to the text depends on whether it
+    // was riding this file: when it was, the whole-reply wording above is
+    // the true one. Three review rounds went into getting that right.
+    'not_sent_file_retries_exhausted' => 'A file was not sent to WhatsApp: the module kept trying and gave up. The server log says what went wrong.',
+    'not_sent_file_meta_error'    => 'A file was not sent to WhatsApp: Meta refused it with error :error. The server log says what Meta answered.',
+    'not_sent_file_meta_refused'  => 'A file was not sent to WhatsApp: Meta refused it without saying why. The server log says what Meta answered.',
+    'not_sent_file_window_expired' => 'A file was not sent to WhatsApp: the 24-hour customer service window has closed, so Meta refuses it. An approved template is the only way to reach the customer until they write again.',
     'account_inactive_banner'      => 'This WhatsApp channel is inactive. Replies written here will not reach the customer until an administrator restores the connection.',
     'templates_section_help' => 'Configure up to five approved templates below. When at least one is filled in, agents see one button per template and nothing else. When none are, agents get a link to browse every template Meta has approved for this account. Administrators always keep that link, since it is a quicker way to check names and languages than WhatsApp Manager.',
     'browse_templates_admin_only' => 'Visible to administrators only.',
@@ -160,6 +189,10 @@ return [
     'webhook_subscribe_failed'     => 'Could not subscribe to Meta webhooks: :error',
 
     'media_attachment_unavailable' => 'The attached file could not be downloaded from WhatsApp.',
+    'inbound_unrenderable'         => 'Unsupported message',
+    'inbound_unrenderable_named'   => 'Unsupported message (:kind)',
+    'inbound_unavailable'          => 'Message not available (error 131060). WhatsApp did not hand this message over; if this number is also in use in the WhatsApp Business app, Meta\'s advice is to look for it there.',
+    'inbound_chat_opened'          => 'Chat opened, no message yet',
     'media_preview_no_caption'     => 'Attachment (:type)',
     'reaction_text'                => 'Reacted: :emoji',
     'reaction_removed'             => 'Removed a reaction',
@@ -169,6 +202,9 @@ return [
     'contacts_shared_empty'        => 'Shared a contact card (no name or phone number in it).',
 
     // Monthly service message counter (Meta's 1 October 2026 pricing change).
+    'email_copy_title'            => 'E-mail copy',
+    'email_copy_enable'           => 'Let agents also send a reply to the customer by e-mail',
+    'email_copy_enable_help'      => 'Off by default. FreeScout offers a checkbox on replies written outside Chat Mode, and it arrives already ticked, so an agent who does not notice it sends the same answer twice: once over WhatsApp and once by e-mail. With this off, the module stops that copy and hides the checkbox. Turn it on if you want that choice available on this channel; the checkbox then works as FreeScout intends, and it is still ticked by default, so tell your agents. The switch only has an effect on FreeScout 1.8.251 and later, and whether the copy actually arrives is your installation\'s outbound mail setup, not this module\'s.',
     'usage_title'            => 'Service messages',
     'usage_enable'           => 'Count the service messages sent from FreeScout',
     'usage_enable_help'      => 'From 1 October 2026 Meta bills the service messages sent inside the 24-hour customer window, with a monthly allowance per business phone number. This counter only sees what left through FreeScout, so if this number is also used elsewhere, the real total at Meta is higher.',
@@ -246,17 +282,19 @@ return [
     'erasure_col_channels'                 => 'Channels',
     'erasure_col_first_last'               => 'First and last record',
     'erasure_col_orphaned'                 => 'Records whose conversation is gone',
+    'erasure_col_channel_rows'             => 'Contact links',
+    'erasure_col_records'                  => 'Customer records carrying the number',
     'erasure_erase_button'                 => 'Erase what we hold',
     'erasure_erase_help'                   => 'This cannot be undone, and it covers every record for this person, not a selection.',
     'erasure_confirm'                      => 'Erase the WhatsApp identity from every record of this person? This cannot be undone.',
     'erasure_receipt_title'                => 'Proof of erasure',
     'erasure_receipt_warning'              => 'This is shown once and is stored nowhere. Copy it or take a screenshot now: leaving this screen loses it for good.',
     'erasure_nothing_to_erase'             => 'There was nothing left to erase under that identifier.',
-    'erasure_receipt_removed'              => 'Removed on :date: this WhatsApp identity (:identifiers) from :messages message record(s), and :channels contact channel record(s).',
-    'erasure_receipt_kept'                 => 'Kept on purpose: Meta\'s own message identifiers. Without them, a webhook redelivery from Meta would recreate this person.',
+    'erasure_receipt_removed'              => 'Removed on :date: this WhatsApp identity (:identifiers) from :messages message record(s), :channels contact channel record(s), and :records customer record(s).',
+    'erasure_receipt_kept'                 => 'Kept, and made unreadable: each of Meta\'s message identifiers is replaced by a one-way fingerprint of itself. A redelivery from Meta still cannot recreate this person, and the identifier the fingerprint came from can no longer be read from this module\'s own records.',
     'erasure_receipt_remains_intro'        => 'Outside this module\'s reach, and where each is removed:',
     'erasure_receipt_remains_conversations' => 'The conversations and their contents stay in FreeScout, with the phone number in each conversation title and in each message sender; remove them by deleting those conversations in FreeScout.',
-    'erasure_receipt_remains_customer'     => 'The customer record may still carry the phone number in two places. The name shown in conversation lists can be edited in FreeScout. The channel fields on that record cannot: FreeScout strips them from its own edit form, so nothing in FreeScout or in this module removes them.',
+    'erasure_receipt_remains_customer'     => 'The name on the customer record is still there, and it is the phone number itself whenever nobody has renamed the contact, so it shows in every conversation list. It is left alone because renaming a record is the administrator\'s decision and FreeScout\'s own edit form does it; the number is removed from the record\'s phone list and channel fields, which that form cannot reach.',
     'erasure_receipt_remains_queue'        => 'Webhook payloads that ended up in FreeScout\'s failed job queue may contain the message text; clear them from the queue.',
     'erasure_receipt_remains_debuglog'     => 'If detailed logging has ever been on, the module\'s debug log holds the full text of the messages and the phone numbers. Its retention only deletes old files while logging is running, so files from a window you have since switched off stay until someone removes them from the server by hand, and a retention of 0 keeps every file forever.',
     'erasure_receipt_remains_portfolios'   => 'If this person wrote from two different Meta portfolios without ever revealing their number, this cannot be resolved from the module\'s side: there is no record connecting the two, so only the side you identified could ever be erased.',

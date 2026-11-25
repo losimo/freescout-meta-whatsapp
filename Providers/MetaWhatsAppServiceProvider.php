@@ -5,6 +5,7 @@ namespace Modules\MetaWhatsApp\Providers;
 use Illuminate\Support\ServiceProvider;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
+use Modules\MetaWhatsApp\Support\IdentityChangeAudit;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -55,6 +56,22 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
             return $channels;
         }, 20, 1);
 
+        // The module's own activity log, offered in the picker an
+        // administrator chooses from under Settings » Alerts (issue #60). The
+        // Logs screen itself lists whatever log names exist in the table, so
+        // this is only about being alertable; without it the rows are
+        // readable but nobody can ask to be told about them.
+        //
+        // The filter is the supported way in, and on 1.8.252 it is the only
+        // one: getAvailableLogs() builds a list that merges the log names
+        // present in the table and then returns the filter applied to the
+        // static list instead, so the merge never reaches the caller.
+        \Eventy::addFilter('activity_log.available_logs', function ($logs) {
+            $logs[] = IdentityChangeAudit::LOG_NAME;
+
+            return $logs;
+        }, 20, 1);
+
         // Nom visible del canal enter a customer_channel (mecanisme del core:
         // CustomerChannel::getChannelName()).
         \Eventy::addFilter('channel.name', function ($name, $channel = null) {
@@ -73,6 +90,43 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
             $this->handleOutboundReplies($conversation, $replies);
         }, 20, 3);
 
+        // Issue #57. Core 1.8.251 (core issue #5799) puts an "Also send reply
+        // to customer by email" checkbox, ticked by default, on the reply
+        // form of every chat conversation whose customer has an e-mail, and
+        // ConversationsController reads it into Thread::META_CHAT_SEND_EMAIL
+        // six lines before firing this hook. SendReplyToCustomer then
+        // dispatches the WhatsApp send above and, with that flag present,
+        // carries on and e-mails the same reply: the customer gets the answer
+        // twice unless the agent unticks the box every single time.
+        //
+        // The stop has to be here and not in the stylesheet, because a
+        // checkbox hidden by CSS is still submitted; hiding it alone would
+        // only take away the agent's ability to untick it. The rule that
+        // hides it is the second layer, so nobody is shown a control that
+        // does nothing.
+        //
+        // The shape is the one the Kapso WhatsApp module settled on, which
+        // MarkoD pointed at when he reported this.
+        \Eventy::addAction('thread.before_save_from_request', function ($thread, $request = null) {
+            $this->dropCoreEmailCopy($thread);
+        }, 20, 2);
+
+        // T01. The core's Mailbox::deleteMailbox() (app/Mailbox.php:1141 in
+        // 1.8.252) destroys every conversation, thread and folder of the
+        // mailbox and only then deletes the mailbox row, which is where
+        // this module's foreign key was stopping it: an error, and a
+        // mailbox left alive with nothing in it. There is no earlier hook
+        // to use. The first one the core offers is this one, fired from
+        // MailboxObserver::deleting(), by which point the content is
+        // already gone. Refusing the deletion up front would need a hook
+        // the core does not have yet.
+        \Eventy::addAction('mailbox.before_delete', function ($mailbox) {
+            $accounts = WhatsAppAccount::where('mailbox_id', (int) $mailbox->id)->get();
+            foreach ($accounts as $account) {
+                \Modules\MetaWhatsApp\Support\ChannelTeardown::forAccount($account);
+            }
+        }, 20, 1);
+
         // UX clean-up on WhatsApp channel pages: the core's e-mail artefacts
         // (the Cc/Bcc toggle in the reply form, the technical address under
         // the mailbox name in the sidebar) say nothing on a channel that has
@@ -86,13 +140,32 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
         // an instant, a flash, before the <style> at the end of the page
         // arrived (found through issue #17).
         \Eventy::addAction('layout.head', function () {
-            if ($this->currentPageIsWhatsAppMailbox()) {
-                echo '<style>#toggle-cc { display: none !important; }</style>';
+            $account = $this->currentPageWhatsAppAccount();
+            if ($account) {
+                // Three selectors and not one: the core reveals the fields
+                // by a path that does not go through the link. Restoring a
+                // draft that carries cc or bcc makes it click `#toggle-cc`
+                // itself, and a hidden element still answers a programmatic
+                // click, so hiding only the link left the containers
+                // reachable (issue #17, reopened twice on that). `.field-cc`
+                // is carried by both the Cc and the Bcc block, `.cc-toggler`
+                // is the wrapper the link sits in. The core does the same to
+                // itself in chat mode.
+                echo '<style>#toggle-cc, .cc-toggler, .field-cc { display: none !important; }</style>';
                 echo $this->sidebarMailboxEmailCss();
                 echo $this->sidebarPhoneMeta();
                 echo '<style>.metawhatsapp-window-clock-open { color: #767676; } '
                     .'.metawhatsapp-window-clock-warning { color: #8a6d3b; }</style>';
                 echo $this->hideSidebarNewConversationCss();
+                // Second layer of issue #57: where the server drops the
+                // flag, the checkbox would be a control that does nothing,
+                // so it is hidden too. Where the channel allows the e-mail
+                // copy, the checkbox is the control the agent uses and has
+                // to stay visible. `.conv-chat-email` is the whole
+                // form-group, label included.
+                if (!$account->allow_core_email_copy) {
+                    echo '<style>.conv-chat-email { display: none !important; }</style>';
+                }
             }
 
             if (\Route::currentRouteName() == 'dashboard') {
@@ -298,6 +371,60 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
     }
 
     /**
+     * Issue #57: take the core's "also send this reply by e-mail" flag off a
+     * reply that belongs to a WhatsApp mailbox, so SendReplyToCustomer stops
+     * after dispatching the WhatsApp send instead of sending the same text
+     * again by e-mail.
+     *
+     * Keyed on the thread's own conversation and not on the request or the
+     * page, because this hook fires on every reply in the install and both
+     * of the core's call sites have to get the same answer: the reply path
+     * (ConversationsController:1251 in 1.8.252) and the per-recipient copies
+     * of a new conversation (:1410). The second should be unreachable here,
+     * since this module refuses starting a conversation in a WhatsApp
+     * mailbox, and answering for it costs a query it will never run.
+     *
+     * Silent on a core older than 1.8.251, which has neither the checkbox nor
+     * the constant. That silence is the risk the tripwire in
+     * CoreChatEmailCopyTest covers: if the core renames the constant while
+     * keeping the checkbox, this guard would quietly stop guarding.
+     */
+    protected function dropCoreEmailCopy($thread): void
+    {
+        if (!$thread instanceof \App\Thread
+            || !defined(\App\Thread::class . '::META_CHAT_SEND_EMAIL')
+        ) {
+            return;
+        }
+
+        $mailboxId = (int) optional($thread->conversation)->mailbox_id;
+        if (!$mailboxId) {
+            $mailboxId = (int) \App\Conversation::where('id', (int) $thread->conversation_id)
+                ->value('mailbox_id');
+        }
+
+        if (!$mailboxId) {
+            return;
+        }
+
+        $account = WhatsAppAccount::where('mailbox_id', $mailboxId)->first();
+        if (!$account) {
+            return;
+        }
+
+        // The channel can be told to allow it. The core's own default is to
+        // offer this checkbox, so a module that refuses it for everyone is
+        // overruling the core rather than fixing the defect, which was the
+        // box arriving ticked (#57). Off by default: the accident stays
+        // closed for an installation that never thinks about it.
+        if ($account->allow_core_email_copy) {
+            return;
+        }
+
+        $thread->unsetMeta(\App\Thread::META_CHAT_SEND_EMAIL);
+    }
+
+    /**
      * Issue #45. The account's phone number, for sidebar-phone.js to put where
      * the technical address used to be.
      *
@@ -346,6 +473,16 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
      * `btn-group-justified`, which lays its children out as table cells, so a
      * marker element would claim a column of its own and skew the row. The
      * rule keys on markup the core already writes.
+     *
+     * Inert from FreeScout 1.8.252, and deliberately kept. That release
+     * gates the link on `$mailbox->isConnected()` in
+     * resources/views/mailboxes/sidebar_menu_view.blade.php, so on a
+     * WhatsApp mailbox it is no longer rendered and this rule matches
+     * nothing. It is not behind a version check on purpose: the module's
+     * floor is still 1.8.234, so the rule is needed from there to 1.8.251
+     * anyway, and a check could misread a patched template and bring the
+     * button back on an install where the route refuses it regardless. The
+     * rule goes away on its own when the floor rises past 1.8.251.
      *
      * Deliberately only this one link. Hiding the whole strip when it has
      * nothing left (an agent without permission to see the settings button)
@@ -435,11 +572,47 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
 
     protected function handleOutboundReplies($conversation, $replies)
     {
-        $account = WhatsAppAccount::where('mailbox_id', $conversation->mailbox_id)
-            ->where('is_active', true)
-            ->first();
+        $account = WhatsAppAccount::where('mailbox_id', $conversation->mailbox_id)->first();
         if (!$account) {
-            return; // Conversa chat d'un altre canal.
+            return; // A chat conversation of some other channel.
+        }
+
+        // T28. The lookup used to ask for is_active = true, so a channel an
+        // administrator had switched off took the return above, the one that
+        // means "not ours". It is ours, stopped. Every refusal this module
+        // knows how to report lives inside the outbound jobs, and none of
+        // them is dispatched from here, so the agent wrote a reply, pressed
+        // send, saw it in the conversation, and nothing happened anywhere:
+        // no note, no log, no row.
+        //
+        // No failed row is written on purpose. Writing one would also stop
+        // these replies from being re-dispatched when the channel comes
+        // back, which is a different question with a real trade-off (a
+        // backlog delivered days late and out of context, against replies
+        // that are never sent at all unless the agent sends them again).
+        // That one is our finding 4 and belongs to its own ticket, decided
+        // rather than arrived at as a side effect.
+        //
+        // Its own note, and not the one the jobs use. The core hands this
+        // hook every message thread of the conversation and not only the
+        // new one (core, app/Listeners/SendReplyToCustomer.php:41 in
+        // 1.8.252), and the loop below dispatches any reply with no row of
+        // its own, so a reply refused here does go out once the channel is
+        // back and the agent writes again. The jobs' note asks the agent to
+        // send the message again, which is right where a failed row was
+        // written and nothing will re-dispatch it, and on this path it asked
+        // for the duplicate: the customer would get the same answer twice.
+        if (!$account->is_active) {
+            \Log::error('[MetaWhatsApp] Reply not sent: the channel is inactive', [
+                'conversation_id' => $conversation->id,
+                'account_id'      => $account->id,
+            ]);
+            \Modules\MetaWhatsApp\Support\OutboundGuard::noteRefusal(
+                $this->firstPublishedMessage($replies),
+                'metawhatsapp::metawhatsapp.not_sent_channel_inactive_kept'
+            );
+
+            return;
         }
 
         // Destinatari: últim inbound de la conversa; fallback customer_channel.
@@ -447,10 +620,35 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
             ->where('direction', \Modules\MetaWhatsApp\Models\WhatsAppMessage::DIRECTION_INBOUND)
             ->orderBy('id', 'desc')
             ->first();
-        $phone = $lastInbound->contact_phone
-            ?? \App\CustomerChannel::where('customer_id', $conversation->customer_id)
+        $phone = $lastInbound->contact_phone ?? null;
+
+        if (!$phone) {
+            // El fallback agafava la primera fila que trobava. Des del #59 un
+            // client pot tenir més d'un número de WhatsApp, i triar-ne un
+            // voldria dir lliurar la resposta a algú a qui l'agent no
+            // escrivia, sense que res a la pantalla ho digués. Amb diversos
+            // números i cap missatge entrant que n'assenyali un, el mòdul
+            // s'absté.
+            $numbers = \App\CustomerChannel::where('customer_id', $conversation->customer_id)
                 ->where('channel', WhatsAppAccount::CHANNEL)
-                ->value('channel_id');
+                ->pluck('channel_id');
+
+            if ($numbers->count() === 1) {
+                $phone = $numbers->first();
+            } elseif ($numbers->count() > 1) {
+                \Log::error('[MetaWhatsApp] Reply not sent: the customer has several WhatsApp numbers and the conversation has no inbound message to choose one', [
+                    'conversation_id' => $conversation->id,
+                    'numbers'         => $numbers->count(),
+                ]);
+                \Modules\MetaWhatsApp\Support\OutboundGuard::noteRefusal(
+                    $this->firstPublishedMessage($replies),
+                    'metawhatsapp::metawhatsapp.not_sent_several_numbers'
+                );
+
+                return;
+            }
+        }
+
         if (!$phone) {
             \Log::error('[MetaWhatsApp] Reply without recipient phone, not sent', [
                 'conversation_id' => $conversation->id,
@@ -495,13 +693,37 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
 
             // Multimèdia (A3): un missatge de WhatsApp per adjunt (Meta no
             // permet més d'un objecte multimèdia per missatge). El text de
-            // la resposta viatja com a caption del primer adjunt, tret que
-            // sigui audio (Meta no admet caption en audio): en aquest cas
-            // el text es despatxa a part.
+            // la resposta viatja com a caption del primer adjunt.
+            //
+            // Two reasons it cannot: Meta takes no caption on audio, and a
+            // caption over MAX_CAPTION characters has the whole message
+            // refused. Both end the same way, with the text dispatched as a
+            // message of its own, so they are one condition and they are
+            // decided here.
+            //
+            // The length rule lives here and not inside the media job, which
+            // is where the review found it: there it ran before the upload,
+            // and a transient error brought the worker back with the caption
+            // restored from the serialized payload, so the text could be
+            // dispatched twice or, if the first attempt died earlier still,
+            // never. Here it is decided once per reply, from the thread, with
+            // no retry around it.
             $text         = trim(\Helper::htmlToText($fresh->body));
             $firstIsAudio = \Modules\MetaWhatsApp\Jobs\SendWhatsAppMedia::mediaCategory($attachments->first()->mime_type) === 'audio';
+            $textRides    = $text !== ''
+                && !$firstIsAudio
+                && mb_strlen($text) <= \Modules\MetaWhatsApp\Jobs\SendWhatsAppMedia::MAX_CAPTION;
 
-            if ($text !== '' && $firstIsAudio
+            // Deliberately without a window check of its own, after the
+            // fourth review round showed what one costs here. Deciding it in
+            // the request rather than in the job takes a snapshot: with the
+            // window shut no text job was queued, and if the customer wrote
+            // in before the media job ran, the file went out and the agent's
+            // words were dropped with nothing to say so. It would also make
+            // the module stricter than Meta on an administrator's own margin,
+            // refusing a text that Meta might still have taken. Meta decides,
+            // and its refusal leaves a note like any other.
+            if ($text !== '' && !$textRides
                 && !\Modules\MetaWhatsApp\Models\WhatsAppMessage::where('thread_id', $fresh->id)
                     ->where('direction', \Modules\MetaWhatsApp\Models\WhatsAppMessage::DIRECTION_OUTBOUND)
                     ->whereNull('attachment_id')
@@ -519,7 +741,7 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
                     continue; // Ja enviat (o fallit definitivament).
                 }
 
-                $caption = ($index === 0 && $text !== '' && !$firstIsAudio) ? $text : null;
+                $caption = ($index === 0 && $textRides) ? $text : null;
 
                 \Modules\MetaWhatsApp\Jobs\SendWhatsAppMedia::dispatch($account->id, $fresh->id, $phone, $attachment->id, $caption);
             }

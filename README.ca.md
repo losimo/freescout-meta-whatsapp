@@ -27,7 +27,7 @@ El projecte és públic i porta en ús real de producció des de la v1.0, iteran
 Cinc passos des d'una instal·lació de FreeScout nova fins a tenir un canal de WhatsApp funcionant. Cada pas enllaça amb el detall complet més avall — és el camí més curt, no un substitut.
 
 1. **Instal·la el mòdul.** Activa **MetaWhatsApp** des de Manage → Modules (o les tres comandes `artisan` si treballes des de la línia de comandes). Vegeu [Instal·lació](#installació).
-2. **Prepara Meta.** Necessites una App de tipus Business amb el producte WhatsApp afegit, un número de telèfon registrat, i quatre valors de l'App Dashboard: **Phone Number ID**, **WABA ID**, **Access Token**, **App Secret**. Vegeu [Requisits previs a Meta](#requisits-previs-a-meta) — en particular, genera un token permanent en lloc del de 24 hores que Meta mostra per defecte.
+2. **Prepara Meta.** Necessites una App de tipus Business amb el producte WhatsApp afegit, un número de telèfon registrat, i quatre valors de l'App Dashboard: **Phone Number ID**, **ID del compte de missatgeria** (el camp que Meta encara anomena **WABA ID**), **Access Token**, **App Secret**. Vegeu [Requisits previs a Meta](#requisits-previs-a-meta) — en particular, genera un token permanent en lloc del de 24 hores que Meta mostra per defecte.
 3. **Afegeix el canal a FreeScout.** Manage → WhatsApp → Add account, enganxa els quatre valors, desa. Vegeu [Configuració del canal → A FreeScout](#a-freescout).
 4. **Apunta Meta cap al webhook.** Enganxa l'URL del webhook i el verify token que la pàgina del compte t'acaba de donar a la pantalla de configuració de Webhook de Meta, i activa el camp `messages`. Si a més voleu que s'ompli el panell d'esdeveniments del compte, activeu-hi també `message_template_status_update` i `template_category_update`: sense ells Meta no envia res i aquell panell es queda buit per molt que l'activeu al FreeScout. Vegeu [Configuració del canal → A Meta](#a-meta).
 5. **Envia un missatge real** al número i confirma que crea una conversa a FreeScout, després respon des de FreeScout i confirma que arriba al telèfon.
@@ -90,6 +90,21 @@ Queda fora d'abast:
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 - Vincular un número pel protocol no oficial de dispositiu acompanyant del WhatsApp Web, tal com fan alguns clients d'escriptori. No necessita cap aprovació de la Cloud API, que és justament el que el fa llaminer, i queda fora d'abast a posta: el protocol està fet per enginyeria inversa, Meta el pot trencar quan vulgui, i fer-lo servir pot acabar amb el número suspès. En un compte personal aquella és l'aposta de qui l'assumeix. En la línia d'atenció d'una empresa, una suspensió atura totes les converses de cop, així que el mòdul no correrà aquell risc en nom vostre.
 
+## Novetats a la v3.0.0
+
+- **Identificadors que deixen de ser llegibles.** Els ids de missatge de Meta porten el número de telèfon a dins; ara una supressió el substitueix per una empremta d'un sol sentit, i una migració fa el mateix a les files que ja havien esborrat versions anteriors. És per això que el primer dígit es mou: el significat de dades desades ha canviat. (La pantalla de supressió va sortir a la v2.2.0.)
+- **La pantalla de supressió arriba a dues coses que se li escapaven**: els enllaços de contacte que queden quan s'esborra un canal o la seva bústia, dels quals responia que no hi havia res, i el número a la llista de telèfons i als camps de canal de la fitxa del client.
+- **La finestra de 24 hores es compta des de l'hora que Meta registra**, i no des del moment en què el treballador de la cua va escriure la fila. Cada retard entre les dues feia semblar la finestra més oberta del que era.
+- **Vuit camins que refusaven enviar una resposta no deixaven res a la conversa.** Tots deixen ara una nota que l'agent pot veure, inclosa una resposta que mor perquè el canal està apagat, que abans no deixava rastre enlloc.
+- **El text de l'agent ja no es perd amb l'adjunt que el portava**, i un fitxer d'un subtipus que WhatsApp no accepta s'envia com a document, així que arriba en lloc de ser rebutjat com la imatge o l'àudio que s'anava a enviar.
+- **Un missatge de WhatsApp d'un número que el FreeScout ja coneix s'arxiva sota aquell client** en lloc de crear-ne un segon, i quan Meta avisa que un contacte ha canviat de número el mòdul ho segueix: una resposta no va a un número que el seu propietari ha deixat, i un número que l'operadora reassigni més tard no aterra a la fitxa del propietari anterior.
+- **Esborrar un canal ja no atura l'entrada dels altres números del mateix compte de Meta.** La crida que treu la subscripció del webhook és de tot el compte, així que amb dos números sota una WABA se'n portava l'altre en silenci.
+- **Un missatge d'un tipus que el mòdul no pot dibuixar arriba ara a la conversa** en lloc de caure al log, i compta per a la finestra com qualsevol altre.
+- **Un interruptor de còpia per correu per canal**, desactivat per defecte, per a la casella que el FreeScout 1.8.251 va afegir i que enviava la mateixa resposta dues vegades.
+- Un client que crea el mòdul s'anomena ara amb el seu número de telèfon, o amb el seu identificador d'àmbit de negoci, i mai amb el nom de perfil de Meta.
+
+La major part d'aquesta versió surt de 41 tiquets que va obrir [@MarkoD](https://github.com/MarkoD) després de llegir el codi. La llista completa és al [CHANGELOG](CHANGELOG.md).
+
 ## Novetats a la v2.4.0
 
 - **El nom de la bústia a la barra lateral ara porta a sota el número de telèfon del canal**, on una bústia de WhatsApp no ensenyava res (#45). El mòdul amagava l'adreça tècnica amb CSS, i això encongia la capçalera 27px, cosa que deixava mig tapada la icona del mòdul oficial Mailbox Icons en passar-hi el ratolí. Reportat amb captures d'abans i després per [@MarkoD](https://github.com/MarkoD).
@@ -104,14 +119,6 @@ Queda fora d'abast:
 - **Correcció: els agents ara reben avís dels missatges entrants** (#46). No el rebien en cap versió d'aquest mòdul. Ni correu, ni campaneta, ni avís del navegador, i res al registre que ho digués. El listener del FreeScout només desa l'esdeveniment en un búfer, i el core buida aquell búfer en dos llocs, i cap dels dos corre dins d'un worker de cues, que és on aquest mòdul processa els webhooks. Reportat amb el diagnòstic sencer per [@MarkoD](https://github.com/MarkoD).
 - **Podeu triar de qui vénen les notes automàtiques del mòdul** (#43). Deixeu-ho sense marcar i no canvia res: la nota porta l'agent de qui parla. Trieu un usuari, per exemple un que creeu i anomeneu Sistema o WhatsApp, i les notes portaran aquell usuari, cosa que evita que el FreeScout ensenyi aquella nota a un agent com si l'hagués escrita ell mateix. Si esborreu aquell usuari més endavant, les notes tornen a portar l'agent.
 - L'avís de finestra caducada ja no diu que Meta no admeti enviar una plantilla a un contacte de qui només se'n sap l'ID de WhatsApp. Meta l'accepta com a destinatari; aquest mòdul encara no ho ha construït, i ara diu quin dels dos és el límit.
-
-## Novetats a la v2.2.0
-
-- **Una pantalla per atendre una petició de dret de supressió.** Cerqueu el que el mòdul guarda d'una persona pel número de telèfon o per l'ID de WhatsApp, elimineu-ho, i endueu-vos-en un comprovant d'un sol ús que a més diu què queda fora de l'abast del mòdul i on s'elimina cadascuna d'aquelles coses. Un missatge a la cua pendent d'enviar-se a un contacte eliminat es refusa en lloc de lliurar-se, i ho deixa dit a la conversa. Això tanca un forat que el mòdul mateix ja documentava: la seva taula no es netejava mai en esborrar un client o una conversa al FreeScout, així que un administrador podia creure que havia atès una petició de supressió mentre el número de telèfon seguia allà.
-- **Iniciar una conversa es refusa en una bústia de WhatsApp** (#44). El botó "New Conversation" de la barra lateral ja no hi surt, la ruta que hi ha darrere es refusa, i el Clone també, que crea una conversa sense arribar a ensenyar cap formulari. Aquell formulari no podia funcionar mai aquí, perquè la Cloud API només permet respondre dins de la finestra que va obrir el client o enviar una plantilla aprovada; fer-lo servir produïa una conversa que semblava desada mentre no s'enviava res ni es registrava res. Ara el refús s'explica en lloc de rebotar en silenci.
-- **Correcció**: un missatge entrant ja no acaba dins d'una conversa creada a mà per un agent (#44). La conversa que es reutilitza ha de ser de xat, cosa que és també el que protegeix les instal·lacions que ja arrosseguen una d'aquelles.
-- **Les notes automàtiques porten la cara de l'agent de qui parlen** (#43): una resposta refusada o un lliurament fallit es veuen com qualsevol altra nota en lloc de sortir sense avatar. Quan no hi ha autor resoluble, la nota segueix sortint igual que abans.
-- El README ara explica per què aquest mòdul no vincularà un número pel protocol no oficial de dispositiu acompanyant del WhatsApp Web, i el CONTRIBUTING diu qui manté cada idioma.
 
 Les versions anteriors són a la [pàgina de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -188,13 +195,26 @@ Des de **Gestionar → WhatsApp → Afegeix compte**:
 
 1. Introdueix el **nom del canal**.
 2. Introdueix el **número de telèfon** en format E.164 (`+34...`).
-3. Omple **Phone Number ID**, **WABA ID**, **Access Token** i **App Secret**.
+3. Omple **Phone Number ID**, **ID del compte de missatgeria**, **Access Token** i **App Secret**.
+
+> **Sobre el nom.** Meta està partint el compte de WhatsApp Business en un **WhatsApp account**, que conté un número de telèfon, i un **compte de missatgeria**, que conté les plantilles, la facturació i les subscripcions de webhook. El teu WABA ID d'abans continua com a identificador del compte de missatgeria: el valor no canvia, i tampoc no canvia res del que el mòdul en fa. Les pantalles de Meta encara diuen WABA ID, així que és el nom que es fa servir més avall quan t'indica on mirar.
 4. Copia el **token de verificació** generat automàticament.
 5. Copia la **URL del webhook** mostrada pel mòdul (sempre té la forma `https://el-teu-domini/meta-whatsapp/webhook`, compartida per tots els comptes).
 6. Tria si vols:
    - crear una bústia nova (recomanat), o
    - associar-ne una d'existent compatible (sense servidors de correu configurats i no vinculada a cap altre compte WhatsApp; el desplegable només mostra les vàlides).
 7. Desa el compte.
+
+### Treure un canal
+
+Des de **Gestiona → WhatsApp**, esborrar un canal també el treu de la banda de Meta: el mòdul demana a Meta que cancel·li la subscripció del webhook d'aquell número, i els esdeveniments deixen d'arribar. Si Meta ho refusa, per exemple perquè el token ha caducat, el canal s'esborra igualment i el mòdul t'avisa que treguis la subscripció a mà al App Dashboard.
+
+Dues coses se'n van amb el canal, i totes dues a posta:
+
+- **Els registres de missatges del mòdul d'aquell canal.** Contenen el telèfon del contacte i els identificadors de missatge de Meta, i un cop el canal no hi és no es poden arribar des de cap pantalla, així que s'esborren en lloc de quedar-se. Les converses es queden al FreeScout, intactes.
+- **Tot el que el mòdul afegeix a la bústia.** La bústia torna a ser una bústia normal: tornen els camps Cc i Bcc, sota el nom hi surt l'adreça tècnica en lloc del telèfon, torna el botó de conversa nova, i desapareixen el compte enrere de la finestra i el botó de plantilles. No hi ha res trencat; simplement ja no és una bústia de WhatsApp.
+
+Esborrar la **bústia** sencera, des de la configuració de bústies del FreeScout, esborra el canal amb ella. Una resposta que ja estigués encolada quan passa qualsevol de les dues coses no s'envia, i l'agent rep una nota a la conversa dient-ho.
 
 ### A Meta
 
@@ -214,10 +234,28 @@ Quan la configuració és correcta, un missatge enviat al número de WhatsApp cr
 ## Funcionament diari
 
 - Els missatges entrants creen una conversa nova o s'afegeixen a la conversa activa del mateix client.
-- La identitat del client es resol pel seu telèfon.
+- La identitat del client es resol pel seu telèfon, tal com s'explica més avall.
 - Respondre des de FreeScout envia la resposta a WhatsApp **després dels 15 segons** de la finestra de desfer del core.
 - Si l'agent desfà la resposta dins d'aquest marge, el missatge no s'envia.
 - Les **notes internes no s'envien mai** al client.
+
+### A qui s'atribueix el missatge
+
+Un missatge entrant busca la persona que hi ha darrere del número en aquest ordre:
+
+1. Un client que ja tingui aquell número com a canal de WhatsApp.
+2. Un client que ja tingui aquell número a la seva fitxa, importat o escrit per un agent. El mòdul li afegeix el canal de WhatsApp i no toca res més de la fitxa.
+3. Si no, un client nou, anomenat amb el número de telèfon, o amb l'identificador d'àmbit de negoci quan Meta no envia número.
+
+El pas 2 compara els dígits de manera exacta, així que `+34650387943`, `+34 650 38 79 43` i `0034650387943` són el mateix remitent. Un número desat **sense el prefix de país no hi casa, i és volgut**: `650387943` pot ser aquell mòbil espanyol o la cua d'un número d'un altre lloc, i penjar una conversa de la persona equivocada és una avaria que no es veu. Deseu els números en E.164 (`+34650387943`) si voleu que hi casin.
+
+FreeScout no exigeix que els telèfons siguin únics. Quan diversos clients tenen el mateix número, la conversa va a la fitxa més antiga i una nota interna anomena les altres, perquè un agent les pugui fusionar.
+
+El nom de perfil de Meta no es fa servir a posta. Sovint són inicials o un sobrenom, així que sembla un nom real sense ser-ho, mentre que un client que encara es diu `+34...` es llegeix d'un cop d'ull com algú que ningú no ha casat amb cap fitxa. Un nom escrit per una persona tampoc no es toca mai: aquest mòdul només escriu el nom d'un client que crea ell.
+
+**Si el contacte canvia de número de telèfon**, WhatsApp ho diu i el mòdul ho segueix: l'enllaç i els missatges d'aquella persona es mouen al número nou, així que la seva història es queda en un sol lloc i les respostes li continuen arribant. Una nota interna ho diu a l'agent, sense escriure cap dels dos números. Si el número nou ja és d'un altre client, no es mou res, perquè fusionar dues persones no és una decisió que prengui un mòdul tot sol.
+
+**Una persona amb dos números de WhatsApp** funciona: els dos números apunten al mateix client i cadascun té la seva conversa. És el que evita que una resposta vagi al número equivocat, perquè el destinatari és l'últim missatge entrant de la conversa mateixa. Si un agent respon en una conversa que no té cap missatge entrant i el client té diversos números, el mòdul no endevina: s'absté i ho diu a la conversa.
 
 ### Finestra de 24 hores
 
@@ -230,6 +268,8 @@ Si s'intenta respondre fora de finestra:
 - El client no rep cap resposta.
 
 Des de la v1.3.0, una finestra caducada es pot recuperar manualment amb una plantilla HSM pre-aprovada — vegeu més avall.
+
+El compte enrere va amb l'hora que **Meta** registra del missatge del client, no amb l'hora en què va arribar al FreeScout. Les dues es separen sempre que hi ha un retard: la cua aturada, un job reintentant, o Meta reentregant després que el vostre endpoint hagi estat inabastable. Comptar des de l'arribada ensenyava una finestra més oberta que la real, que és la direcció perillosa: el compte enrere semblava sa i la resposta tornava amb un `131047` sense que el client rebés res.
 
 ### Què cobra Meta
 
@@ -276,6 +316,16 @@ L'enviament sortint de multimèdia segueix la mateixa regla que el text: només 
 
 El multimèdia s'emmagatzema amb l'emmagatzematge local ja existent de FreeScout — no s'introdueix cap adaptador d'emmagatzematge nou.
 
+### Enviar la resposta també per correu
+
+El FreeScout ensenya una casella, **Envia també la resposta al client per correu**, a les respostes escrites en una conversa de xat fora del mode xat, i arriba ja marcada. En una bústia de WhatsApp això vol dir que la mateixa resposta pot sortir dues vegades, una per WhatsApp i una per correu, sense que l'agent ho hagi triat.
+
+El mòdul ho atura per defecte i amaga la casella. Si vols aquesta opció en un canal, activa **Còpia per correu** a la seva configuració: el mòdul s'aparta i la casella funciona com el FreeScout vol. Segueix venint marcada per defecte quan apareix, o sigui que val més avisar els agents abans d'activar-ho.
+
+Hi ha dues condicions. L'interruptor només té efecte a partir del FreeScout 1.8.251, i que la còpia arribi de debò depèn de la configuració de sortida de la teva instal·lació i no de res que faci aquest mòdul. I un parany que val més saber abans de començar, assenyalat per [@MarkoD](https://github.com/MarkoD): el formulari del canal només ofereix bústies sense connexió de correu configurada, així que si vols enganxar el WhatsApp a una bústia des de la qual també vols enviar correu, **associa-la primer i configura la connexió després**, o no la trobaràs a la llista.
+
+El core està afegint els seus propis controls per a la mateixa casella. `APP_CHAT_CONVERSATION_REPLY_BY_EMAIL=false` al `.env` la treu de tot arreu, i la resta de la condició és que la conversa no estigui en mode Chat, que el client tingui adreça de correu i que la bústia tingui la sortida activa. Una versió anterior d'aquesta línia deia que la sortida activa volia dir tenir una connexió de correu configurada; no ho vol dir, i aquí la diferència importa: el mètode de sortida per defecte del FreeScout és PHP mail, que compta com a actiu sense configurar res, així que a una bústia de WhatsApp la casella sí que surt. L'interruptor d'aquest mòdul és el que la treu. El canvi és a la branca master del FreeScout a data del 25 de novembre del 2026, posterior a la 1.8.252, així que arribarà a la versió següent.
+
 ## Dades personals
 
 [Què guarda aquest mòdul dels vostres clients, on ho guarda, i què s'esborra quan elimineu un client o una conversa](docs/personal-data.md). També hi diu clarament els forats que té, inclosos els tres llocs on l'esborrat no arriba: el fitxer de registre detallat, la cua de treballs del core, i les dues columnes de canal que el FreeScout escriu en un client i no neteja mai. El document és en anglès.
@@ -284,7 +334,8 @@ El multimèdia s'emmagatzema amb l'emmagatzematge local ja existent de FreeScout
 
 Aquestes limitacions són conegudes i acceptades dins l'abast actual de funcionalitats:
 
-- Els tipus de missatge diferents de text, multimèdia (incl. stickers), botó, ubicació, reacció i contactes (p. ex. `order`, respostes de llista `interactive`) es continuen descartant (es registren al log, no es mostren a la conversa).
+- Els tipus de missatge diferents de text, multimèdia (incl. stickers), botó, ubicació, reacció i contactes (p. ex. `order`, respostes de llista `interactive`, o qualsevol cosa que Meta entregui com a `unsupported`) no es poden representar. Des de la v3.0.0 ja no es descarten: el missatge arriba a la conversa com una entrada **Missatge no compatible**, amb el tipus quan Meta l'anomena, i compta per a la finestra de 24 hores com qualsevol altre. Apareix on hi aniria el missatge del client, perquè és això el que és, així que també reobre una conversa tancada i avisa l'agent assignat. El que ha enviat de debò només es veu al WhatsApp. Els avisos *sobre* un missatge (esborrar-lo, editar-lo, fixar-lo) no es mostren ni reobren res.
+- Un client que escriu amb un **nom d'usuari** de WhatsApp i sense telèfon disponible queda arxivat correctament, però **no se li pot respondre**: aquest mòdul envia només per número de telèfon. La resposta es refusa amb una nota visible a la conversa. Meta documenta l'enviament a un identificador d'àmbit de negoci; aquest mòdul encara no ho implementa.
 - La descàrrega de multimèdia entrant no té validació de mida pròpia del mòdul més enllà de la que Meta ja aplica abans d'entregar el webhook.
 - No hi ha vista de galeria o carrusel per a imatges/vídeos — cada adjunt apareix com una fila/miniatura independent, igual que qualsevol altre adjunt de FreeScout.
 - Fins a 5 plantilles configurades estàticament per compte, o qualsevol plantilla APPROVED obtinguda en viu via el selector dinàmic (amb variables `{{n}}`); sense sincronització/cache automàtica de la llista estàtica des del catàleg de Meta.
@@ -319,7 +370,7 @@ Abans de fer el pas de proves a producció:
 | Meta no verifica el webhook | URL no accessible públicament, certificat invàlid o verify token incorrecte |
 | Meta retorna 403 als POST del webhook | `phone_number_id` o WABA desconegut, compte inactiu o signatura HMAC invàlida |
 | Els missatges entren però no surten | Error `131047` per finestra de 24 hores o error `190` per token caducat |
-| El compte surt com a `⚠ Bústia desvinculada` | La bústia associada s'ha eliminat o ja no és resoluble |
+| El compte surt com a `⚠ Bústia desvinculada` | Falta la fila de la bústia. Esborrar una bústia ja no deixa aquest estat, perquè el canal se'n va amb ella, així que només es veurà després d'una restauració o d'un canvi fet directament a la base de dades |
 | No es processa res | El worker de cues està aturat (`php artisan queue:work`) |
 | **Gestionar → WhatsApp** dona "pàgina no trobada" | Les rutes del mòdul no arriben al FreeScout. Obriu `/meta-whatsapp/webhook`: si respon, les rutes són vives i el problema és un altre; si també dona 404, no hi arriben. Tingueu present que `/meta-whatsapp` és una ruta i no una carpeta, així que no hi ha res a buscar al disc, i que un 404 no s'escriu mai a cap registre, per tant un registre buit no vol dir res |
 | Un fix d'una actualització del mòdul no sembla aplicar-se | El worker de cues continua executant codi antic en memòria. Reiniciar el cron no el recarrega; cal `php artisan queue:restart` |

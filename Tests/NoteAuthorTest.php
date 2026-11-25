@@ -392,4 +392,40 @@ class NoteAuthorTest extends TestCase
         $this->assertEquals($assignee->id, $note->user_id);
         $this->assertNotEquals($agent->id, $note->user_id, 'the note carried the agent, not the assignee');
     }
+
+    // ------------------------------------- the author of nobody's note (#55)
+
+    /**
+     * Issue #55. The core's print view reads the author's name without
+     * checking for null (resources/views/conversations/partials/thread.blade.php:89,
+     * inside @if (\Helper::isPrint())), so a note with no author at all
+     * takes the whole page down with a call on null.
+     *
+     * Some of this module's notes concern no agent whatsoever: the one that
+     * says a customer matched several records, and the one that says Meta
+     * reported a new number. Both reach forNote(null), which used to answer
+     * null, which is the authorless note the reporter printed.
+     *
+     * The replacement is the core's own expression for "the installation
+     * itself" and not user id 1: nothing creates that id, an administrator
+     * can be demoted, and a deleted user keeps their row.
+     */
+    public function test_a_note_that_concerns_no_agent_still_gets_an_author()
+    {
+        $this->assertNull(NoteAuthor::configuredUserId(), 'the setting leaked from another test');
+
+        $author = NoteAuthor::forNote(null);
+
+        $this->assertNotNull($author, 'a note with no author breaks the core print view');
+        $this->assertEquals(User::getSuperAdmin()->id, $author);
+    }
+
+    /** The administrator's choice still wins over the installation's admin. */
+    public function test_the_chosen_user_still_wins_for_a_note_that_concerns_no_agent()
+    {
+        $system = $this->makeUser('Systemuser');
+        NoteAuthor::setUserId($system->id);
+
+        $this->assertEquals($system->id, NoteAuthor::forNote(null));
+    }
 }

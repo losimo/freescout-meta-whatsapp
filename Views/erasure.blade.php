@@ -34,6 +34,7 @@
                                 'identifiers' => implode(', ', $receipt['identifiers']),
                                 'messages'    => $receipt['messages'],
                                 'channels'    => $receipt['channel_rows'],
+                                'records'     => $receipt['records'],
                                 'date'        => now()->format('Y-m-d H:i'),
                             ]) }}
 
@@ -91,6 +92,20 @@
                             <tr>
                                 <th>{{ __('metawhatsapp::metawhatsapp.erasure_col_orphaned') }}</th>
                                 <td>{{ $summary['orphaned'] }}</td>
+                            </tr>
+                            {{-- Both of these can be the only thing left. With
+                                 the channel or the mailbox deleted there are no
+                                 message rows any more, and a screen that counted
+                                 only those reported nothing while the person's
+                                 number was still in a row this is the only
+                                 thing that can reach. --}}
+                            <tr>
+                                <th>{{ __('metawhatsapp::metawhatsapp.erasure_col_channel_rows') }}</th>
+                                <td>{{ $summary['channel_rows'] }}</td>
+                            </tr>
+                            <tr>
+                                <th>{{ __('metawhatsapp::metawhatsapp.erasure_col_records') }}</th>
+                                <td>{{ $summary['records'] }}</td>
                             </tr>
                         </tbody>
                     </table>

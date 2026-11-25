@@ -81,7 +81,18 @@ class PersonalDataErasureTest extends TestCase
         PersonalDataErasure::erase('+34611000002');
 
         $fresh = $row->fresh();
-        $this->assertEquals($wamid, $fresh->wamid);
+
+        // Meta's message id used to be asserted unchanged here, which is
+        // what hid T02: the id is base64 with the contact's phone number
+        // inside it, so it counts as identity and cannot be kept as it
+        // was. What is kept is a one-way form of it, which is all
+        // idempotency ever needed.
+        $this->assertSame(WhatsAppMessage::erasedWamid($wamid), $fresh->wamid);
+        $this->assertTrue(
+            WhatsAppMessage::existsForWamid($wamid),
+            'a redelivery of this message would no longer be recognised'
+        );
+
         $this->assertEquals(WhatsAppMessage::STATUS_READ, $fresh->status);
         $this->assertNotNull($fresh->delivered_at);
         $this->assertNotNull($fresh->read_at);
@@ -286,7 +297,10 @@ class PersonalDataErasureTest extends TestCase
         // past the account's threshold, same as the rest of the suite does
         // (see TemplateRecoveryTest), so the banner actually has a reason to
         // render instead of staying empty because the window is still open.
-        WhatsAppMessage::where('id', $inbound->id)->update(['created_at' => now()->subDay()]);
+        // Both columns, because the window clock reads Meta's own time first
+        // and falls back to created_at (T10). Ageing created_at alone no
+        // longer ages the window, which is the whole point of that fix.
+        WhatsAppMessage::where('id', $inbound->id)->update(['created_at' => now()->subDay(), 'meta_sent_at' => now()->subDay()]);
 
         PersonalDataErasure::erase('+34611000011');
 
@@ -535,6 +549,61 @@ class PersonalDataErasureTest extends TestCase
     }
 
     /**
+     * The third way the same row got written back, and this one we made
+     * ourselves: deleting a channel (or the mailbox it is attached to)
+     * takes its message rows with it, and a job queued before that still
+     * carries the phone number. The inactive-account branch it lands in
+     * asks OutboundGuard, which used to answer "the phone is still held"
+     * because the customer_channel row survives a channel deletion, and
+     * then recordFailure() wrote a fresh failed-thread-N row with the
+     * real number under the id of an account that no longer exists.
+     */
+    public function test_a_deleted_channel_does_not_record_the_phone_back()
+    {
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.erasure-gone', '34611000019', 'hola'));
+        $inbound      = WhatsAppMessage::where('wamid', 'wamid.erasure-gone')->first();
+        $conversation = \App\Conversation::find($inbound->conversation_id);
+
+        $thread = new \App\Thread();
+        $thread->conversation_id = $conversation->id;
+        $thread->type            = \App\Thread::TYPE_MESSAGE;
+        $thread->status          = $conversation->status;
+        $thread->state           = \App\Thread::STATE_PUBLISHED;
+        $thread->body            = 'reply queued, then the channel was deleted';
+        $thread->source_via      = \App\Thread::PERSON_USER;
+        $thread->source_type     = \App\Thread::SOURCE_TYPE_WEB;
+        $thread->customer_id     = $conversation->customer_id;
+        $thread->save();
+
+        $job = new \Modules\MetaWhatsApp\Jobs\SendWhatsAppMessage(
+            $account->id, $thread->id, '+34611000019'
+        );
+
+        // Meta is not contacted here: the subscription call belongs to the
+        // screens, and this test is about what the queue does afterwards.
+        \Modules\MetaWhatsApp\Support\ChannelTeardown::forAccount($account, false);
+
+        $job->handle();
+
+        $this->assertFalse(
+            WhatsAppMessage::where('wamid', 'failed-thread-' . $thread->id)->exists(),
+            'a row was written under an account that no longer exists'
+        );
+        $this->assertFalse(
+            WhatsAppMessage::where('contact_phone', '+34611000019')->exists(),
+            'the phone number was written back into the table the teardown had just cleared'
+        );
+
+        $note = \App\Thread::where('conversation_id', $conversation->id)
+            ->where('type', \App\Thread::TYPE_NOTE)
+            ->orderByDesc('id')
+            ->first();
+        $this->assertNotNull($note, 'the agent was told nothing at all');
+        $this->assertStringContainsString('channel of this mailbox was deleted', $note->body);
+    }
+
+    /**
      * failed() is the callback the worker invokes after the final retry
      * has exhausted $tries, not a path handle() ever walks again. It does
      * its own idempotency check and called recordFailure() directly, with
@@ -580,6 +649,142 @@ class PersonalDataErasureTest extends TestCase
         $this->assertFalse(
             WhatsAppMessage::where('contact_phone', '+34611000016')->exists(),
             'the erased phone was written back into the table'
+        );
+    }
+
+    /**
+     * The false nothing, which is the worst output this screen can produce.
+     *
+     * Deleting the channel or the mailbox takes the module's message rows
+     * out (T38) and leaves the contact links in `customer_channel`, which
+     * the core's own edit form cannot reach. The search read only the
+     * messages, so it answered "this module holds nothing under that
+     * identifier" with the number still in a row this screen is the only
+     * thing that can remove, and the screen could then never remove it: the
+     * button only appears when something was found.
+     */
+    public function test_a_number_whose_messages_are_gone_is_still_found_and_removed()
+    {
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.erasure-links', '34611000020', 'hola'));
+
+        \Modules\MetaWhatsApp\Support\ChannelTeardown::forAccount($account, false);
+
+        $this->assertSame(
+            0,
+            WhatsAppMessage::where('contact_phone', '+34611000020')->count(),
+            'the teardown is supposed to have taken the message rows out first'
+        );
+        $this->assertTrue(
+            \App\CustomerChannel::where('channel', WhatsAppAccount::CHANNEL)
+                ->where('channel_id', '+34611000020')->exists(),
+            'the contact link is what this case is about, and it is not there'
+        );
+
+        $summary = PersonalDataErasure::summary('+34611000020');
+        $this->assertNotNull($summary, 'the screen answered that it holds nothing while the contact link was there');
+        $this->assertSame(1, $summary['channel_rows']);
+        $this->assertSame(0, $summary['messages']);
+
+        $receipt = PersonalDataErasure::erase('+34611000020');
+        $this->assertSame(1, $receipt['channel_rows']);
+        $this->assertFalse(
+            \App\CustomerChannel::where('channel', WhatsAppAccount::CHANNEL)
+                ->where('channel_id', '+34611000020')->exists()
+        );
+    }
+
+    /**
+     * The number this module itself writes onto the customer record.
+     *
+     * `customers.phones` is where findOrCreateCustomer() puts it when it
+     * creates the person, and it is the column `Customer::byPhone()`
+     * searches, so a number left there goes on resolving to them: the
+     * receipt said the identifiers were gone while the next message from
+     * that number would have found this record again. `customers.channel_id`
+     * is the same shape, written by the core's Customer::addChannel() and
+     * cleared by nothing.
+     */
+    public function test_the_number_the_module_wrote_on_the_customer_record_is_removed()
+    {
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.erasure-rec', '34611000021', 'hola'));
+
+        $customer = \App\Customer::getCustomerByChannel(WhatsAppAccount::CHANNEL, '+34611000021');
+        $this->assertNotNull($customer);
+        $this->assertContains(
+            '+34611000021',
+            array_column($customer->getPhones(), 'value'),
+            'the module is supposed to have written the number on the record it created'
+        );
+
+        $summary = PersonalDataErasure::summary('+34611000021');
+        $this->assertSame(1, $summary['records'], 'the screen did not say the record carries the number');
+
+        $receipt = PersonalDataErasure::erase('+34611000021');
+
+        $this->assertSame(1, $receipt['records']);
+        $fresh = \App\Customer::find($customer->id);
+        $this->assertNotContains(
+            '+34611000021',
+            array_column($fresh->getPhones(), 'value'),
+            'the number stayed on the record, where Customer::byPhone() keeps finding the person'
+        );
+        $this->assertEmpty(
+            \Modules\MetaWhatsApp\Support\CustomerMatcher::matchingIds('+34611000021'),
+            'the number still resolves to somebody after a receipt said it was gone'
+        );
+        $this->assertNull($fresh->channel_id, "the core's channel flag kept the erased identifier");
+    }
+
+    /** Every other number on the record is somebody's work, and stays. */
+    public function test_erasure_leaves_the_records_other_numbers_alone()
+    {
+        $account  = $this->createTestAccount();
+        $customer = new \App\Customer();
+        $customer->first_name = 'Two numbers';
+        $customer->setPhones([
+            ['value' => '+34930000000', 'type' => \App\Customer::PHONE_TYPE_WORK],
+            ['value' => '+34611000022', 'type' => \App\Customer::PHONE_TYPE_MOBILE],
+        ]);
+        $customer->save();
+        $customer->addChannel(WhatsAppAccount::CHANNEL, '+34611000022');
+        $this->row($account, ['contact_phone' => '+34611000022']);
+
+        PersonalDataErasure::erase('+34611000022');
+
+        $phones = array_column(\App\Customer::find($customer->id)->getPhones(), 'value');
+        $this->assertContains('+34930000000', $phones, 'a number the request said nothing about was removed');
+        $this->assertNotContains('+34611000022', $phones);
+    }
+
+    /**
+     * A business-scoped id is not read as a phone number, however numeric it
+     * looks. Stripping the separators out of 'US.34611222333' leaves the
+     * digits of a real number, and treating that as one is how a message
+     * once landed in the conversation of whoever owns it. So the record
+     * cleanup asks where an identifier is held rather than how it looks.
+     */
+    public function test_a_numeric_business_scoped_id_does_not_take_a_phone_off_a_record()
+    {
+        $account  = $this->createTestAccount();
+        $customer = new \App\Customer();
+        $customer->first_name = 'Someone else';
+        $customer->setPhones([
+            ['value' => '+34611000023', 'type' => \App\Customer::PHONE_TYPE_MOBILE],
+        ]);
+        $customer->save();
+
+        // A contact known only by a business-scoped id whose digits are that
+        // other person's number.
+        $this->row($account, ['contact_user_id' => 'US.34611000023']);
+
+        PersonalDataErasure::erase('US.34611000023');
+
+        $this->assertContains(
+            '+34611000023',
+            array_column(\App\Customer::find($customer->id)->getPhones(), 'value'),
+            "another person's phone was taken off their record by a business-scoped id that looked like it"
         );
     }
 

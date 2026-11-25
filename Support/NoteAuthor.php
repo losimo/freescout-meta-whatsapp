@@ -34,11 +34,11 @@ class NoteAuthor
     const OPTION_USER = 'metawhatsapp.note_author_user_id';
 
     /**
-     * The user id a note must carry, or null for no author at all.
+     * The user id a note must carry.
      *
      * @param int|null $concernsUserId the agent the note is about
      *
-     * @return int|null
+     * @return int|null null only on an installation with no administrator
      */
     public static function forNote(?int $concernsUserId): ?int
     {
@@ -48,11 +48,45 @@ class NoteAuthor
             return $configured;
         }
 
-        // The fallback is deliberately the same expression as before the
-        // setting existed, including the null: a note with no resolvable
-        // author still has to be written, because it carries the only
-        // visible trace of the failure.
-        return $concernsUserId ?: null;
+        if ($concernsUserId) {
+            return $concernsUserId;
+        }
+
+        return self::installationAuthorId();
+    }
+
+    /**
+     * Who signs a note that concerns no agent at all (issue #55).
+     *
+     * Some notes are about nobody: the customer matched several records, or
+     * Meta reported a new number. Those used to be written with no author,
+     * and the core's print view reads the author's name without checking for
+     * null (resources/views/conversations/partials/thread.blade.php:89, inside
+     * the isPrint() branch), so printing such a conversation failed on a call
+     * on null. The non-print path goes through conversations/thread_by, which
+     * handles it, which is why the defect only showed when printing.
+     *
+     * getSuperAdmin() and not user id 1, which the report proposed: nothing
+     * in FreeScout creates that id, an administrator can be demoted later,
+     * and a deleted user keeps their row. The core's own expression is the
+     * first non-deleted administrator, and it is what the core itself falls
+     * back to when it needs to act as the installation.
+     *
+     * The cost is real and was stated in the issue before taking it: a note
+     * attributed to a real administrator is rendered by the core as "you" to
+     * that administrator, which is the reason the author became configurable
+     * in the first place (#43). The person who pays it is also the person who
+     * can set a different author, which is what makes it the right trade.
+     *
+     * Null stays possible, because an installation with no administrator at
+     * all is not ours to invent a user for. The note is still written: it
+     * carries the only visible trace of what happened.
+     */
+    protected static function installationAuthorId(): ?int
+    {
+        $admin = User::getSuperAdmin();
+
+        return $admin ? $admin->id : null;
     }
 
     /**

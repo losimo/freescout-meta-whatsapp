@@ -383,6 +383,7 @@ class MetaWhatsAppController extends Controller
         // llançava una BadMethodCallException, o sigui un 500 en desar
         // qualsevol canal i l'edició perduda.
         $account->usage_counter_enabled = (bool) $request->input('usage_counter_enabled');
+        $account->allow_core_email_copy  = (bool) $request->input('allow_core_email_copy');
         if ($request->filled('access_token')) {
             $account->access_token = encrypt($request->access_token);
         }
@@ -405,18 +406,47 @@ class MetaWhatsAppController extends Controller
         $autoCreated = $account->auto_created_mailbox;
 
         // Ordre imposat per la FK ON DELETE RESTRICT: primer el compte, després la bústia.
-        $account->delete();
+        // L'enderroc viu a ChannelTeardown perquè el ganxo mailbox.before_delete
+        // (T01) ha de fer exactament el mateix i no una còpia.
+        $teardown = \Modules\MetaWhatsApp\Support\ChannelTeardown::forAccount($account);
 
         if ($autoCreated && $mailbox) {
             if ($mailbox->conversations()->exists()) {
-                \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.account_deleted_mailbox_kept'));
+                $this->flashTeardown($teardown, __('metawhatsapp::metawhatsapp.account_deleted_mailbox_kept'));
                 return redirect()->route('metawhatsapp.settings');
             }
             $mailbox->delete();
         }
 
-        \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.account_deleted'));
+        $this->flashTeardown($teardown, __('metawhatsapp::metawhatsapp.account_deleted'));
         return redirect()->route('metawhatsapp.settings');
+    }
+
+    /**
+     * One flash for both exits of destroy().
+     *
+     * When Meta refused the unsubscribe the channel is still gone, so this
+     * is not an error, but the administrator is left with something to do
+     * and nobody else will tell them: the subscription has to be removed
+     * by hand, or Meta keeps delivering events that this installation now
+     * refuses and retries each one for up to seven days, to every app
+     * subscribed to that account (`webhooks_overview`, corpus of
+     * 2026-11-22). Meta's own reason is appended untranslated, because it
+     * is Meta's sentence and not ours.
+     */
+    protected function flashTeardown(array $teardown, string $done)
+    {
+        if ($teardown['unsubscribed'] === false) {
+            $message = $done . ' ' . __('metawhatsapp::metawhatsapp.account_deleted_unsubscribe_failed');
+            if (!empty($teardown['error'])) {
+                $message .= ' (' . $teardown['error'] . ')';
+            }
+            \Session::flash('flash_warning_floating', $message);
+
+            return;
+        }
+
+        \Session::flash('flash_success_floating', $done);
     }
 
     /**
@@ -606,7 +636,15 @@ class MetaWhatsAppController extends Controller
         SendWhatsAppTemplate::dispatch($account->id, $thread->id, $phone, $name, $language, $variables);
 
         \Session::flash('flash_success_floating', __('metawhatsapp::metawhatsapp.template_sent'));
-        return redirect()->back();
+
+        // T26. Back from here is the picker, because that is where the form
+        // was posted from. The agent has just sent a message, so the page
+        // worth showing is the conversation carrying it. Only this redirect
+        // moves: the refusals above and in the shared guard stay where they
+        // are, because an error has to be read on the page that raised it,
+        // and sendTemplate() keeps ->back() because the banner it answers
+        // already lives on the conversation.
+        return redirect()->route('conversations.view', ['id' => $conversation->id]);
     }
 
     /**

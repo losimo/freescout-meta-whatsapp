@@ -67,6 +67,34 @@ class OutboundRefusalTest extends TestCase
         $method->invoke($provider, $conversation, $replies);
     }
 
+    /**
+     * Issue #59 made this reachable: a customer can now hold more than one
+     * WhatsApp number, and the recipient fallback used to answer with
+     * whichever row came first. On a conversation with no inbound message to
+     * point at one of them, sending would mean delivering an agent's reply to
+     * a person they were not writing to, with nothing on screen saying so.
+     */
+    public function test_a_reply_is_refused_when_the_customer_has_several_whatsapp_numbers_and_nothing_points_at_one()
+    {
+        $account = $this->createTestAccount();
+        [$conversation, $thread] = $this->makeReplyWithoutRecipientPhone($account);
+
+        \App\CustomerChannel::create($conversation->customer_id, WhatsAppAccount::CHANNEL, '+34611222333');
+        \App\CustomerChannel::create($conversation->customer_id, WhatsAppAccount::CHANNEL, '+34655444555');
+
+        $this->dispatchReplies($conversation, [$thread]);
+
+        $note = Thread::where('conversation_id', $conversation->id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->first();
+
+        $this->assertNotNull($note, 'a reply that was never sent left no trace on the conversation');
+        $this->assertStringContainsString(
+            __('metawhatsapp::metawhatsapp.not_sent_several_numbers'),
+            $note->body
+        );
+    }
+
     public function test_reply_without_recipient_phone_leaves_a_note()
     {
         $account = $this->createTestAccount();
@@ -161,6 +189,74 @@ class OutboundRefusalTest extends TestCase
                 ->where('type', Thread::TYPE_NOTE)
                 ->where('body', 'like', OutboundGuard::NOTE_MARKER . '%')
                 ->count()
+        );
+    }
+
+    // ------------------------------------------------- issue #51
+
+    /**
+     * Issue #51. The de-duplication was "any refusal note in this
+     * conversation in the last five minutes", which is a crude stand-in for
+     * "the three attachments of one reply". Two different replies failing a
+     * couple of minutes apart left a single note, so the second refusal was
+     * silent, and the reporter asked for the identifier of the reply to be
+     * the key instead.
+     *
+     * Note that the suppression no longer expires: the same reply cannot
+     * collect a second note hours later either, which is the behaviour change
+     * this carries.
+     */
+    public function test_two_replies_that_fail_leave_one_note_each()
+    {
+        $account = $this->createTestAccount();
+        [$conversation, $first] = $this->makeReplyWithoutRecipientPhone($account);
+
+        $this->dispatchReplies($conversation, [$first]);
+
+        $second = new Thread();
+        $second->conversation_id    = $conversation->id;
+        $second->user_id            = 1;
+        $second->type               = Thread::TYPE_MESSAGE;
+        $second->status             = $conversation->status;
+        $second->state              = Thread::STATE_PUBLISHED;
+        $second->body               = '<p>second reply, same conversation</p>';
+        $second->source_via         = Thread::PERSON_USER;
+        $second->source_type        = Thread::SOURCE_TYPE_WEB;
+        $second->customer_id        = $conversation->customer_id;
+        $second->created_by_user_id = 1;
+        $second->save();
+
+        $this->dispatchReplies($conversation, [$second]);
+
+        $notes = Thread::where('conversation_id', $conversation->id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->where('body', 'like', OutboundGuard::NOTE_MARKER . '%')
+            ->count();
+
+        $this->assertEquals(2, $notes, 'the second reply failed in silence because the first had just failed');
+    }
+
+    /**
+     * The identifier is stored as a string, and the reason is a collision the
+     * reporter's own pattern would have had: looking for ":1" inside the JSON
+     * also matches ":123", so one reply's note would suppress another's.
+     */
+    public function test_a_threads_note_does_not_suppress_a_note_of_a_thread_whose_id_starts_the_same()
+    {
+        $account = $this->createTestAccount();
+        [$conversation, $thread] = $this->makeReplyWithoutRecipientPhone($account);
+
+        $this->dispatchReplies($conversation, [$thread]);
+        $note = Thread::where('conversation_id', $conversation->id)
+            ->where('type', Thread::TYPE_NOTE)
+            ->where('body', 'like', OutboundGuard::NOTE_MARKER . '%')
+            ->first();
+
+        $this->assertNotNull($note);
+        $this->assertSame(
+            (string) $thread->id,
+            $note->getMeta(OutboundGuard::META_REFUSED_THREAD),
+            'the refused thread id is not stored as a string, so a shorter id would match a longer one'
         );
     }
 }

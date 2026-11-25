@@ -13,6 +13,7 @@ use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 use Modules\MetaWhatsApp\Support\DeliveryFailure;
+use Modules\MetaWhatsApp\Support\OutboundFailure;
 use Modules\MetaWhatsApp\Support\OutboundGuard;
 
 class SendWhatsAppMedia implements ShouldQueue
@@ -21,6 +22,21 @@ class SendWhatsAppMedia implements ShouldQueue
 
     // El backoff entre reintents el gestiona el worker (Laravel 5.5).
     public $tries = 3;
+
+    /**
+     * Meta's documented limit for a media caption, in characters.
+     *
+     * The caption half of T07. Past it Meta refuses the whole message, which
+     * took the agent's words down with the file. The rule itself is applied
+     * by the dispatcher, which is the one place that decides whether the text
+     * rides the first attachment or travels on its own; it reads this.
+     *
+     * The other half of that ticket, splitting a text over 4096 characters
+     * into several messages, is not in this batch: it would need a
+     * discriminator for the second and later pieces, and one text row per
+     * thread is what keeps the send idempotent.
+     */
+    const MAX_CAPTION = 1024;
 
     // Límits documentats de Meta per tipus (bytes).
     const MAX_SIZES = [
@@ -66,7 +82,7 @@ class SendWhatsAppMedia implements ShouldQueue
             // window (a synchronous 190 deactivates the account). Without
             // this check, recordFailure() below would write the erased
             // phone straight back into a failed-thread-N row.
-            if (OutboundGuard::refuseIfContactErased($this->threadId, $this->toPhone)) {
+            if (OutboundGuard::refuseIfUnreachable($this->accountId, $this->threadId, $this->toPhone)) {
                 return;
             }
             $thread = Thread::find($this->threadId);
@@ -110,6 +126,23 @@ class SendWhatsAppMedia implements ShouldQueue
             return;
         }
 
+        // The window comes before the attachment is even resolved, which the
+        // fourth review round asked for: a vanished attachment also loses the
+        // text riding it, so that branch sends the text on its own, and with
+        // the window shut that would be a guaranteed 131047. Nothing can be
+        // sent at all once the window is closed, so it is the first thing
+        // asked. The attachment id is read from the job rather than from the
+        // row, which has not been looked up yet.
+        if (WhatsAppMessage::windowExpired($thread->conversation_id, $account)) {
+            Log::error('[MetaWhatsApp] Outside the 24h window: media not sent', [
+                'account_id'    => $account->id,
+                'thread_id'     => $thread->id,
+                'attachment_id' => $this->attachmentId,
+            ]);
+            $this->recordFailure($account->id, $thread, 'window_expired');
+            return;
+        }
+
         $attachment = Attachment::find($this->attachmentId);
         if (!$attachment || (int) $attachment->thread_id !== $thread->id) {
             Log::error('[MetaWhatsApp] SendWhatsAppMedia: attachment missing or not linked to thread', [
@@ -120,16 +153,11 @@ class SendWhatsAppMedia implements ShouldQueue
             // El text de la resposta pot haver sortit igualment, però el
             // fitxer no. Sense nota, l'agent creu que el client l'ha rebut.
             OutboundGuard::noteRefusal($thread, 'metawhatsapp::metawhatsapp.not_sent_attachment_missing');
-            return;
-        }
-
-        if (WhatsAppMessage::windowExpired($thread->conversation_id, $account)) {
-            Log::error('[MetaWhatsApp] Outside the 24h window: media not sent', [
-                'account_id'    => $account->id,
-                'thread_id'     => $thread->id,
-                'attachment_id' => $attachment->id,
-            ]);
-            $this->recordFailure($account->id, $thread, 'window_expired');
+            // The text was riding this file, and the file no longer resolves,
+            // so without this the words are lost as surely as on any other
+            // failure. The note above already says the text may have gone out
+            // on its own, which this is what makes true.
+            $this->sendTextSeparately($thread);
             return;
         }
 
@@ -144,7 +172,8 @@ class SendWhatsAppMedia implements ShouldQueue
                 'size'          => $attachment->size,
                 'max_size'      => $maxSize,
             ]);
-            $this->recordFailure($account->id, $thread, 'size_exceeded');
+            $textWentOnItsOwn = $this->sendTextSeparately($thread, 'size_exceeded');
+            $this->recordFailure($account->id, $thread, 'size_exceeded', $textWentOnItsOwn);
             return;
         }
 
@@ -164,7 +193,8 @@ class SendWhatsAppMedia implements ShouldQueue
                 'error_code'    => $upload['error_code'],
                 'error'         => $upload['error_message'],
             ]);
-            $this->recordFailure($account->id, $thread, (string) $upload['error_code']);
+            $textWentOnItsOwn = $this->sendTextSeparately($thread, (string) $upload['error_code']);
+            $this->recordFailure($account->id, $thread, (string) $upload['error_code'], $textWentOnItsOwn);
             return;
         }
 
@@ -217,23 +247,133 @@ class SendWhatsAppMedia implements ShouldQueue
             ]);
         }
 
-        $this->recordFailure($account->id, $thread, (string) $result['error_code']);
+        $textWentOnItsOwn = $this->sendTextSeparately($thread, (string) $result['error_code']);
+        $this->recordFailure($account->id, $thread, (string) $result['error_code'], $textWentOnItsOwn);
     }
 
     /**
-     * Deriva la categoria de Meta (image/video/audio/document) a partir
-     * del mime_type d'un adjunt d'agent. Prefix-based, com detectType()
-     * del core: no es manté una llista blanca dels sub-tipus exactes que
-     * Meta accepta per categoria (fora d'abast en aquest MVP); si Meta
-     * rebutja un sub-tipus concret, es tracta com qualsevol altre error
-     * semàntic de l'enviament.
+     * Sends the reply's text as a message of its own (T06).
+     *
+     * The agent's words travel as the caption of the first attachment, so a
+     * file that does not go out takes them with it. The thread is still in
+     * FreeScout looking answered, and the customer has nothing.
+     *
+     * Mechanically this works because the row this job writes on failure
+     * carries attachment_id, and the text job skips a thread only when a row
+     * with no attachment_id exists. That same check is what stops the text
+     * going twice: the dispatcher already sends it separately when the first
+     * attachment is audio, and a second attachment of the same reply failing
+     * must not deliver the words again.
+     *
+     * Never from the expired-window branch, and never when Meta's own answer
+     * was 131047. The text job has no window check of its own, so either
+     * would be a guaranteed second refusal on top of the one that already
+     * happened. The second case is the review's finding and it is not
+     * theoretical: windowExpired() measures against
+     * template_threshold_minutes, which an administrator can set to anything,
+     * so the local check can pass while Meta says the window is shut.
+     */
+    protected function sendTextSeparately(Thread $thread, ?string $errorCode = null): bool
+    {
+        if ($this->caption === null || trim($this->caption) === '') {
+            return false;
+        }
+
+        if (DeliveryFailure::isWindowExpired($errorCode)) {
+            return false;
+        }
+
+        $alreadyWent = WhatsAppMessage::where('thread_id', $thread->id)
+            ->where('direction', WhatsAppMessage::DIRECTION_OUTBOUND)
+            ->whereNull('attachment_id')
+            ->exists();
+
+        if ($alreadyWent) {
+            return true;
+        }
+
+        SendWhatsAppMessage::dispatch($this->accountId, $thread->id, $this->toPhone);
+
+        return true;
+    }
+
+    /**
+     * The exact subtypes WhatsApp accepts for image, video and audio, from
+     * Meta's own table in our dated copy of the documentation
+     * (docs/referencia/meta-whatsapp-docs-2026-11-22/business-phone-numbers_media.md,
+     * 22 November 2026).
+     *
+     * Note video/3gpp and not video/3gp: .3gp is the file extension and 3gpp
+     * is the type. The reported patch had the extension, which would have
+     * sent every 3GPP video as a document.
+     *
+     * audio/ogg is listed by Meta as OPUS codecs only, mono input only. The
+     * codec cannot be read from a mime type, so the file is still sent as
+     * audio; if it is not OPUS, Meta refuses it and since T04 that refusal
+     * leaves a note.
+     *
+     * Documents are not listed here, and the demotion does not promise the
+     * file will arrive. The review was right about that: the upload still
+     * carries the attachment's own mime type into Meta's /media endpoint,
+     * which validates against its own closed list, so an image/gif is
+     * refused there whatever category the message would have used. Meta's
+     * document list is exactly eight types (text/plain, application/pdf
+     * and the three Office pairs).
+     *
+     * What the demotion does buy is a message that describes the file
+     * honestly when the upload does succeed, and a consistent answer to the
+     * caption question below.
+     *
+     * The module deliberately does not refuse an unlisted subtype itself.
+     * Being stricter than Meta is the worse failure of the two: a wasted
+     * upload costs bandwidth, while a local refusal would withhold a file
+     * WhatsApp might have taken. Meta decides, and since T04 its refusal
+     * leaves a note carrying its own reason.
+     */
+    const ACCEPTED_SUBTYPES = [
+        'image' => ['image/jpeg', 'image/png', 'image/webp'],
+        'video' => ['video/mp4', 'video/3gpp'],
+        'audio' => ['audio/aac', 'audio/amr', 'audio/mpeg', 'audio/mp4', 'audio/ogg'],
+    ];
+
+    /**
+     * Meta's category (image/video/audio/document) for an agent's attachment.
+     *
+     * T09. This used to decide on the mime prefix alone, like the core's
+     * detectType(), and a docblock said the exact subtypes were left out of
+     * the MVP on purpose: whatever Meta refused would be handled as any other
+     * semantic error. That was true and it was also silent, which is what
+     * this batch is about. A subtype WhatsApp does not accept now goes as a
+     * document, so the file arrives rather than being refused.
+     *
+     * Deciding it here and in one place matters beyond this job: the
+     * dispatcher asks the same function whether the first attachment is audio
+     * in order to decide whether the reply text can ride as a caption. Meta
+     * takes no caption on audio but does on a document, so a demoted file
+     * must change that answer too, and it does because both read this.
+     *
+     * The size check in handle() reads MAX_SIZES with the category this
+     * returns, so a demoted file is measured against the document limit of
+     * 100 MB rather than the 16 MB of the audio it was going to be sent as.
+     * That is right for a file Meta accepts as a document, and for one it
+     * does not accept at all it means an upload that will be refused on its
+     * type instead of a local refusal that blamed the size. The note the
+     * agent reads is Meta's reason rather than our guess, which is the
+     * trade this takes knowingly.
      */
     public static function mediaCategory(string $mimeType): string
     {
-        $prefix = strtolower(explode('/', $mimeType)[0] ?? '');
-        if (in_array($prefix, ['image', 'video', 'audio'], true)) {
+        // Parameters travel in the header (audio/ogg; codecs=opus is what a
+        // browser recording arrives as) and are not part of the type.
+        $type   = strtolower(trim(explode(';', $mimeType)[0]));
+        $prefix = explode('/', $type)[0] ?? '';
+
+        if (isset(self::ACCEPTED_SUBTYPES[$prefix])
+            && in_array($type, self::ACCEPTED_SUBTYPES[$prefix], true)
+        ) {
             return $prefix;
         }
+
         return 'document';
     }
 
@@ -259,26 +399,35 @@ class SendWhatsAppMedia implements ShouldQueue
         }
     }
 
-    protected function recordFailure(int $accountId, Thread $thread, string $errorCode)
+    /**
+     * See the same method in the text job (T04). This job is the reason
+     * OutboundFailure takes an attachment: it fails per file, and the
+     * synthetic wamid has to stay unique per file.
+     */
+    /**
+     * @param bool $justDispatchedText this call has just sent the reply's
+     *                                 text as a message of its own
+     */
+    protected function recordFailure(int $accountId, Thread $thread, string $errorCode, bool $justDispatchedText = false)
     {
-        // firstOrCreate i no create: el wamid sintètic té UNIQUE i aquest
-        // mètode es pot cridar dues vegades per al mateix adjunt, per
-        // exemple en un reintent del worker. Amb create, la segona petava
-        // per clau duplicada.
-        WhatsAppMessage::firstOrCreate(
-            // Els fallits no tenen wamid de Meta: clau sintètica per
-            // thread+adjunt (el wamid té UNIQUE a la taula).
-            ['wamid' => 'failed-thread-' . $thread->id . '-att-' . $this->attachmentId],
-            [
-                'account_id'      => $accountId,
-                'conversation_id' => $thread->conversation_id,
-                'thread_id'       => $thread->id,
-                'attachment_id'   => $this->attachmentId,
-                'contact_phone'   => $this->toPhone,
-                'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
-                'status'          => WhatsAppMessage::STATUS_FAILED,
-                'error_code'      => substr($errorCode, 0, 20),
-            ]
+        // Whether the reply's text survived this failure, which decides
+        // whether the note speaks about one file or about the whole reply.
+        //
+        // A null caption means the words were never riding this file: the
+        // dispatcher sent them separately, or there were none, or this is not
+        // the attachment that carries them. A caption means they were, and
+        // they went down with it, unless this very call has just sent them on
+        // their own. That last clause is the third review round's finding: the
+        // flag was read before the dispatch, so the two paths that refuse and
+        // then send the text still wrote the whole-reply note, telling the
+        // agent nothing had arrived while the text was on its way.
+        OutboundFailure::record(
+            $accountId,
+            $thread,
+            $errorCode,
+            $this->toPhone,
+            $this->attachmentId,
+            $this->caption === null || $justDispatchedText
         );
     }
 
@@ -299,7 +448,7 @@ class SendWhatsAppMedia implements ShouldQueue
             // Same reason as the !$account branch above: a job that
             // exhausted its retries can still land here after an erasure,
             // and recordFailure() would write the phone straight back.
-            if (OutboundGuard::refuseIfContactErased($this->threadId, $this->toPhone)) {
+            if (OutboundGuard::refuseIfUnreachable($this->accountId, $this->threadId, $this->toPhone)) {
                 return;
             }
             $thread = Thread::find($this->threadId);

@@ -13,7 +13,11 @@
             @include('partials/flash_messages')
 
             <p>
-                <a href="{{ url()->previous() }}">{{ __('metawhatsapp::metawhatsapp.templates_picker_back') }}</a>
+                {{-- T26: named and not url()->previous(). "Previous" prefers the
+                     Referer, so after a refused send, or after arriving from
+                     anywhere but the conversation, it pointed at this page
+                     itself and the link led nowhere. --}}
+                <a href="{{ route('conversations.view', ['id' => $conversation->id]) }}">{{ __('metawhatsapp::metawhatsapp.templates_picker_back') }}</a>
             </p>
 
             @if($errors->has('send_template'))

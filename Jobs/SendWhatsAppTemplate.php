@@ -12,6 +12,7 @@ use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
 use Modules\MetaWhatsApp\Support\DeliveryFailure;
+use Modules\MetaWhatsApp\Support\OutboundFailure;
 use Modules\MetaWhatsApp\Support\OutboundGuard;
 
 /**
@@ -92,7 +93,7 @@ class SendWhatsAppTemplate implements ShouldQueue
             // window (a synchronous 190 deactivates the account). Without
             // this check, recordFailure() below would write the erased
             // phone straight back into a failed-thread-N row.
-            if (OutboundGuard::refuseIfContactErased($this->threadId, $this->toPhone)) {
+            if (OutboundGuard::refuseIfUnreachable($this->accountId, $this->threadId, $this->toPhone)) {
                 return;
             }
             $thread = Thread::find($this->threadId);
@@ -228,22 +229,10 @@ class SendWhatsAppTemplate implements ShouldQueue
         return app(WhatsAppApiClient::class, ['account' => $account]);
     }
 
+    /** See the same method in the text job: the shared part is OutboundFailure (T04). */
     protected function recordFailure(int $accountId, Thread $thread, string $errorCode)
     {
-        // firstOrCreate i no create: vegeu el mateix mètode al job de text.
-        WhatsAppMessage::firstOrCreate(
-            // Els fallits no tenen wamid de Meta: clau sintètica per thread.
-            ['wamid' => 'failed-thread-' . $thread->id],
-            [
-                'account_id'      => $accountId,
-                'conversation_id' => $thread->conversation_id,
-                'thread_id'       => $thread->id,
-                'contact_phone'   => $this->toPhone,
-                'direction'       => WhatsAppMessage::DIRECTION_OUTBOUND,
-                'status'          => WhatsAppMessage::STATUS_FAILED,
-                'error_code'      => substr($errorCode, 0, 20),
-            ]
-        );
+        OutboundFailure::record($accountId, $thread, $errorCode, $this->toPhone);
     }
 
     public function failed(\Throwable $e)
@@ -262,7 +251,7 @@ class SendWhatsAppTemplate implements ShouldQueue
             // Same reason as the !$account branch above: a job that
             // exhausted its retries can still land here after an erasure,
             // and recordFailure() would write the phone straight back.
-            if (OutboundGuard::refuseIfContactErased($this->threadId, $this->toPhone)) {
+            if (OutboundGuard::refuseIfUnreachable($this->accountId, $this->threadId, $this->toPhone)) {
                 return;
             }
             $thread = Thread::find($this->threadId);

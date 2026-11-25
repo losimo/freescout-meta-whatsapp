@@ -165,7 +165,10 @@ class TemplateRecoveryTest extends TestCase
         $this->runJob($account, $this->inboundPayload($account, 'wamid.tr2', '34611222333', 'hola'));
         $msg = WhatsAppMessage::where('wamid', 'wamid.tr2')->first();
         // Envelleix el missatge 2 hores: supera el llindar de 60 min.
-        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subMinutes(120)]);
+        // Both columns, because the window clock reads Meta's own time first
+        // and falls back to created_at (T10). Ageing created_at alone no
+        // longer ages the window, which is the whole point of that fix.
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subMinutes(120), 'meta_sent_at' => now()->subMinutes(120)]);
         $this->assertTrue(WhatsAppMessage::windowExpired($msg->conversation_id, $account));
         // Amb el llindar per defecte (1435) encara seria oberta.
         $account->template_threshold_minutes = 1435;
@@ -254,7 +257,7 @@ class TemplateRecoveryTest extends TestCase
         // Envelleix l'inbound perquè la finestra es consideri caducada: el
         // re-check de finestra al servidor (item 2) rebutjaria l'enviament
         // amb un inbound recent.
-        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay()]);
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay(), 'meta_sent_at' => now()->subDay()]);
 
         Queue::fake();
         $admin = $this->makeAdminUser();
@@ -387,7 +390,7 @@ class TemplateRecoveryTest extends TestCase
         $conversation = Conversation::find($msg->conversation_id);
         // Age the inbound so the window counts as expired (recovery banner
         // open), same as the rest of this suite.
-        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay()]);
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay(), 'meta_sent_at' => now()->subDay()]);
 
         \Modules\MetaWhatsApp\Support\PersonalDataErasure::erase('+34611222444');
 
@@ -462,7 +465,7 @@ class TemplateRecoveryTest extends TestCase
         $msg          = WhatsAppMessage::where('wamid', 'wamid.idem1')->first();
         $conversation = Conversation::find($msg->conversation_id);
         // Envelleix l'inbound per superar el llindar per defecte (1435 min).
-        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay()]);
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay(), 'meta_sent_at' => now()->subDay()]);
 
         Queue::fake();
         $admin = $this->makeAdminUser();
@@ -596,7 +599,7 @@ class TemplateRecoveryTest extends TestCase
         $this->runJob($account, $this->inboundPayload($account, 'wamid.multi1', '34611222333', 'hola'));
         $msg          = WhatsAppMessage::where('wamid', 'wamid.multi1')->first();
         $conversation = Conversation::find($msg->conversation_id);
-        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay()]);
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay(), 'meta_sent_at' => now()->subDay()]);
 
         Queue::fake();
         $admin = $this->makeAdminUser();
@@ -635,7 +638,7 @@ class TemplateRecoveryTest extends TestCase
         $this->runJob($account, $this->inboundPayload($account, 'wamid.multi2', '34611222333', 'hola'));
         $msg          = WhatsAppMessage::where('wamid', 'wamid.multi2')->first();
         $conversation = Conversation::find($msg->conversation_id);
-        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay()]);
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay(), 'meta_sent_at' => now()->subDay()]);
 
         Queue::fake();
         $admin = $this->makeAdminUser();

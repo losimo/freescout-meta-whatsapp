@@ -39,6 +39,7 @@ class WhatsAppAccount extends Model
         'template_threshold_minutes',
         'templates',
         'usage_counter_enabled',
+        'allow_core_email_copy',
     ];
 
     // access_token i app_secret mai fillable: s'assignen explícitament amb encrypt().

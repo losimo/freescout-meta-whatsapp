@@ -176,6 +176,22 @@
 
                 @if($account ?? false)
                 <div class="form-group">
+                    <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.email_copy_title') }}</label>
+                    <div class="col-sm-8">
+                        <div class="checkbox">
+                            <label>
+                                <input type="checkbox" name="allow_core_email_copy" value="1"
+                                       {{ old('allow_core_email_copy', $account->allow_core_email_copy ?? false) ? 'checked' : '' }}>
+                                {{ __('metawhatsapp::metawhatsapp.email_copy_enable') }}
+                            </label>
+                        </div>
+                        <p class="help-block">{{ __('metawhatsapp::metawhatsapp.email_copy_enable_help') }}</p>
+                    </div>
+                </div>
+                @endif
+
+                @if($account ?? false)
+                <div class="form-group">
                     <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.usage_title') }}</label>
                     <div class="col-sm-8">
                         <div class="checkbox">

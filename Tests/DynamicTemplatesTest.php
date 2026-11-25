@@ -262,7 +262,10 @@ class DynamicTemplatesTest extends TestCase
         $this->runJob($account, $this->inboundPayload($account, 'wamid.dyn3', '34611222333', 'hola'));
         $msg          = WhatsAppMessage::where('wamid', 'wamid.dyn3')->first();
         $conversation = Conversation::find($msg->conversation_id);
-        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay()]);
+        // Both columns, because the window clock reads Meta's own time first
+        // and falls back to created_at (T10). Ageing created_at alone no
+        // longer ages the window, which is the whole point of that fix.
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay(), 'meta_sent_at' => now()->subDay()]);
 
         Queue::fake();
         $admin = $this->makeAdminUser();
@@ -297,7 +300,7 @@ class DynamicTemplatesTest extends TestCase
         $this->runJob($account, $this->inboundPayload($account, 'wamid.dyn4', '34611222333', 'hola'));
         $msg          = WhatsAppMessage::where('wamid', 'wamid.dyn4')->first();
         $conversation = Conversation::find($msg->conversation_id);
-        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay()]);
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay(), 'meta_sent_at' => now()->subDay()]);
 
         Queue::fake();
         $admin = $this->makeAdminUser();
@@ -334,5 +337,74 @@ class DynamicTemplatesTest extends TestCase
         $response->assertStatus(302);
         $response->assertSessionHasErrors();
         Queue::assertNotPushed(SendWhatsAppTemplate::class);
+    }
+
+    /**
+     * T26. The back link was `url()->previous()`, which prefers the Referer,
+     * and the Referrer-Policy the core would send is commented out
+     * (app/Http/Middleware/ResponseHeaders.php:21). Reaching the picker from
+     * anywhere other than the conversation, or returning to it after a
+     * refused send, made "back" point at the picker itself, so the link led
+     * nowhere and the agent had to use the browser.
+     *
+     * The conversation is the only place this page can sensibly return to,
+     * and the view already holds it, so it is named rather than guessed.
+     */
+    public function test_the_picker_back_link_points_at_the_conversation()
+    {
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.dyn6', '34611222333', 'hola'));
+        $msg          = WhatsAppMessage::where('wamid', 'wamid.dyn6')->first();
+        $conversation = Conversation::find($msg->conversation_id);
+
+        $this->app->bind(WhatsAppApiClient::class, function ($app, $params) {
+            return new class($params['account']) extends WhatsAppApiClient {
+                protected function curlGet(string $url, array $headers): array
+                {
+                    return ['ok' => true, 'body' => json_encode(['data' => []]), 'http_status' => 200,
+                        'error_code' => null, 'error_message' => null, 'transient' => false];
+                }
+            };
+        });
+
+        $html = $this->actingAs($this->makeAdminUser())
+            ->get($this->url('/meta-whatsapp/conversation/' . $conversation->id . '/templates'))
+            ->getContent();
+
+        $this->assertStringContainsString(
+            'href="' . route('conversations.view', ['id' => $conversation->id]) . '"',
+            $html,
+            'the back link does not lead to the conversation the picker was opened from'
+        );
+    }
+
+    /**
+     * The other half of T26: after a template is sent, `redirect()->back()`
+     * returned to the picker, because the picker is where the form was
+     * posted from. The agent had just sent a message and the one thing it
+     * made sense to show was the conversation carrying it.
+     *
+     * Only this redirect changes. The refusals in this controller keep
+     * returning to where they were raised, because an error has to be read
+     * on the page that caused it.
+     */
+    public function test_a_sent_template_returns_to_the_conversation()
+    {
+        $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.dyn7', '34611222333', 'hola'));
+        $msg          = WhatsAppMessage::where('wamid', 'wamid.dyn7')->first();
+        $conversation = Conversation::find($msg->conversation_id);
+        WhatsAppMessage::where('id', $msg->id)->update(['created_at' => now()->subDay(), 'meta_sent_at' => now()->subDay()]);
+
+        Queue::fake();
+
+        $response = $this->actingAs($this->makeAdminUser())
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/conversation/' . $conversation->id . '/send-dynamic-template'), [
+                'template_name'     => 'marketing_promo',
+                'template_language' => 'en',
+            ]);
+
+        $response->assertRedirect(route('conversations.view', ['id' => $conversation->id]));
     }
 }

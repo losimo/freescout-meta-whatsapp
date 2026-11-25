@@ -31,7 +31,10 @@ class WhatsAppAccountRequest extends FormRequest
             // descarten al controlador, no cal 'required' aquí.
             'templates'                  => 'nullable|array|max:5',
             'templates.*.id'             => 'nullable|string|max:512',
-            'templates.*.language'       => 'nullable|string|max:15|regex:/^[a-z]{2}(_[A-Z]{2})?$/',
+            // {2,3} and not {2}: `fil` (Filipino) is the one three-letter
+            // code Meta hands out, and the form refused to save a channel
+            // that used it (T25).
+            'templates.*.language'       => 'nullable|string|max:15|regex:/^[a-z]{2,3}(_[A-Z]{2})?$/',
             'templates.*.display_name'   => 'nullable|string|max:190',
             'templates.*.recovery_text'  => 'nullable|string|max:1000',
         ];

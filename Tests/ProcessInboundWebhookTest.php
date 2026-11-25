@@ -255,7 +255,14 @@ class ProcessInboundWebhookTest extends TestCase
      * that tells the agent nothing about who is on the other side. Meta sends
      * the username in the same payload and we were not reading it.
      */
-    public function test_a_customer_with_no_phone_is_named_after_their_username()
+    /**
+     * Was test_a_customer_with_no_phone_is_named_after_their_username, and
+     * reversed on the reporter's argument in #59: a username is as arbitrary
+     * as a profile name, and what they want to read on a customer with no
+     * phone number is an identifier, because it says "not matched to anybody
+     * yet".
+     */
+    public function test_a_customer_with_no_phone_is_named_after_their_identifier()
     {
         $bsuid   = 'US.13491208655302741918';
         $account = $this->createTestAccount();
@@ -268,7 +275,8 @@ class ProcessInboundWebhookTest extends TestCase
 
         $customer = \App\Customer::getCustomerByChannel(WhatsAppAccount::CHANNEL_BSUID, $bsuid);
         $this->assertNotNull($customer, 'The message should have created a customer.');
-        $this->assertEquals('@pablomorales', $customer->first_name);
+        $this->assertEquals($bsuid, $customer->getFullName());
+        $this->assertStringNotContainsString('pablomorales', $customer->getFullName());
     }
 
     public function test_missatge_nou_crea_customer_conversa_i_thread()
@@ -580,7 +588,12 @@ class ProcessInboundWebhookTest extends TestCase
             ->where('body', 'like', '[WhatsApp delivery failed]%')
             ->first();
         $this->assertNotNull($note, 'the note must survive an unresolvable author');
-        $this->assertNull($note->created_by_user_id);
+        // Until issue #55 this asserted null, which was the point of the
+        // test: the note had to be written even when no agent could be
+        // resolved. The note is still written; what changed is that an
+        // authorless one broke the core's print view, so a note nobody wrote
+        // now carries the installation's administrator. See NoteAuthorTest.
+        $this->assertEquals(\App\User::getSuperAdmin()->id, $note->created_by_user_id);
     }
 
     public function test_status_failed_asincron_no_duplica_la_nota_en_rebre_el_webhook_dues_vegades()
@@ -694,10 +707,12 @@ class ProcessInboundWebhookTest extends TestCase
         $this->assertStringContainsString('"' . str_repeat('a', 60) . '…"', $note->body);
     }
 
-    public function test_sense_cos_de_missatge_la_nota_cau_al_wamid()
+    public function test_with_no_message_body_the_note_names_the_kind_and_not_the_identifier()
     {
-        // Multimèdia sense caption: no hi ha text per citar, així que cal
-        // conservar el wamid com a identificador.
+        // Media with no caption: there is no text to quote. This used to
+        // fall back to Meta's message id, which carries the contact's
+        // phone number in base64 and left a readable copy of it in a note
+        // body that no erasure reaches (T02).
         $account = $this->createTestAccount();
         [$conversation] = $this->seedOutboundForFailure($account, 'wamid.fail-in-empty', 'wamid.out-empty', '');
 
@@ -708,7 +723,8 @@ class ProcessInboundWebhookTest extends TestCase
             ->where('body', 'like', '[WhatsApp delivery failed]%')
             ->first();
         $this->assertNotNull($note);
-        $this->assertStringContainsString('wamid.out-empty', $note->body);
+        $this->assertStringNotContainsString('wamid.out-empty', $note->body);
+        $this->assertStringContainsString('a message with no text', $note->body);
     }
 
     public function test_una_fallida_reobre_la_conversa_tancada()
@@ -974,10 +990,25 @@ class ProcessInboundWebhookTest extends TestCase
         $this->assertEquals('WhatsApp +34611222333', $conversation->subject);
     }
 
+    /**
+     * A status is always about a message that already existed, and a status
+     * dated before its own row is now refused as the garbage value it looks
+     * like. So the row is put where it belongs in time, which is also what
+     * stops this case passing for the wrong reason: with both times falling
+     * back to now() the two would match whatever the code did with Meta's.
+     */
+    private function backdate(string $wamid, int $minutes): void
+    {
+        WhatsAppMessage::where('wamid', $wamid)->update(['created_at' => now()->subMinutes($minutes)]);
+    }
+
     public function test_status_read_sense_delivered_previ_omple_els_dos_timestamps()
     {
         $account = $this->createTestAccount();
         $this->runJob($account, $this->inboundPayload($account, 'wamid.in8', '34611222333', 'hola'));
+        $this->backdate('wamid.in8', 30);
+
+        $readAt = now()->subMinutes(10)->timestamp;
 
         $statusPayload = $this->inboundPayload($account, 'x', 'x', 'x');
         $statusPayload['entry'][0]['changes'][0]['value'] = [
@@ -986,21 +1017,35 @@ class ProcessInboundWebhookTest extends TestCase
             'statuses'          => [[
                 'id'        => 'wamid.in8',
                 'status'    => 'read',
-                'timestamp' => (string) 1700000000,
+                'timestamp' => (string) $readAt,
             ]],
         ];
         $this->runJob($account, $statusPayload);
 
         $msg = WhatsAppMessage::where('wamid', 'wamid.in8')->first();
-        $this->assertNotNull($msg->delivered_at);
-        $this->assertNotNull($msg->read_at);
-        $this->assertEquals($msg->delivered_at->timestamp, $msg->read_at->timestamp);
+        $this->assertEquals($readAt, $msg->read_at->timestamp);
+        $this->assertEquals(
+            $readAt,
+            $msg->delivered_at->timestamp,
+            'a read with no delivered before it leaves the delivery time empty'
+        );
     }
 
+    /**
+     * The times were fixed constants from 2023 until the 3.0.0 review, which
+     * read as a delivery that happened before the message existed. A status
+     * dated before its own row is now refused, because that is what a
+     * garbage value looks like, so the fixture says what it means: delivered
+     * a while ago, read after that.
+     */
     public function test_status_delivered_seguit_de_read_no_sobreescriu_delivered_at()
     {
         $account = $this->createTestAccount();
         $this->runJob($account, $this->inboundPayload($account, 'wamid.in9', '34611222333', 'hola'));
+        $this->backdate('wamid.in9', 30);
+
+        $deliveredAt = now()->subMinutes(10)->timestamp;
+        $readAt      = now()->subMinutes(4)->timestamp;
 
         $deliveredPayload = $this->inboundPayload($account, 'x', 'x', 'x');
         $deliveredPayload['entry'][0]['changes'][0]['value'] = [
@@ -1009,7 +1054,7 @@ class ProcessInboundWebhookTest extends TestCase
             'statuses'          => [[
                 'id'        => 'wamid.in9',
                 'status'    => 'delivered',
-                'timestamp' => (string) 1700000000,
+                'timestamp' => (string) $deliveredAt,
             ]],
         ];
         $this->runJob($account, $deliveredPayload);
@@ -1021,19 +1066,32 @@ class ProcessInboundWebhookTest extends TestCase
             'statuses'          => [[
                 'id'        => 'wamid.in9',
                 'status'    => 'read',
-                'timestamp' => (string) 1700000100,
+                'timestamp' => (string) $readAt,
             ]],
         ];
         $this->runJob($account, $readPayload);
 
         $msg = WhatsAppMessage::where('wamid', 'wamid.in9')->first();
-        $this->assertEquals(1700000000, $msg->delivered_at->timestamp);
-        $this->assertEquals(1700000100, $msg->read_at->timestamp);
+        $this->assertEquals($deliveredAt, $msg->delivered_at->timestamp, 'the read rewrote the delivery time');
+        $this->assertEquals($readAt, $msg->read_at->timestamp);
     }
 
-    public function test_tipus_no_suportat_es_descarta_sense_efectes()
+    /**
+     * Was test_tipus_no_suportat_es_descarta_sense_efectes, which asserted
+     * that an `order` left no row and no conversation. T39 reversed that on
+     * purpose: a message the person sent reaches the conversation even when
+     * this module cannot draw it, because the alternative is a customer
+     * waiting for an answer to something nobody was shown.
+     *
+     * What is still worth guarding is that it does not become a *second*
+     * conversation: it belongs in the one the person already has.
+     */
+    public function test_tipus_no_suportat_va_a_la_conversa_que_ja_hi_ha()
     {
         $account = $this->createTestAccount();
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.in6a', '34611222333', 'Hola'));
+        $before = Conversation::where('mailbox_id', $account->mailbox_id)->count();
+
         $payload = $this->inboundPayload($account, 'wamid.in6', '34611222333', 'x');
         $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
             'from'      => '34611222333',
@@ -1043,11 +1101,14 @@ class ProcessInboundWebhookTest extends TestCase
             'order'     => ['catalog_id' => 'cat-1', 'product_items' => []],
         ];
 
-        $before = Conversation::where('mailbox_id', $account->mailbox_id)->count();
         $this->runJob($account, $payload);
 
-        $this->assertEquals(0, WhatsAppMessage::where('wamid', 'wamid.in6')->count());
-        $this->assertEquals($before, Conversation::where('mailbox_id', $account->mailbox_id)->count());
+        $this->assertEquals(1, WhatsAppMessage::where('wamid', 'wamid.in6')->count());
+        $this->assertEquals(
+            $before,
+            Conversation::where('mailbox_id', $account->mailbox_id)->count(),
+            'the message opened a second conversation for the same person'
+        );
     }
 
     public function test_missatge_button_es_processa_amb_el_text_del_boto()
@@ -1276,7 +1337,12 @@ class ProcessInboundWebhookTest extends TestCase
         // Fase 2: el BSUID resol un client placeholder amb conversa i thread.
         $customer = Customer::getCustomerByChannel(WhatsAppAccount::CHANNEL_BSUID, $bsuid);
         $this->assertNotNull($customer);
-        $this->assertEquals('Anna Prova', $customer->first_name);
+        // Named after the identifier since #59, not after the profile name
+        // the payload carries. The assertion is on the displayed name because
+        // how it splits across the two columns is the core's rule
+        // (Customer::parseName) and not this module's decision.
+        $this->assertEquals($bsuid, $customer->getFullName());
+        $this->assertStringNotContainsString('Anna', $customer->getFullName());
 
         $msg = WhatsAppMessage::where('wamid', 'wamid.f2a')->first();
         $this->assertNotNull($msg);
@@ -1410,36 +1476,51 @@ class ProcessInboundWebhookTest extends TestCase
     }
 
     /**
-     * Issue #7: firePostEvents() passava null com a $user a
-     * conversation.status_changed, cosa que fa petar mòduls com Workflows
-     * (accedeixen a $user->id sense comprovar null) i es perd el missatge.
+     * Issue #7 was that firePostEvents() passed null as $user to
+     * conversation.status_changed, which breaks modules like Workflows (they
+     * read $user->id without checking) and lost the message. The answer then
+     * was to always resolve a user.
+     *
+     * Issue #53 removed the event instead: the core never fires it for
+     * anything a customer did, so inventing a user for it was the defect,
+     * not the fix. The behaviour now lives in
+     * Tests/CustomerReopenEventsTest.php.
+     *
+     * What is kept here is the rule that outlasted both tickets, and it is
+     * about any future caller rather than this path: if this module ever
+     * fires that event again, it may not pass null. Asserted against the
+     * source, because there is no call left to run.
      */
-    public function test_status_changed_event_rep_sempre_un_user_no_null()
+    public function test_el_modul_no_dispara_mai_status_changed_amb_un_user_nul()
     {
-        $account = $this->createTestAccount();
+        $source = file_get_contents(__DIR__ . '/../Jobs/ProcessInboundWebhook.php');
 
-        $this->runJob($account, $this->inboundPayload($account, 'wamid.st1a', '34611222333', 'hola'));
-        $msg1 = WhatsAppMessage::where('wamid', 'wamid.st1a')->first();
-        $conversation = Conversation::find($msg1->conversation_id);
-        $conversation->status = Conversation::STATUS_CLOSED;
-        $conversation->save();
-
-        $capturedUser = 'listener-not-called';
-        \Eventy::addAction('conversation.status_changed', function ($conv, $user, $changedOnReply, $prevStatus) use (&$capturedUser) {
-            $capturedUser = $user;
-        }, 20, 4);
-
-        $this->runJob($account, $this->inboundPayload($account, 'wamid.st1b', '34611222333', 'una altra cosa'));
-
-        $this->assertInstanceOf(User::class, $capturedUser);
-        $this->assertNotNull($capturedUser->id);
+        $this->assertStringNotContainsString(
+            "\\Eventy::action('conversation.status_changed'",
+            $source,
+            'the module fires an event the core reserves for agent actions (#53)'
+        );
+        $this->assertStringNotContainsString(
+            'conversation.status_changed\', $conversation, null',
+            $source,
+            'the null that broke Workflows is back (#7)'
+        );
     }
 
     /**
-     * Issue #8: el descart de tipus no suportats loguejava a nivell info i
-     * sense el remitent, fent-lo invisible amb APP_LOG_LEVEL=error (defecte).
+     * Issue #8 asked for the discard of an unsupported type to stop being
+     * invisible, and the answer then was a log line at error level with the
+     * sender in it. T39 went further: the message now reaches the
+     * conversation, so the log line is no longer the only trace and no longer
+     * an error, and the sender's phone number has come out of it because the
+     * log is one of the places erasure cannot reach.
+     *
+     * What issue #8 actually asked for is still asserted, in
+     * Tests/InboundUnsupportedTypeTest.php: the type is named, and the event
+     * is visible. This test keeps the half that has not changed, which is that
+     * the line exists at all.
      */
-    public function test_tipus_no_suportat_es_registra_en_error_amb_remitent()
+    public function test_tipus_no_suportat_deixa_linia_al_registre_amb_el_tipus()
     {
         Log::spy();
         $account = $this->createTestAccount();
@@ -1451,9 +1532,8 @@ class ProcessInboundWebhookTest extends TestCase
 
         $this->runJob($account, $payload);
 
-        Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
-            return $message === '[MetaWhatsApp] Unsupported message type, discarded'
-                && ($context['from'] ?? null) === '34611222333'
+        Log::shouldHaveReceived('warning')->withArgs(function ($message, $context = []) {
+            return strpos($message, '[MetaWhatsApp]') === 0
                 && ($context['type'] ?? null) === 'order';
         })->once();
     }

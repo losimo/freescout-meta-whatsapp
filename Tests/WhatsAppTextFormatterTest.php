@@ -59,4 +59,110 @@ class WhatsAppTextFormatterTest extends TestCase
             WhatsAppTextFormatter::format($escaped)
         );
     }
+
+    /**
+     * The four cases reported on issue #48. Each one used to be stored
+     * mangled, and the mangled URL was then linkified by FreeScout into a
+     * link pointing somewhere else.
+     */
+    public function test_leaves_a_url_with_underscores_untouched()
+    {
+        $this->assertSame(
+            'https://example.com/my_page_name?x=1',
+            WhatsAppTextFormatter::format('https://example.com/my_page_name?x=1')
+        );
+    }
+
+    public function test_leaves_an_email_with_underscores_untouched()
+    {
+        $this->assertSame(
+            'john_doe_smith@example.com',
+            WhatsAppTextFormatter::format('john_doe_smith@example.com')
+        );
+    }
+
+    public function test_leaves_a_multiplication_untouched()
+    {
+        $this->assertSame('2*3*4 = 24', WhatsAppTextFormatter::format('2*3*4 = 24'));
+    }
+
+    public function test_leaves_a_file_name_with_underscores_untouched()
+    {
+        $this->assertSame('file_name_v2.pdf', WhatsAppTextFormatter::format('file_name_v2.pdf'));
+    }
+
+    public function test_leaves_every_marker_inside_a_url_untouched()
+    {
+        $url = 'https://example.com/a_b_c/d*e*f/g~h~i';
+
+        $this->assertSame($url, WhatsAppTextFormatter::format($url));
+    }
+
+    public function test_leaves_markers_at_a_word_boundary_inside_a_url_untouched()
+    {
+        // The underscores here sit at a word boundary, so only taking the
+        // URL out of the text saves this one.
+        $this->assertSame(
+            'https://example.com/_foo_',
+            WhatsAppTextFormatter::format('https://example.com/_foo_')
+        );
+    }
+
+    public function test_leaves_an_escaped_query_string_untouched()
+    {
+        $escaped = htmlspecialchars(
+            'https://example.com/s?a=1&b_c_d=2&e=*3*',
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+        $this->assertSame($escaped, WhatsAppTextFormatter::format($escaped));
+    }
+
+    public function test_formats_around_an_email_in_the_same_sentence()
+    {
+        $escaped = htmlspecialchars(
+            'Write to john_doe_smith@example.com and put *urgent* in the subject',
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+        $this->assertSame(
+            'Write to john_doe_smith@example.com and put <strong>urgent</strong> in the subject',
+            WhatsAppTextFormatter::format($escaped)
+        );
+    }
+
+    public function test_formats_around_a_url_in_the_same_sentence()
+    {
+        $escaped = htmlspecialchars(
+            'See https://example.com/my_page_name?a=1&b=2 and reply _today_',
+            ENT_QUOTES,
+            'UTF-8'
+        );
+
+        $this->assertSame(
+            'See https://example.com/my_page_name?a=1&amp;b=2 and reply <em>today</em>',
+            WhatsAppTextFormatter::format($escaped)
+        );
+    }
+
+    public function test_still_formats_markers_next_to_punctuation()
+    {
+        $this->assertSame('(<strong>bold</strong>)', WhatsAppTextFormatter::format('(*bold*)'));
+        $this->assertSame(
+            '&quot;<strong>bold</strong>&quot;',
+            WhatsAppTextFormatter::format(htmlspecialchars('"*bold*"', ENT_QUOTES, 'UTF-8'))
+        );
+        $this->assertSame('<strong>bold</strong>.', WhatsAppTextFormatter::format('*bold*.'));
+        $this->assertSame('<em>a</em>, <s>b</s>!', WhatsAppTextFormatter::format('_a_, ~b~!'));
+    }
+
+    public function test_still_formats_a_url_the_agent_wrapped_in_a_marker()
+    {
+        $this->assertSame(
+            '<strong>https://example.com/my_page_name</strong>',
+            WhatsAppTextFormatter::format('*https://example.com/my_page_name*')
+        );
+    }
 }

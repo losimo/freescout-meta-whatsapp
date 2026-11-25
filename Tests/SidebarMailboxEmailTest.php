@@ -214,15 +214,72 @@ class SidebarMailboxEmailTest extends TestCase
      * address and had to be split off from it. It is a different element with
      * a different problem (it belongs to e-mail, not to WhatsApp) and hiding
      * it outright is still right, so splitting must not have dropped it.
+     *
+     * Issue #17, reopened: hiding the toggle is not enough. Both routes
+     * MarkoD found arrive the same way. When the reply form is filled from a
+     * saved draft that carries cc or bcc, the core runs
+     * `$('#toggle-cc').click()` (public/js/main.js:1932 in 1.8.252) and the
+     * handler strips the `hidden` class off `.field-cc` (:2513). A hidden
+     * element still answers a programmatic click, so the containers come
+     * back: once by saving a draft and opening it again, once by pressing
+     * Undo after sending, which restores that same draft.
+     *
+     * So the rule hides what the core reveals, `.field-cc`, carried by both
+     * the Cc and the Bcc blocks (resources/views/conversations/
+     * view.blade.php:305 and :322), and not only the control that reveals
+     * it. `.cc-toggler` (:338) is the wrapper the link sits in, hidden with
+     * them so the row does not keep its space.
+     *
+     * It is the same remedy the core applies to itself in chat mode, at
+     * main.js:1948.
      */
-    public function test_the_cc_toggle_is_still_hidden_outright()
+    public function test_the_cc_and_bcc_fields_are_hidden_and_not_only_the_toggle()
     {
         $account = $this->createTestAccount();
 
         $this->assertStringContainsString(
-            '#toggle-cc { display: none !important; }',
+            '#toggle-cc, .cc-toggler, .field-cc { display: none !important; }',
             $this->mailboxPage($account->mailbox_id),
-            'splitting the rule lost the Cc/Bcc toggle'
+            'the core reveals .field-cc when it restores a draft, so hiding the toggle alone leaves Cc/Bcc reachable'
+        );
+    }
+
+    /**
+     * Issue #57, the visible half. The flag the core sets from this checkbox
+     * is already dropped server-side in the provider, so what is left is a
+     * ticked box that does nothing: hiding it keeps the agent from reading
+     * meaning into a control with none.
+     *
+     * The rule travels in <head> with the rest for the reason issue #17
+     * paid for: a stylesheet arriving at the end of the body leaves a window
+     * in which the thing is painted.
+     */
+    public function test_the_core_email_copy_checkbox_is_hidden()
+    {
+        $account = $this->createTestAccount();
+
+        $this->assertStringContainsString(
+            '.conv-chat-email { display: none !important; }',
+            $this->mailboxPage($account->mailbox_id),
+            'the core e-mail copy checkbox is still offered on a WhatsApp mailbox'
+        );
+    }
+
+    /**
+     * With the copy allowed on this channel, the checkbox is the control
+     * the agent uses, so hiding it would leave them with a feature they
+     * were given and cannot reach.
+     */
+    public function test_the_checkbox_is_offered_when_the_channel_allows_the_copy()
+    {
+        $account = $this->createTestAccount();
+        $account->allow_core_email_copy = true;
+        $account->save();
+
+        $this->assertStringNotContainsString(
+            '.conv-chat-email { display: none !important; }',
+            $this->mailboxPage($account->mailbox_id),
+            'the channel allows the e-mail copy and the checkbox is hidden anyway'
         );
     }
 
@@ -240,6 +297,11 @@ class SidebarMailboxEmailTest extends TestCase
 
         $this->assertStringNotContainsString('metawhatsapp-sidebar-phone', $html);
         $this->assertStringNotContainsString('.sidebar-title-email', $html);
+        $this->assertStringNotContainsString(
+            '.conv-chat-email',
+            $html,
+            'the e-mail copy checkbox was hidden on a mailbox this module has nothing to do with'
+        );
         $this->assertStringContainsString(
             $plain->email,
             $html,
