@@ -12,9 +12,11 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+use Modules\MetaWhatsApp\Support\AgentNotifications;
 use Modules\MetaWhatsApp\Support\DeliveryFailure;
 use Modules\MetaWhatsApp\Support\OutboundFailure;
 use Modules\MetaWhatsApp\Support\OutboundGuard;
+use Modules\MetaWhatsApp\Support\ReadReceipt;
 
 class SendWhatsAppMedia implements ShouldQueue
 {
@@ -70,7 +72,29 @@ class SendWhatsAppMedia implements ShouldQueue
         $this->caption      = $caption;
     }
 
+    /**
+     * Issue #64. The whole job runs inside AgentNotifications::around(),
+     * which flushes the subscription buffer once the run is over so that a
+     * note this job writes actually reaches the agents subscribed to notes.
+     *
+     * Around the job and not on the last line of run(): the body returns
+     * early on several paths that have just written a note, and failed()
+     * writes one too. What exactly is flushed, what is put back when the run
+     * throws, and why that is not a finally, are all in that class and in
+     * one copy, which is the difference between this and #18, #25, #28, #29.
+     */
     public function handle()
+    {
+        return AgentNotifications::around(
+            function () {
+                return $this->run();
+            },
+            $this->notificationContext()
+        );
+    }
+
+    /** The job itself. Everything it writes is flushed by handle(). */
+    protected function run()
     {
         $account = OutboundGuard::accountForSending(
             $this->accountId,
@@ -85,9 +109,14 @@ class SendWhatsAppMedia implements ShouldQueue
             if (OutboundGuard::refuseIfUnreachable($this->accountId, $this->threadId, $this->toPhone)) {
                 return;
             }
-            $thread = Thread::find($this->threadId);
-            if ($thread) {
-                $this->recordFailure($this->accountId, $thread, 'account_inactive');
+            // And no row when the channel is only switched off, which is
+            // OutboundGuard::refusalLeavesARow(): a row would be what stops
+            // this reply going out when the channel is reconnected.
+            if (OutboundGuard::refusalLeavesARow($this->accountId, OutboundGuard::SUBJECT_MEDIA)) {
+                $thread = Thread::find($this->threadId);
+                if ($thread) {
+                    $this->recordFailure($this->accountId, $thread, 'account_inactive');
+                }
             }
             return;
         }
@@ -213,7 +242,7 @@ class SendWhatsAppMedia implements ShouldQueue
                 'category'        => WhatsAppMessage::CATEGORY_SERVICE,
                 'status'          => WhatsAppMessage::STATUS_SENT,
             ]);
-            $this->markLastInboundAsRead($account, $thread);
+            ReadReceipt::markLastInbound($this->apiClient($account), $thread->conversation_id);
             return;
         }
 
@@ -383,28 +412,10 @@ class SendWhatsAppMedia implements ShouldQueue
     }
 
     /**
-     * Marca com a llegit l'últim missatge entrant de la conversa (issue
-     * #23). Si no n'hi ha cap, simplement no fa res.
-     */
-    protected function markLastInboundAsRead(WhatsAppAccount $account, Thread $thread)
-    {
-        $lastInbound = WhatsAppMessage::where('conversation_id', $thread->conversation_id)
-            ->where('direction', WhatsAppMessage::DIRECTION_INBOUND)
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->first();
-
-        if ($lastInbound && $lastInbound->wamid) {
-            $this->apiClient($account)->markAsRead($lastInbound->wamid);
-        }
-    }
-
-    /**
      * See the same method in the text job (T04). This job is the reason
      * OutboundFailure takes an attachment: it fails per file, and the
      * synthetic wamid has to stay unique per file.
-     */
-    /**
+     *
      * @param bool $justDispatchedText this call has just sent the reply's
      *                                 text as a message of its own
      */
@@ -431,7 +442,55 @@ class SendWhatsAppMedia implements ShouldQueue
         );
     }
 
+    /**
+     * The last resort, and it deliberately does NOT rescue the reply's text.
+     *
+     * `handle()` does rescue it when Meta refuses the file outright, through
+     * sendTextSeparately(), so the words still reach the customer. Here they
+     * do not, and the reason is not symmetry:
+     *
+     * - **There is no error code to read.** This runs when the retries are
+     *   exhausted or the worker died, so nothing tells us whether the 24
+     *   hour window is still open. sendTextSeparately() refuses on a window
+     *   error precisely because the text job has no window check of its own,
+     *   and dispatching one from here would be that same guaranteed second
+     *   refusal with the check missing instead of failing.
+     * - **The time is unknown.** A job that reaches `failed_jobs` can be
+     *   retried months later and land here, and the guard right below exists
+     *   because an erasure can have happened in between. Sending something
+     *   new from a handler that runs after the job was given up on means
+     *   acting on state nobody has re-read.
+     *
+     * What makes that acceptable is the note. With the caption on this
+     * attachment and no separate dispatch, recordFailure() writes the
+     * whole-reply note rather than the file-only one, so the agent is told
+     * that nothing of that reply arrived. The words are lost, and they are
+     * reported as lost, which leaves the decision where it belongs.
+     *
+     * Written down on 25 November 2026 because the branch review found the
+     * behaviour deliberate and the reason nowhere: it had been argued in a
+     * conversation and never in the code.
+     *
+     * The body moved into runFailed() when #64 wrapped both entry points of
+     * every job, and this is the reasoning for that body: it stays with it.
+     */
     public function failed(\Throwable $e)
+    {
+        AgentNotifications::around(
+            function () use ($e) {
+                $this->runFailed($e);
+            },
+            $this->notificationContext()
+        );
+    }
+
+    /**
+     * The retries are over, and this writes a note too (#64), through
+     * OutboundFailure, which is why failed() wraps it in a flush.
+     *
+     * What it does and why is the block above failed().
+     */
+    protected function runFailed(\Throwable $e)
     {
         Log::error('[MetaWhatsApp] SendWhatsAppMedia failed permanently', [
             'account_id'    => $this->accountId,
@@ -456,5 +515,15 @@ class SendWhatsAppMedia implements ShouldQueue
                 $this->recordFailure($this->accountId, $thread, 'transient');
             }
         }
+    }
+
+    /** What the discarded-notifications log line carries for this job. */
+    protected function notificationContext(): array
+    {
+        return [
+            'job'        => static::class,
+            'account_id' => $this->accountId,
+            'thread_id'  => $this->threadId,
+        ];
     }
 }

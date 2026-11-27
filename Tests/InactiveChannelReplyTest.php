@@ -94,7 +94,7 @@ class InactiveChannelReplyTest extends TestCase
         $note = $this->refusalNote($conversation);
         $this->assertNotNull($note, 'the reply died with the channel off and the conversation says nothing');
         $this->assertNotNull($note->created_by_user_id, 'an authorless note breaks the core print view (#55)');
-        Queue::assertNothingPushed();
+        $this->assertNothingSentToMeta();
     }
 
     /**
@@ -195,7 +195,7 @@ class InactiveChannelReplyTest extends TestCase
         [$conversation, $first] = $this->makeReply($account);
 
         $this->dispatchReplies($conversation, [$first]);
-        Queue::assertNothingPushed();
+        $this->assertNothingSentToMeta();
 
         $account->is_active = true;
         $account->save();
@@ -241,6 +241,117 @@ class InactiveChannelReplyTest extends TestCase
             Conversation::STATUS_ACTIVE,
             (int) $conversation->fresh()->status,
             'the note landed in a closed conversation, where the agent will not see it'
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // The same event caught inside the job (the review's race, 25 Nov)
+    // -----------------------------------------------------------------
+
+    /**
+     * The other side of the dispatch, and the reason this matters.
+     *
+     * The channel can go off in the seconds between the dispatcher letting a
+     * reply through and the job running, and then the refusal is reported
+     * from inside the job instead. That path used to write a failed row, and
+     * the dispatcher skips any reply thread that already has an outbound row
+     * (MetaWhatsAppServiceProvider: "Ja enviat (o fallit definitivament)"),
+     * so the reply above went out when the channel came back while this one
+     * never did. Same event, two endings, and the customer's answer hanging
+     * on which side of the dispatch the channel happened to go off.
+     */
+    public function test_a_reply_refused_inside_the_job_is_also_dispatched_once_it_is_back()
+    {
+        Queue::fake();
+        $account = $this->createTestAccount(['is_active' => false]);
+        [$conversation, $thread] = $this->makeReply($account);
+
+        // Not the dispatcher this time: the job itself, which is what runs
+        // when the channel was still active a moment earlier.
+        (new SendWhatsAppMessage($account->id, $thread->id, '+34611222333'))->handle();
+
+        $this->assertNotNull($this->refusalNote($conversation), 'the job path says nothing in the conversation');
+
+        $account->is_active = true;
+        $account->save();
+
+        $this->dispatchReplies($conversation, [$thread]);
+
+        Queue::assertPushed(SendWhatsAppMessage::class, 1);
+    }
+
+    /**
+     * And it has to say the same thing, because the agent cannot tell which
+     * path caught their reply. Both notes now report a reply that is still
+     * pending rather than one to be written again.
+     */
+    public function test_both_paths_say_the_reply_is_still_pending()
+    {
+        Queue::fake();
+        $account = $this->createTestAccount(['is_active' => false]);
+        [$conversation, $thread] = $this->makeReply($account);
+
+        (new SendWhatsAppMessage($account->id, $thread->id, '+34611222333'))->handle();
+
+        $this->assertStringContainsString(
+            __('metawhatsapp::metawhatsapp.not_sent_channel_inactive_kept'),
+            (string) $this->refusalNote($conversation)->body,
+            'the job path asks the agent to write the reply again, which would send it twice'
+        );
+    }
+
+    /**
+     * The rule in one place, and its two exceptions stated as cases rather
+     * than as prose: a channel that is gone will never send this reply, and
+     * a template has no second chance to protect because an agent sends one
+     * by pressing a button.
+     */
+    public function test_which_refusals_leave_a_row()
+    {
+        $off = $this->createTestAccount(['is_active' => false]);
+        $on  = $this->createTestAccount();
+
+        $this->assertFalse(
+            OutboundGuard::refusalLeavesARow($off->id, OutboundGuard::SUBJECT_MESSAGE),
+            'a reply refused on a channel that is merely off would be recorded as failed'
+        );
+        $this->assertFalse(
+            OutboundGuard::refusalLeavesARow($off->id, OutboundGuard::SUBJECT_MEDIA),
+            'the attachments of a reply would be recorded as failed'
+        );
+        $this->assertTrue(
+            OutboundGuard::refusalLeavesARow($off->id, OutboundGuard::SUBJECT_TEMPLATE),
+            'a template refused with the channel off would leave no trace at all'
+        );
+        $this->assertTrue(
+            OutboundGuard::refusalLeavesARow($on->id + 10000, OutboundGuard::SUBJECT_MESSAGE),
+            'a reply whose channel has been deleted would leave no trace at all'
+        );
+    }
+
+    /**
+     * The third answer, which is a race rather than a case.
+     *
+     * This question is only ever asked inside the branch where
+     * accountForSending() has already refused, and it refuses only when the
+     * channel is missing or inactive. So a channel that is found and active
+     * by the time this runs is one an administrator reconnected in between,
+     * which is the switched-off case arriving a second late, and the note
+     * written moments earlier already says the reply is still pending.
+     *
+     * Answering yes there writes a permanent failed row, and the dispatcher
+     * skips any reply thread that holds one, so the reply is never sent
+     * while the note says it will be. The row and the note cannot
+     * contradict each other.
+     */
+    public function test_a_channel_reconnected_mid_refusal_still_leaves_no_row()
+    {
+        $account = $this->createTestAccount();
+
+        $this->assertFalse(
+            OutboundGuard::refusalLeavesARow($account->id, OutboundGuard::SUBJECT_MESSAGE),
+            'the reply was recorded as failed because the channel came back between two lookups,'
+                . ' so it will never be sent and the note says it is pending'
         );
     }
 }

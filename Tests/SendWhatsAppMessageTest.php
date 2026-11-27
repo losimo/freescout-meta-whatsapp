@@ -59,23 +59,34 @@ class SendWhatsAppMessageTest extends TestCase
     }
 
     /**
-     * Fins a la #29 aquest test afirmava que amb el compte inactiu NO es
-     * creava cap fila, i era precisament el problema: l'agent veia la seva
-     * resposta com a enviada i enlloc deia el contrari. Ara no s'envia
-     * res, però queda constància a la fila i a la conversa.
+     * Issue #29 asked for this path to leave a trace, because an agent saw
+     * their reply in the conversation and nothing said it had not gone out.
+     * The trace was a failed row and a note; it is now the note alone, and
+     * the reason is the one the review found on 25 November 2026.
+     *
+     * The dispatcher skips any reply thread that already has an outbound
+     * row, failed ones included, so that row was also what decided whether
+     * the reply was ever delivered. Refused before dispatching it waited and
+     * went out when the channel came back (T28); refused seconds later in
+     * here it was silently never sent again. Same event, two endings, and
+     * the customer's answer hanging on which side of the dispatch the
+     * channel went off. The note is where the agent looks, and the channel's
+     * own panel is where an administrator sees it is off.
      */
-    public function test_compte_inactiu_no_envia_pero_deixa_constancia()
+    public function test_compte_inactiu_no_envia_i_deixa_la_resposta_pendent()
     {
         $account = $this->createTestAccount(['is_active' => false]);
         $thread  = $this->makeConversationWithThread($account, Thread::TYPE_MESSAGE, Thread::STATE_PUBLISHED);
 
         (new SendWhatsAppMessage($account->id, $thread->id, '+34611222333'))->handle();
 
-        $failed = WhatsAppMessage::where('thread_id', $thread->id)
-            ->where('status', WhatsAppMessage::STATUS_FAILED)
-            ->first();
-        $this->assertNotNull($failed, 'Ha de quedar constància que no s\'ha enviat.');
-        $this->assertEquals('account_inactive', $failed->error_code);
+        $this->assertEquals(
+            0,
+            WhatsAppMessage::where('thread_id', $thread->id)
+                ->where('direction', WhatsAppMessage::DIRECTION_OUTBOUND)
+                ->count(),
+            'a row here is what would stop this reply going out once the channel is back'
+        );
 
         // Cap fila de missatge enviat: no s'ha fet cap crida a Meta.
         $this->assertEquals(

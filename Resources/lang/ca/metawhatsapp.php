@@ -198,6 +198,8 @@ return [
     'email_copy_title'            => 'Còpia per correu',
     'email_copy_enable'           => 'Permet que els agents enviïn també la resposta al client per correu',
     'email_copy_enable_help'      => 'Desactivat per defecte. El FreeScout ofereix una casella a les respostes escrites fora del mode xat, i arriba ja marcada, així que un agent que no se n\'adoni envia la mateixa resposta dues vegades: una per WhatsApp i una per correu. Amb això desactivat, el mòdul atura aquella còpia i amaga la casella. Activa-ho si vols que aquesta opció estigui disponible en aquest canal; llavors la casella funciona com el FreeScout vol, i segueix venint marcada per defecte, o sigui que val més avisar els agents. L\'interruptor només té efecte a partir del FreeScout 1.8.251, i que la còpia arribi de debò depèn de la configuració de sortida de la vostra instal·lació, no d\'aquest mòdul.',
+    'email_copy_core_disabled'    => 'El FreeScout mateix s\'està executant amb l\'APP_CHAT_CONVERSATION_REPLY_BY_EMAIL desactivat, o sigui que no dibuixa cap casella ni envia cap còpia, digui el que digui aquest interruptor, i activar-ho aquí no canvia res mentre segueixi així. Si acabes de canviar aquella línia, una configuració en memòria cau manté el valor antic fins que es reconstrueix.',
+    'email_copy_mailbox_cannot_send' => 'Aquesta bústia no té cap mètode de sortida actiu, així que a partir de la versió del FreeScout posterior a la 1.8.252 la casella no sortirà ni que això estigui activat. A la 1.8.251 i la 1.8.252 encara surt, i llavors la còpia es lliura a una configuració de correu que no la pot enviar.',
     'usage_title'            => 'Missatges de servei',
     'usage_enable'           => 'Compta els missatges de servei enviats des del FreeScout',
     'usage_enable_help'      => 'A partir de l\'1 d\'octubre del 2026 Meta factura els missatges de servei enviats dins de la finestra de 24 hores, amb una franquícia mensual per número de telèfon. Aquest comptador només veu el que ha sortit del FreeScout, o sigui que si aquest número també s\'usa des d\'una altra banda, el total real a Meta és més alt.',
@@ -217,7 +219,7 @@ return [
 
     // Esdeveniments del compte: el registre opcional del que Meta ha reportat sobre el compte.
     'account_events_title'    => 'Esdeveniments del compte',
-    'account_events_help'     => 'El que Meta ha reportat sobre el vostre compte: canvis d\'estat de plantilles, valoracions de qualitat, restriccions. Aquí no hi ha res que identifiqui cap client. Els registres de més de 90 dies s\'esborren.',
+    'account_events_help'       => 'El que Meta ha reportat sobre el vostre compte: canvis d\'estat i de categoria de plantilles, restriccions, infraccions i bloquejos del compte, avisos sobre límits d\'enviament i sobre el perfil de l\'empresa, canvis de cabal per número i la decisió de la revisió de polítiques. Aquí no hi ha res que identifiqui cap client. Els registres de més de 90 dies s\'esborren.',
     'account_events_empty'    => 'No hi ha res registrat. O no ha passat res, o el registre està apagat.',
     'account_events_when'     => 'Quan',
     'account_events_type'     => 'Esdeveniment',
@@ -226,15 +228,15 @@ return [
     'account_events_link'     => 'Esdeveniments del compte',
     'account_events_channel'  => 'Canal',
     'account_events_enable'      => 'Registra el que Meta reporta sobre el compte',
-    'account_events_enable_help' => 'Canvis d\'estat de plantilles, canvis de categoria (que en decideixen el preu), valoracions de qualitat i restriccions, conservats 90 dies i llegibles des de l\'enllaç de sota. Només fets del compte: aquí no s\'hi registra res de cap client. Apagat si no el voleu. Una cosa que aquest interruptor no pot fer tot sol: Meta només envia aquests esdeveniments si a la configuració de webhook de la vostra app hi ha activats `message_template_status_update` i `template_category_update`, a més de `messages`. Des d\'aquí no podem veure si hi són, així que si el registre es queda buit, aquell és el primer lloc on mirar.',
+    'account_events_enable_help' => 'Canvis d\'estat de plantilles, canvis de categoria (que en decideixen el preu), restriccions, infraccions i bloquejos del compte, avisos sobre límits d\'enviament, sobre l\'estat de compte d\'empresa oficial i sobre la foto del perfil, canvis de cabal i de límit per número, i la decisió de la revisió de polítiques. Conservats 90 dies i llegibles des de l\'enllaç de sota. Només fets del compte: aquí no s\'hi registra res de cap client. Apagat si no el voleu. La valoració de qualitat dels missatges, la del verd, groc i vermell, no hi és: Meta no envia cap webhook amb aquest valor, així que només es pot llegir al WhatsApp Manager o demanar-la per l\'API. Una cosa que aquest interruptor no pot fer tot sol: Meta només envia aquests esdeveniments si a la configuració de webhook de la vostra app hi ha activats `message_template_status_update`, `template_category_update`, `account_update`, `account_alerts`, `phone_number_quality_update` i `account_review_update`, a més de `messages`. Des d\'aquí no podem veure si hi són, així que si el registre es queda buit, aquell és el primer lloc on mirar.',
 
     // Author of the module's automatic notes (issue #43). The note is about an
     // agent, and FreeScout writes "you" when the author is the person reading,
     // so by default the agent is told in their own voice something the module
     // wrote about them.
     'note_author'          => 'Notes automàtiques escrites per',
-    'note_author_agent'    => 'L\'agent de qui parla la nota',
-    'note_author_help'     => 'Per defecte una nota automàtica porta l\'agent de qui parla, i el FreeScout la hi ensenya com si l\'hagués escrita ell mateix. Trieu aquí un usuari, per exemple un que creeu i anomeneu Sistema o WhatsApp, i les notes portaran aquest usuari; si l\'esborreu més endavant, tornen a portar l\'agent. Abans de crear-lo: és un usuari normal del FreeScout, així que se li poden assignar converses i rebrà correus de notificació si no li buideu les subscripcions, i el canvi només afecta les notes que s\'escriguin a partir d\'ara.',
+    'note_author_default'  => 'El primer administrador',
+    'note_author_help'     => 'Per defecte una nota automàtica l\'escriu el primer administrador de la instal·lació, i el FreeScout ensenya una nota al seu autor com si l\'hagués escrita ell, així que aquell administrador llegirà aquestes notes com a frases seves, i en rep l\'avís com qualsevol altre. Trieu aquí un usuari, per exemple un que creeu i anomeneu Sistema o WhatsApp, i les notes portaran aquest usuari; si l\'esborreu més endavant, tornen al primer administrador. Dues coses sobre l\'usuari que trieu: no rep avís de les notes del mòdul, igual que el FreeScout no avisa mai qui escriu una nota, així que trieu un usuari de marcador i no algú que treballi converses; i per la resta és un usuari normal del FreeScout, així que se li poden assignar converses i rebrà els altres correus de notificació si no li buideu les subscripcions. El canvi només afecta les notes que s\'escriguin a partir d\'ara.',
     'note_author_unknown'  => 'Aquest usuari no existeix, així que no s\'ha desat res.',
 
     // Comprovacions d'entorn: coses que impedeixen que el mòdul funcioni i que
@@ -275,19 +277,22 @@ return [
     'erasure_col_orphaned'                 => 'Registres amb la conversa ja inexistent',
     'erasure_col_channel_rows'             => 'Enllaços de contacte',
     'erasure_col_records'                  => 'Fitxes de client que el conserven',
+    'erasure_records_other_data' => 'Registres que porten també altres dades: :count. Només se\'ls treu aquesta identitat, i la resta del registre es queda com està.',
     'erasure_erase_button'                 => 'Elimina el que guardem',
     'erasure_erase_help'                   => 'Això no es pot desfer, i afecta tots els registres d\'aquesta persona, no una selecció.',
     'erasure_confirm'                      => 'Voleu eliminar la identitat de WhatsApp de tots els registres d\'aquesta persona? Això no es pot desfer.',
     'erasure_receipt_title'                => 'Comprovant de l\'eliminació',
     'erasure_receipt_warning'              => 'Això es mostra un sol cop i no es desa enlloc. Copieu-ho o feu-ne una captura ara: en sortir d\'aquesta pantalla es perd definitivament.',
     'erasure_nothing_to_erase'             => 'No quedava res per eliminar amb aquest identificador.',
-    'erasure_receipt_removed'              => 'Eliminat el :date: aquesta identitat de WhatsApp (:identifiers) de :messages registre(s) de missatge, :channels registre(s) de canal de contacte i :records fitxa/fitxes de client.',
+    'erasure_receipt_removed'              => 'Eliminat el :date: aquesta identitat de WhatsApp (:identifiers) de :messages registre(s) de missatge, :channels registre(s) de canal de contacte i :records fitxa/fitxes de client, de les quals :names tenien la identitat com a nom sencer i ara diuen «:placeholder».',
+    'erased_contact_name'                  => 'Contacte esborrat',
     'erasure_receipt_kept'                 => 'Conservat i fet il·legible: cada identificador de missatge de Meta se substitueix per una empremta d\'un sol sentit d\'ell mateix. Una reentrega de Meta segueix sense poder recrear aquesta persona, i l\'identificador del qual surt l\'empremta ja no es pot llegir als registres propis d\'aquest mòdul.',
     'erasure_receipt_remains_intro'        => 'Fora de l\'abast d\'aquest mòdul, i on es treu cada cosa:',
     'erasure_receipt_remains_conversations' => 'Les converses i el seu contingut segueixen al FreeScout, amb el telèfon al títol de cada conversa i al remitent de cada missatge; es treuen esborrant aquelles converses des del FreeScout.',
-    'erasure_receipt_remains_customer'     => 'El nom de la fitxa del client hi continua, i és el número de telèfon mateix sempre que ningú no hagi reanomenat el contacte, així que surt a totes les llistes de converses. No s\'hi toca perquè reanomenar una fitxa és una decisió de l\'administrador i el formulari d\'edició del FreeScout ja ho fa; el número sí que s\'elimina de la llista de telèfons i dels camps de canal de la fitxa, on aquell formulari no arriba.',
+    'erasure_receipt_remains_customer'     => 'La fitxa del client no s’esborra mai, i un nom que sigui qualsevol altra cosa que la identitat eliminada es queda tal com està: reanomenar un contacte és una decisió de l’administrador i el formulari d’edició del FreeScout ja ho fa. El que sí que reanomena aquesta pantalla és una fitxa que tenia la identitat mateixa com a nom sencer, perquè aquell nom l’hi va escriure aquest mòdul en crear-la i és la còpia més visible de totes; les que ho eren surten comptades a dalt.',
     'erasure_receipt_remains_queue'        => 'Els payloads de webhook que hagin acabat a la cua de treballs fallits del FreeScout poden contenir el text del missatge; es netegen des de la cua.',
     'erasure_receipt_remains_debuglog'     => 'Si el registre detallat ha estat activat alguna vegada, el log de depuració del mòdul conté el text sencer dels missatges i els números de telèfon. La seva retenció només esborra fitxers antics mentre el registre està funcionant, així que els fitxers d\'un període que ja heu desactivat es queden fins que algú els elimini del servidor a mà, i una retenció de 0 conserva tots els fitxers per sempre.',
     'erasure_receipt_remains_portfolios'   => 'Si aquesta persona va escriure des de dos portfolios de Meta diferents sense revelar mai el número, això no es pot resoldre des del mòdul: no hi ha cap registre que connecti els dos, així que només s\'ha pogut eliminar el costat que vau identificar.',
     'new_conversation_refused'             => 'Una conversa de WhatsApp només la pot iniciar el client, així que aquesta bústia no té formulari de conversa nova. Responeu dins d\'una conversa existent, o envieu una plantilla aprovada si la finestra de 24 hores ja s\'ha tancat.',
+    'trademark_notice'                     => 'WhatsApp i Meta són marques de Meta Platforms, Inc. Aquest mòdul és un projecte independent, no hi està afiliat ni compta amb el seu suport, i fa servir aquests noms només per dir a quin servei es connecta.',
 ];

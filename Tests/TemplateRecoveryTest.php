@@ -736,6 +736,12 @@ class TemplateRecoveryTest extends TestCase
      * el fil d'auditoria i ha dit a l'agent que la plantilla estava
      * encuada. Sortir en silenci deixava una conversa que aparenta un
      * enviament que no ha existit.
+     *
+     * The row stays on this path while the reply paths lost theirs on
+     * 25 November 2026, and the asymmetry is deliberate: a reply with no row
+     * is dispatched again when the channel comes back, and a template is
+     * sent by an agent pressing a button, with nothing that re-sends it. See
+     * OutboundGuard::refusalLeavesARow().
      */
     public function test_un_compte_inactiu_registra_la_fallida_en_lloc_de_callar()
     {

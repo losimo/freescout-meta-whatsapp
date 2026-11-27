@@ -198,6 +198,8 @@ return [
     'email_copy_title'            => 'Copia por correo',
     'email_copy_enable'           => 'Permite que los agentes envíen también la respuesta al cliente por correo',
     'email_copy_enable_help'      => 'Desactivado por defecto. FreeScout ofrece una casilla en las respuestas escritas fuera del modo chat, y llega ya marcada, así que un agente que no se dé cuenta envía la misma respuesta dos veces: una por WhatsApp y otra por correo. Con esto desactivado, el módulo detiene esa copia y oculta la casilla. Actívalo si quieres que esa opción esté disponible en este canal; entonces la casilla funciona como FreeScout quiere, y sigue viniendo marcada por defecto, así que conviene avisar a los agentes. El interruptor solo tiene efecto a partir de FreeScout 1.8.251, y que la copia llegue realmente depende de la configuración de salida de su instalación, no de este módulo.',
+    'email_copy_core_disabled'    => 'FreeScout mismo se está ejecutando con APP_CHAT_CONVERSATION_REPLY_BY_EMAIL desactivado, así que no dibuja ninguna casilla ni envía ninguna copia, diga lo que diga este interruptor, y activarlo aquí no cambia nada mientras siga así. Si acabas de cambiar esa línea, una configuración en caché mantiene el valor antiguo hasta que se reconstruye.',
+    'email_copy_mailbox_cannot_send' => 'Este buzón no tiene ningún método de salida activo, así que a partir de la versión de FreeScout posterior a la 1.8.252 la casilla no aparecerá aunque esto esté activado. En la 1.8.251 y la 1.8.252 todavía aparece, y entonces la copia se entrega a una configuración de correo que no puede enviarla.',
     'usage_title'            => 'Mensajes de servicio',
     'usage_enable'           => 'Cuenta los mensajes de servicio enviados desde FreeScout',
     'usage_enable_help'      => 'A partir del 1 de octubre de 2026 Meta factura los mensajes de servicio enviados dentro de la ventana de 24 horas, con una franquicia mensual por número de teléfono. Este contador solo ve lo que ha salido de FreeScout, así que si este número también se usa desde otro sitio, el total real en Meta es más alto.',
@@ -217,7 +219,7 @@ return [
 
     // Eventos de la cuenta: el registro opcional de lo que Meta ha reportado sobre la cuenta.
     'account_events_title'    => 'Eventos de la cuenta',
-    'account_events_help'     => 'Lo que Meta ha reportado sobre vuestra cuenta: cambios de estado de plantillas, valoraciones de calidad, restricciones. Aquí no hay nada que identifique a ningún cliente. Los registros de más de 90 días se borran.',
+    'account_events_help'       => 'Lo que Meta ha reportado sobre vuestra cuenta: cambios de estado y de categoría de plantillas, restricciones, infracciones y bloqueos de la cuenta, avisos sobre límites de envío y sobre el perfil de la empresa, cambios de caudal por número y la decisión de la revisión de políticas. Aquí no hay nada que identifique a ningún cliente. Los registros de más de 90 días se borran.',
     'account_events_empty'    => 'No hay nada registrado. O no ha pasado nada, o el registro está apagado.',
     'account_events_when'     => 'Cuándo',
     'account_events_type'     => 'Evento',
@@ -226,15 +228,15 @@ return [
     'account_events_link'     => 'Eventos de la cuenta',
     'account_events_channel'  => 'Canal',
     'account_events_enable'      => 'Registra lo que Meta reporta sobre la cuenta',
-    'account_events_enable_help' => 'Cambios de estado de plantillas, cambios de categoría (que deciden su precio), valoraciones de calidad y restricciones, conservados 90 días y legibles desde el enlace de abajo. Solo hechos de la cuenta: aquí no se registra nada de ningún cliente. Apagado si no lo queréis. Una cosa que este interruptor no puede hacer solo: Meta solo envía estos eventos si en la configuración de webhook de vuestra app están activados `message_template_status_update` y `template_category_update`, además de `messages`. Desde aquí no podemos ver si lo están, así que si el registro se queda vacío, ese es el primer sitio donde mirar.',
+    'account_events_enable_help' => 'Cambios de estado de plantillas, cambios de categoría (que deciden su precio), restricciones, infracciones y bloqueos de la cuenta, avisos sobre límites de envío, sobre el estado de cuenta de empresa oficial y sobre la foto del perfil, cambios de caudal y de límite por número, y la decisión de la revisión de políticas. Conservados 90 días y legibles desde el enlace de abajo. Solo hechos de la cuenta: aquí no se registra nada de ningún cliente. Apagado si no lo queréis. La valoración de calidad de los mensajes, la del verde, amarillo y rojo, no está: Meta no envía ningún webhook con ese valor, así que solo se puede leer en el WhatsApp Manager o pedirla por la API. Una cosa que este interruptor no puede hacer solo: Meta solo envía estos eventos si en la configuración de webhook de vuestra app están activados `message_template_status_update`, `template_category_update`, `account_update`, `account_alerts`, `phone_number_quality_update` y `account_review_update`, además de `messages`. Desde aquí no podemos ver si lo están, así que si el registro se queda vacío, ese es el primer sitio donde mirar.',
 
     // Author of the module's automatic notes (issue #43). The note is about an
     // agent, and FreeScout writes "you" when the author is the person reading,
     // so by default the agent is told in their own voice something the module
     // wrote about them.
     'note_author'          => 'Notas automáticas escritas por',
-    'note_author_agent'    => 'El agente del que habla la nota',
-    'note_author_help'     => 'Por defecto una nota automática lleva el agente del que habla, y FreeScout se la muestra a ese agente como si la hubiera escrito él mismo. Elegid aquí un usuario, por ejemplo uno que creéis y llaméis Sistema o WhatsApp, y las notas llevarán ese usuario; si lo borráis más adelante, vuelven a llevar el agente. Antes de crearlo: es un usuario normal de FreeScout, así que se le pueden asignar conversaciones y recibirá correos de notificación si no le vaciáis las suscripciones, y el cambio solo afecta a las notas que se escriban a partir de ahora.',
+    'note_author_default'  => 'El primer administrador',
+    'note_author_help'     => 'Por defecto una nota automática la escribe el primer administrador de la instalación, y FreeScout muestra una nota a su autor como si la hubiera escrito él, así que ese administrador leerá estas notas como frases suyas, y recibe el aviso de ellas como cualquier otro. Elegid aquí un usuario, por ejemplo uno que creéis y llaméis Sistema o WhatsApp, y las notas llevarán ese usuario; si lo borráis más adelante, vuelven al primer administrador. Dos cosas sobre el usuario que elijáis: no recibe aviso de las notas del módulo, igual que FreeScout no avisa nunca a quien escribe una nota, así que elegid un usuario de marcador y no a alguien que trabaje conversaciones; y por lo demás es un usuario normal de FreeScout, así que se le pueden asignar conversaciones y recibirá los otros correos de notificación si no le vaciáis las suscripciones. El cambio solo afecta a las notas que se escriban a partir de ahora.',
     'note_author_unknown'  => 'Ese usuario no existe, así que no se ha guardado nada.',
 
     // Comprobaciones de entorno: cosas que impiden que el módulo funcione y que
@@ -275,19 +277,22 @@ return [
     'erasure_col_orphaned'                 => 'Registros cuya conversación ya no existe',
     'erasure_col_channel_rows'             => 'Enlaces de contacto',
     'erasure_col_records'                  => 'Fichas de cliente que lo conservan',
+    'erasure_records_other_data' => 'Registros que llevan también otros datos: :count. Solo se les quita esta identidad, y el resto del registro se queda como está.',
     'erasure_erase_button'                 => 'Eliminar lo que guardamos',
     'erasure_erase_help'                   => 'Esto no se puede deshacer, y afecta a todos los registros de esta persona, no a una selección.',
     'erasure_confirm'                      => '¿Eliminar la identidad de WhatsApp de todos los registros de esta persona? Esto no se puede deshacer.',
     'erasure_receipt_title'                => 'Comprobante de la eliminación',
     'erasure_receipt_warning'              => 'Esto se muestra una sola vez y no se guarda en ningún sitio. Cópialo o haz una captura ahora: al salir de esta pantalla se pierde definitivamente.',
     'erasure_nothing_to_erase'             => 'No quedaba nada por eliminar con ese identificador.',
-    'erasure_receipt_removed'              => 'Eliminado el :date: esta identidad de WhatsApp (:identifiers) de :messages registro(s) de mensaje, :channels registro(s) de canal de contacto y :records ficha(s) de cliente.',
+    'erasure_receipt_removed'              => 'Eliminado el :date: esta identidad de WhatsApp (:identifiers) de :messages registro(s) de mensaje, :channels registro(s) de canal de contacto y :records ficha(s) de cliente, de las cuales :names tenían la identidad como nombre completo y ahora dicen «:placeholder».',
+    'erased_contact_name'                  => 'Contacto borrado',
     'erasure_receipt_kept'                 => 'Conservado y hecho ilegible: cada identificador de mensaje de Meta se sustituye por una huella de un solo sentido de sí mismo. Un reenvío de Meta sigue sin poder recrear a esta persona, y el identificador del que sale la huella ya no se puede leer en los registros propios de este módulo.',
     'erasure_receipt_remains_intro'        => 'Fuera del alcance de este módulo, y dónde se quita cada cosa:',
     'erasure_receipt_remains_conversations' => 'Las conversaciones y su contenido siguen en FreeScout, con el teléfono en el título de cada conversación y en el remitente de cada mensaje; se quitan borrando esas conversaciones en FreeScout.',
-    'erasure_receipt_remains_customer'     => 'El nombre de la ficha del cliente sigue ahí, y es el número de teléfono mismo mientras nadie haya renombrado el contacto, así que aparece en todas las listas de conversaciones. No se toca porque renombrar una ficha es una decisión del administrador y el formulario de edición de FreeScout ya lo hace; el número sí se elimina de la lista de teléfonos y de los campos de canal de la ficha, donde ese formulario no llega.',
+    'erasure_receipt_remains_customer'     => 'La ficha del cliente no se borra nunca, y un nombre que sea cualquier otra cosa que la identidad eliminada se queda tal como está: renombrar un contacto es una decisión del administrador y el formulario de edición de FreeScout ya lo hace. Lo que sí renombra esta pantalla es una ficha que tenía la identidad misma como nombre completo, porque ese nombre lo escribió este módulo al crearla y es la copia más visible de todas; las que lo eran salen contadas arriba.',
     'erasure_receipt_remains_queue'        => 'Los payloads de webhook que hayan acabado en la cola de trabajos fallidos de FreeScout pueden contener el texto del mensaje; se limpian desde la cola.',
     'erasure_receipt_remains_debuglog'     => 'Si el registro detallado ha estado activado alguna vez, el log de depuración del módulo contiene el texto completo de los mensajes y los números de teléfono. Su retención solo borra ficheros antiguos mientras el registro está funcionando, así que los ficheros de un periodo que ya habéis desactivado se quedan hasta que alguien los elimine del servidor a mano, y una retención de 0 conserva todos los ficheros para siempre.',
     'erasure_receipt_remains_portfolios'   => 'Si esta persona escribió desde dos portfolios de Meta distintos sin revelar nunca su número, esto no se puede resolver desde el módulo: no hay ningún registro que conecte los dos, así que solo se ha podido eliminar el lado que identificaste.',
     'new_conversation_refused'             => 'Una conversación de WhatsApp solo la puede iniciar el cliente, así que este buzón no tiene formulario de conversación nueva. Responda dentro de una conversación existente, o envíe una plantilla aprobada si la ventana de 24 horas ya se ha cerrado.',
+    'trademark_notice'                     => 'WhatsApp y Meta son marcas de Meta Platforms, Inc. Este módulo es un proyecto independiente, no está afiliado a Meta Platforms, Inc. ni cuenta con su respaldo, y usa esos nombres solo para decir a qué servicio se conecta.',
 ];

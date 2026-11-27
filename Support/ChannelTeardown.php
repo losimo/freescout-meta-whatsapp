@@ -56,7 +56,7 @@ class ChannelTeardown
     {
         $result = ['messages' => 0, 'unsubscribed' => null, 'error' => null];
 
-        if ($tellMeta && !self::wabaStillAnswered($account)) {
+        if ($tellMeta && self::shouldUnsubscribe($account)) {
             try {
                 $response               = app(WhatsAppApiClient::class, ['account' => $account])
                     ->unsubscribeWebhook();
@@ -96,6 +96,27 @@ class ChannelTeardown
     }
 
     /**
+     * Whether this deletion is the one that tells Meta to stop.
+     *
+     * Two reasons not to, and they used to be one question, which is how
+     * the second one came out inverted: a channel with no `waba_id` answered
+     * "no sibling needs the subscription" and the call went out anyway, with
+     * an empty id in the path. Meta refuses it, and the screen then asks the
+     * administrator to go to the App Dashboard and remove by hand a
+     * subscription that was never there. `waba_id` is required when a
+     * channel is created, so the row is legacy or hand-edited, which is
+     * exactly the kind of row nobody is watching.
+     */
+    protected static function shouldUnsubscribe(WhatsAppAccount $account): bool
+    {
+        if ((string) $account->waba_id === '') {
+            return false;
+        }
+
+        return !self::wabaStillAnswered($account);
+    }
+
+    /**
      * Whether another channel of this installation still answers for the
      * same Messaging account.
      *
@@ -103,20 +124,10 @@ class ChannelTeardown
      * stop it for a while, and unsubscribing the account would turn that
      * into something they cannot undo from this module: switching it back
      * on would leave a channel that sends and never receives.
-     *
-     * A channel with no `waba_id` is on nobody's account, and the call it
-     * would make has an empty id in the path, so there is nothing to keep
-     * and nothing to send.
      */
     protected static function wabaStillAnswered(WhatsAppAccount $account): bool
     {
-        $wabaId = (string) $account->waba_id;
-
-        if ($wabaId === '') {
-            return false;
-        }
-
-        return WhatsAppAccount::where('waba_id', $wabaId)
+        return WhatsAppAccount::where('waba_id', (string) $account->waba_id)
             ->where('id', '!=', $account->id)
             ->exists();
     }

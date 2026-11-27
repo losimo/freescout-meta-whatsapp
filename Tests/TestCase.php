@@ -3,6 +3,7 @@
 namespace Modules\MetaWhatsApp\Tests;
 
 use App\Mailbox;
+use App\Subscription;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 
@@ -22,6 +23,17 @@ abstract class TestCase extends BaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Subscription's event buffer is a static array that lives as long as
+        // the PHP process, and nothing in Laravel's test harness resets it.
+        // Since #64 a module note registers an event in there, and
+        // DatabaseTransactions rolls the rows back without touching the
+        // buffer, so a test that writes a note and never flushes would leave
+        // an event behind for the next test that runs a job: it would flush
+        // an event pointing at a conversation and a mailbox that no longer
+        // exist, and processEvents() dies on the missing mailbox
+        // (app/Subscription.php:340). Every test starts from empty.
+        Subscription::$occurred_events = [];
 
         // El middleware global ResponseHeaders del core crida header(); sota
         // phpunit (CLI, output ja emès pel printer) PHP avisa "headers already
@@ -48,6 +60,37 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
+     * Nothing was dispatched to Meta.
+     *
+     * In place of Queue::assertNothingPushed(), which stopped meaning that
+     * with #64: a module note now refreshes the conversation lists the way
+     * the core does for its own notes, and the core does that with a
+     * broadcast event, which the queue fake records as a pushed job
+     * (Illuminate\Broadcasting\BroadcastEvent). What these tests ask is
+     * whether an outbound job was dispatched, so that is what they assert.
+     *
+     * The job list is globbed rather than written out, so a fourth send job
+     * is covered the day it is added. The count check is there because an
+     * empty glob would make every one of these assertions pass.
+     */
+    protected function assertNothingSentToMeta(): void
+    {
+        $jobs = glob(__DIR__ . '/../Jobs/Send*.php') ?: [];
+
+        $this->assertGreaterThanOrEqual(
+            3,
+            count($jobs),
+            'the outbound jobs were not found, so this assertion was checking nothing'
+        );
+
+        foreach ($jobs as $file) {
+            \Illuminate\Support\Facades\Queue::assertNotPushed(
+                'Modules\\MetaWhatsApp\\Jobs\\' . basename($file, '.php')
+            );
+        }
+    }
+
+    /**
      * Crea una bústia tècnica + compte WhatsApp de prova.
      * S'executa dins de la transacció del test: rollback automàtic.
      */
@@ -65,7 +108,11 @@ abstract class TestCase extends BaseTestCase
 
         $account = new WhatsAppAccount();
         $account->name                 = 'PHPUnit WhatsApp';
-        $account->phone_number         = '+34600999888';
+        // Overridable since #66: two channels of one WABA used to be created
+        // with the same number, so a test that asked which channel a number
+        // belongs to was answered by whichever had the lower id, and passed
+        // for a reason that had nothing to do with the number.
+        $account->phone_number         = $overrides['phone_number'] ?? '+34600999888';
         $account->phone_number_id      = $phoneNumberId;
         $account->waba_id              = $overrides['waba_id'] ?? 'test-waba';
         $account->verify_token         = bin2hex(random_bytes(32));

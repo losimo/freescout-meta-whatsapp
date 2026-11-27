@@ -8,6 +8,7 @@ use App\Thread;
 use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Support\ConversationReopen;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
+use Modules\MetaWhatsApp\Support\ConversationNote;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 
 /**
@@ -87,15 +88,81 @@ class OutboundGuard
         // distinction all along.
         $thread = Thread::find($threadId);
         if ($thread) {
-            self::noteRefusal(
-                $thread,
-                $account
-                    ? 'metawhatsapp::metawhatsapp.not_sent_channel_inactive'
-                    : 'metawhatsapp::metawhatsapp.not_sent_channel_gone'
-            );
+            self::noteRefusal($thread, self::refusalNoteKey($account, $subject));
         }
 
         return null;
+    }
+
+    /**
+     * Which sentence this refusal gets.
+     *
+     * Missing and inactive are not the same thing, and neither are a reply
+     * and a template. A reply refused here keeps its thread and no row, so
+     * the dispatcher sends it the next time the agent writes with the
+     * channel back (T28), and a note asking for it to be written again
+     * would have the customer read the same answer twice. A template has no
+     * such second chance: the agent sends one by pressing a button, nothing
+     * re-sends it, and pressing again is exactly what they have to do.
+     */
+    protected static function refusalNoteKey(?WhatsAppAccount $account, string $subject): string
+    {
+        if (!$account) {
+            return 'metawhatsapp::metawhatsapp.not_sent_channel_gone';
+        }
+
+        return $subject === self::SUBJECT_TEMPLATE
+            ? 'metawhatsapp::metawhatsapp.not_sent_channel_inactive'
+            : 'metawhatsapp::metawhatsapp.not_sent_channel_inactive_kept';
+    }
+
+    /**
+     * Does a refusal for this subject leave a failed row behind?
+     *
+     * One place for a decision that three jobs held a copy of, and the
+     * copies had started to matter. The dispatcher skips any reply thread
+     * that already has an outbound row of its own, failed ones included
+     * (MetaWhatsAppServiceProvider, "Ja enviat (o fallit definitivament)"),
+     * so the row is not only a record: it is what decides whether the reply
+     * is ever delivered.
+     *
+     * With the channel merely switched off, writing it would mean the same
+     * event ends two different ways depending on which side of the dispatch
+     * the channel went off. Refused before dispatching, the reply waits and
+     * goes out when an administrator reconnects; refused seconds later
+     * inside the job, it was silently never sent again. The customer's
+     * answer must not depend on that, so a reply keeps no row here and the
+     * note says it is still pending.
+     *
+     * Two cases still leave one, and not for symmetry's sake. A channel that
+     * is **gone** will never send this reply, so the row is the record of
+     * that and there is no pending state to protect. And a **template** is
+     * sent by an agent pressing a button, with nothing that re-sends it, so
+     * the row is the only trace it leaves and it cannot block a recovery
+     * that does not exist.
+     *
+     * What used to be the argument for the row on every path is issue #29,
+     * where an agent saw their reply in the conversation and nothing said it
+     * had not gone out. That is now what the note does, on every one of
+     * these paths, which is where the agent is actually looking.
+     *
+     * The third answer is a race and not a case. This question is only ever
+     * asked where accountForSending() has already refused, and it refuses
+     * only for a channel that is missing or inactive, so a channel that is
+     * found **and active** by the time this runs is one an administrator
+     * reconnected in between: the switched-off case arriving a second late,
+     * with a note already written saying the reply is still pending. It used
+     * to answer yes there, which wrote the permanent row that stops the
+     * reply ever going out, while the note promised the opposite. The row
+     * and the note cannot contradict each other, so it answers no.
+     */
+    public static function refusalLeavesARow(int $accountId, string $subject): bool
+    {
+        if ($subject === self::SUBJECT_TEMPLATE) {
+            return true;
+        }
+
+        return WhatsAppAccount::find($accountId) === null;
     }
 
     /**
@@ -250,36 +317,24 @@ class OutboundGuard
         // L'agent de qui parla la nota: la resposta que s'ha refusat és seva.
         $agentId = $thread->created_by_user_id ?: $thread->user_id;
 
-        $note = new Thread();
-        $note->conversation_id = $conversation->id;
-        // Not the author and not a choice: the core mirrors the
-        // conversation's assignee onto every thread it writes
-        // (Conversation::createUserThread sets $thread->user_id =
-        // $this->user_id), and FreeScout reads it to decide the name it
-        // prints on the right of a note. Putting an agent here showed that
-        // agent's name on every note regardless of who the note was about,
-        // and on an unassigned conversation the right answer is null.
-        $note->user_id         = $conversation->user_id;
-        // Issue #43. El core decideix l'avatar i la disposició de la nota amb
-        // Thread::getPerson(), que per a notes llegeix created_by_user_cached.
-        // Sense aquest camp la nota sortia sense cara i amb el nom a la dreta.
-        //
-        // Who it names is now the administrator's to choose, because naming
-        // the agent made FreeScout render the note as "you" to the very
-        // person it was written about. NoteAuthor answers with the chosen
-        // user when there is one, and otherwise with this agent, which is
-        // the behaviour this module shipped with.
-        $note->created_by_user_id = NoteAuthor::forNote($agentId ?: null);
-        $note->type            = Thread::TYPE_NOTE;
-        $note->status          = $conversation->status;
-        $note->state           = Thread::STATE_PUBLISHED;
-        $note->body            = self::NOTE_MARKER . ' ' . __($translationKey, $replace);
-        $note->source_via      = Thread::PERSON_USER;
-        $note->source_type     = Thread::SOURCE_TYPE_WEB;
-        $note->customer_id     = $conversation->customer_id;
-        $note->setMeta(self::META_REFUSED_THREAD, (string) $thread->id);
-        $note->setMeta(self::META_REFUSED_REASON, $translationKey);
-        $note->save();
+        // The shape of the note, the author and the three fields that
+        // encode #43, #55 and the assignee mirror live in ConversationNote.
+        // What stays here is this path's policy: the two meta keys that
+        // de-duplicate per reply and per reason, and the reopening below.
+        $note = ConversationNote::write(
+            $conversation,
+            self::NOTE_MARKER . ' ' . __($translationKey, $replace),
+            $agentId ?: null,
+            [
+                self::META_REFUSED_THREAD => (string) $thread->id,
+                self::META_REFUSED_REASON => $translationKey,
+            ],
+            // A refused reply needs an agent to come back, so it notifies
+            // (#64). Written after the alreadyNoted return above, which is
+            // what keeps three attachments of one reply from notifying three
+            // times: the suppressed note registers nothing.
+            true
+        );
 
         self::bringBack($conversation);
 

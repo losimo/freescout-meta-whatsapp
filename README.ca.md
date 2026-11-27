@@ -29,7 +29,7 @@ Cinc passos des d'una instal·lació de FreeScout nova fins a tenir un canal de 
 1. **Instal·la el mòdul.** Activa **MetaWhatsApp** des de Manage → Modules (o les tres comandes `artisan` si treballes des de la línia de comandes). Vegeu [Instal·lació](#installació).
 2. **Prepara Meta.** Necessites una App de tipus Business amb el producte WhatsApp afegit, un número de telèfon registrat, i quatre valors de l'App Dashboard: **Phone Number ID**, **ID del compte de missatgeria** (el camp que Meta encara anomena **WABA ID**), **Access Token**, **App Secret**. Vegeu [Requisits previs a Meta](#requisits-previs-a-meta) — en particular, genera un token permanent en lloc del de 24 hores que Meta mostra per defecte.
 3. **Afegeix el canal a FreeScout.** Manage → WhatsApp → Add account, enganxa els quatre valors, desa. Vegeu [Configuració del canal → A FreeScout](#a-freescout).
-4. **Apunta Meta cap al webhook.** Enganxa l'URL del webhook i el verify token que la pàgina del compte t'acaba de donar a la pantalla de configuració de Webhook de Meta, i activa el camp `messages`. Si a més voleu que s'ompli el panell d'esdeveniments del compte, activeu-hi també `message_template_status_update` i `template_category_update`: sense ells Meta no envia res i aquell panell es queda buit per molt que l'activeu al FreeScout. Vegeu [Configuració del canal → A Meta](#a-meta).
+4. **Apunta Meta cap al webhook.** Enganxa l'URL del webhook i el verify token que la pàgina del compte t'acaba de donar a la pantalla de configuració de Webhook de Meta, i activa el camp `messages`. Si a més voleu que s'ompli el panell d'esdeveniments del compte, activeu-hi també `message_template_status_update`, `template_category_update`, `account_update`, `account_alerts`, `phone_number_quality_update` i `account_review_update`: sense ells Meta no envia res i aquell panell es queda buit per molt que l'activeu al FreeScout. Vegeu [Configuració del canal → A Meta](#a-meta).
 5. **Envia un missatge real** al número i confirma que crea una conversa a FreeScout, després respon des de FreeScout i confirma que arriba al telèfon.
 
 Si el pas 5 no funciona, comença per [Resolució de problemes](#resolució-de-problemes) i [Quan no és cosa del mòdul](#quan-no-és-cosa-del-mòdul) abans de donar per fet que el problema és del mòdul — un worker de cues aturat, un URL de webhook que no coincideix del tot, o un problema de certificat expliquen la majoria d'incidències del primer dia.
@@ -90,6 +90,21 @@ Queda fora d'abast:
 - Chatbots, automatitzacions avançades o integracions multicanal compartides.
 - Vincular un número pel protocol no oficial de dispositiu acompanyant del WhatsApp Web, tal com fan alguns clients d'escriptori. No necessita cap aprovació de la Cloud API, que és justament el que el fa llaminer, i queda fora d'abast a posta: el protocol està fet per enginyeria inversa, Meta el pot trencar quan vulgui, i fer-lo servir pot acabar amb el número suspès. En un compte personal aquella és l'aposta de qui l'assumeix. En la línia d'atenció d'una empresa, una suspensió atura totes les converses de cop, així que el mòdul no correrà aquell risc en nom vostre.
 
+## Novetats a la v3.1.0
+
+- **Les notes automàtiques del mòdul ara avisen els agents que ho havien demanat** (#64). Una resposta refusada, un missatge que Meta diu que no s'ha lliurat, un enviament que falla: la nota apareixia a la conversa i no avisava ningú, ni tan sols un agent subscrit a les notes. També s'avisa l'agent de qui ha fallat la resposta, que és l'avís que més importa aquí. Reportat amb tot el mecanisme per [@MarkoD](https://github.com/MarkoD).
+- **Les regles de Workflow que reaccionen quan s'afegeix una nota començaran a casar amb les notes del mòdul.** Ara disparem l'acció `conversation.note_added` del core, igual que una nota escrita a mà, així que els altres mòduls veuen les nostres com qualsevol altra. Si teniu una regla amb aquest disparador, mireu-la abans d'actualitzar.
+- **Qui signa una nota automàtica canvia a les instal·lacions que no han triat ningú** (#68). Abans era l'agent de qui parla la nota, i el FreeScout ensenya una nota al seu autor com si l'hagués escrita ell, així que l'agent llegia la frase del mòdul com a seva. Ara és el primer administrador de la instal·lació. L'usuari que trieu en aquella opció és també l'únic que no rep avís d'aquestes notes, així que un usuari de marcador que es digui Sistema o WhatsApp és la tria bona, i algú que treballa converses no.
+- **El registre d'esdeveniments del compte conserva el que promet el seu interruptor** (#66): restriccions, infraccions, bloquejos i rehabilitacions del compte, sortida forçada, avisos sobre límits d'enviament, sobre l'estat de compte d'empresa oficial i sobre una foto de perfil esborrada, canvis de cabal per número i la decisió de la revisió de polítiques. El text ja no promet la valoració de qualitat dels missatges, perquè Meta no envia cap webhook amb aquell valor; ara diu on es pot llegir.
+- **Una fallada que Meta reporta d'un missatge que el mòdul no pot casar ara s'escriu on es pot veure** (#65). Acabava en una línia de depuració, i el nivell de registre per defecte del FreeScout no escriu depuració, així que un missatge fallava i enlloc no se'n deia res.
+- **Una resposta refusada amb el canal apagat ja no es perd per un camí i es conserva per l'altre.** Refusada abans de ser encuada, esperava i sortia quan el canal tornava. Refusada uns segons més tard dins el job, no es tornava a enviar mai, i el client no rebia cap resposta.
+- **Un acusament de lectura ja no marca un missatge que el client ja havia vist contestat**, i en una conversa amb dos números d'un mateix client la resposta va a la persona que l'agent està llegint. Tres llocs decidien cadascun quin era el darrer missatge entrant, i Meta els lliura desordenats fins a set dies.
+- **L'interruptor de còpia per correu diu quan la instal·lació té aquella funció apagada per a tothom** (#57), en lloc de semblar una opció que fa alguna cosa.
+- **Un missatge que arriba a la cua amb dies de retard ja no obre una finestra que no hi és.** Meta no n'entrega mai cap tan vell, però un job reintentat després d'un endarreriment sí, i la seva marca de temps de debò es llençava, així que el rellotge el llegia com acabat d'arribar: l'agent tenia la casella de resposta lliure en una conversa que Meta tenia tancada, i la resposta tornava refusada. Ara només es rebutja una hora que cap missatge de WhatsApp pot portar, perquè creure's una marca vella només pot tancar la finestra, que és la veritat.
+- **L'esborrat treu el número també del nom del registre del client**, que és la còpia més visible de totes, i la pantalla ara diu quants dels registres que està a punt de canviar porten també altres dades, per exemple un contacte importat que resulta que porta aquell número. D'aquells registres només se'n treu la identitat esborrada.
+- **La targeta del mòdul té icona** (#63): un auricular blanc damunt el blau del FreeScout. Blau i no el verd de WhatsApp, i un auricular sol i no dins d'una bombolla, perquè aquella forma és marca de Meta i el blau diu que això és un mòdul del FreeScout i no un producte de WhatsApp. Demanada per [@MarkoD](https://github.com/MarkoD).
+- Els README i la pantalla de configuració ara diuen de qui és la marca i que aquest projecte no hi està afiliat.
+
 ## Novetats a la v3.0.0
 
 - **Identificadors que deixen de ser llegibles.** Els ids de missatge de Meta porten el número de telèfon a dins; ara una supressió el substitueix per una empremta d'un sol sentit, i una migració fa el mateix a les files que ja havien esborrat versions anteriors. És per això que el primer dígit es mou: el significat de dades desades ha canviat. (La pantalla de supressió va sortir a la v2.2.0.)
@@ -113,12 +128,6 @@ La major part d'aquesta versió surt de 41 tiquets que va obrir [@MarkoD](https:
 - **L'inici ràpid i la pàgina d'ajustos ara diuen quins camps de webhook necessita Meta** abans que el panell d'esdeveniments del compte es pugui omplir (#47). Sense `message_template_status_update` i `template_category_update` activats a Meta, aquell interruptor no fa res i abans tampoc ho deia.
 - El canvi de preus d'octubre està escrit com a història i no com a avís, a la seva pròpia secció al costat de la finestra de 24 hores. La nota del mètode de pagament es queda a dalt, més curta: un compte sense ell deixa de tenir els missatges entregats, i aquella fallada és silenciosa.
 - El CONTRIBUTING ara diu què volen dir els números de versió.
-
-## Novetats a la v2.3.0
-
-- **Correcció: els agents ara reben avís dels missatges entrants** (#46). No el rebien en cap versió d'aquest mòdul. Ni correu, ni campaneta, ni avís del navegador, i res al registre que ho digués. El listener del FreeScout només desa l'esdeveniment en un búfer, i el core buida aquell búfer en dos llocs, i cap dels dos corre dins d'un worker de cues, que és on aquest mòdul processa els webhooks. Reportat amb el diagnòstic sencer per [@MarkoD](https://github.com/MarkoD).
-- **Podeu triar de qui vénen les notes automàtiques del mòdul** (#43). Deixeu-ho sense marcar i no canvia res: la nota porta l'agent de qui parla. Trieu un usuari, per exemple un que creeu i anomeneu Sistema o WhatsApp, i les notes portaran aquell usuari, cosa que evita que el FreeScout ensenyi aquella nota a un agent com si l'hagués escrita ell mateix. Si esborreu aquell usuari més endavant, les notes tornen a portar l'agent.
-- L'avís de finestra caducada ja no diu que Meta no admeti enviar una plantilla a un contacte de qui només se'n sap l'ID de WhatsApp. Meta l'accepta com a destinatari; aquest mòdul encara no ho ha construït, i ara diu quin dels dos és el límit.
 
 Les versions anteriors són a la [pàgina de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -223,7 +232,7 @@ Des de **App Dashboard → WhatsApp → Configuration → Webhook**:
 1. A **Callback URL**, enganxa la URL del webhook del mòdul.
 2. A **Verify Token**, enganxa el token de verificació generat a FreeScout.
 3. Prem **Verify and save**.
-4. A **Webhook fields**, activa com a mínim el camp **messages**.
+4. A **Webhook fields**, activa com a mínim el camp **messages**. Per al registre d'esdeveniments del compte, activa-hi també `message_template_status_update`, `template_category_update`, `account_update`, `account_alerts`, `phone_number_quality_update` i `account_review_update`; què reporta cadascun és a la [matriu de capacitats](docs/capability-matrix.md).
 
 > **Requisit important**
 >
@@ -303,6 +312,7 @@ Si Meta retorna l'error `190`:
 - el compte passa a estat **Inactiu**,
 - el canal deixa d'enviar i rebre correctament,
 - i cal actualitzar el token d'accés des de l'edició del compte.
+- Una resposta que un agent escrigui amb el canal inactiu **no es descarta**. La conversa rep una nota que ho diu, i la resposta surt quan algú torni a respondre en aquella conversa amb el canal restablert, així que tornar-la a escriure enviaria la mateixa resposta dues vegades.
 
 ### Suport multimèdia (v1.4.0)
 
@@ -324,7 +334,7 @@ El mòdul ho atura per defecte i amaga la casella. Si vols aquesta opció en un 
 
 Hi ha dues condicions. L'interruptor només té efecte a partir del FreeScout 1.8.251, i que la còpia arribi de debò depèn de la configuració de sortida de la teva instal·lació i no de res que faci aquest mòdul. I un parany que val més saber abans de començar, assenyalat per [@MarkoD](https://github.com/MarkoD): el formulari del canal només ofereix bústies sense connexió de correu configurada, així que si vols enganxar el WhatsApp a una bústia des de la qual també vols enviar correu, **associa-la primer i configura la connexió després**, o no la trobaràs a la llista.
 
-El core està afegint els seus propis controls per a la mateixa casella. `APP_CHAT_CONVERSATION_REPLY_BY_EMAIL=false` al `.env` la treu de tot arreu, i la resta de la condició és que la conversa no estigui en mode Chat, que el client tingui adreça de correu i que la bústia tingui la sortida activa. Una versió anterior d'aquesta línia deia que la sortida activa volia dir tenir una connexió de correu configurada; no ho vol dir, i aquí la diferència importa: el mètode de sortida per defecte del FreeScout és PHP mail, que compta com a actiu sense configurar res, així que a una bústia de WhatsApp la casella sí que surt. L'interruptor d'aquest mòdul és el que la treu. El canvi és a la branca master del FreeScout a data del 25 de novembre del 2026, posterior a la 1.8.252, així que arribarà a la versió següent.
+El core està afegint els seus propis controls per a la mateixa casella. `APP_CHAT_CONVERSATION_REPLY_BY_EMAIL=false` al `.env` la treu de tot arreu, i la resta de la condició és que la conversa no estigui en mode Chat, que el client tingui adreça de correu i que la bústia tingui la sortida activa. Una versió anterior d'aquesta línia deia que la sortida activa volia dir tenir una connexió de correu configurada; no ho vol dir, i aquí la diferència importa: el mètode de sortida per defecte del FreeScout és PHP mail, que compta com a actiu sense configurar res, així que a una bústia de WhatsApp la casella sí que surt. L'interruptor d'aquest mòdul és el que la treu. El canvi és a la branca master del FreeScout a data del 25 de novembre del 2026, posterior a la 1.8.252, així que arribarà a la versió següent. Si has desactivat aquell paràmetre, la configuració del canal ara ho diu al costat de **Còpia per correu**, perquè amb la porta del core tancada activar l'interruptor no faria res. El mateix es diu quan la bústia no té cap mètode de sortida actiu, que aquella porta també refusa.
 
 ## Dades personals
 
@@ -341,7 +351,7 @@ Aquestes limitacions són conegudes i acceptades dins l'abast actual de funciona
 - Fins a 5 plantilles configurades estàticament per compte, o qualsevol plantilla APPROVED obtinguda en viu via el selector dinàmic (amb variables `{{n}}`); sense sincronització/cache automàtica de la llista estàtica des del catàleg de Meta.
 - L'enviament de la plantilla de recuperació és sempre **manual**, iniciat per un agent des del banner de la conversa; no hi ha reintent automàtic fora de finestra.
 - Els estats `delivered` i `read` s'actualitzen a la base de dades del mòdul; només el `read` es mostra visualment (via l'indicador natiu "obert" del thread) — el `delivered` no es mostra a la conversa.
-- Si Meta agrupa diversos esdeveniments en un sol enviament de webhook, cadascun s'encamina segons què és realment: un missatge s'atribueix pel seu propi número de telèfon i es descarta si en porta un altre; un fet de nivell de compte (estat de plantilla, qualitat, restriccions) arriba a tots els canals actius de la WABA a què pertany, i es descarta si porta una altra WABA. En la pràctica Meta sol enviar webhooks separats per número, però amb diversos números sota la mateixa App convé tenir-ho present.
+- Si Meta agrupa diversos esdeveniments en un sol enviament de webhook, cadascun s'encamina segons què és realment: un missatge s'atribueix pel seu propi número de telèfon i es descarta si en porta un altre; un fet de nivell de compte arriba a tots els canals actius de la WABA a què pertany, i es descarta si porta una altra WABA. Un fet d'un sol número de telèfon de l'empresa, com un canvi de cabal o una alerta que anomena aquell número, va al canal que n'és propietari, també si el teniu apagat, perquè de qui és un número és una pregunta d'identitat. En la pràctica Meta sol enviar webhooks separats per número, però amb diversos números sota la mateixa App convé tenir-ho present.
 - En mode xat, el core de FreeScout pot generar **esborranys buits** a la conversa per l'autodesat de l'editor; són innocus i es poden descartar manualment.
 - La **bústia tècnica** del canal continua sent visible a **Gestionar → Bústies**.
 - El webhook no implementa rate limiting propi; la barrera principal és la signatura HMAC.
@@ -418,3 +428,15 @@ Els tests treballen contra la base de dades de la instal·lació amb rollback pe
 ## Llicència
 
 AGPL-3.0, igual que FreeScout.
+
+## Marques
+
+WhatsApp i Meta són marques de Meta Platforms, Inc. Aquest mòdul és un projecte
+independent, no hi està afiliat ni compta amb el seu suport, i fa servir
+aquests noms només per dir a quin servei es connecta.
+
+## Credits
+
+L'auricular de la icona del mòdul és de Font Awesome Free 6.7.2, de
+Fonticons, Inc., amb llicència [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+L'hem recolorat de blanc i posat damunt d'un camp blau de FreeScout.

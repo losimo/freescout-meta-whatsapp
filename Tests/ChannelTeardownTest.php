@@ -129,6 +129,31 @@ class ChannelTeardownTest extends TestCase
         $this->assertSame(0, $this->unsubscribeCalls, 'an inactive sibling was treated as no sibling at all');
     }
 
+    /**
+     * A channel with no Messaging account id on it sends nothing.
+     *
+     * `waba_id` is required when a channel is created, so this is a legacy
+     * or hand-edited row, and the point is what the call would look like:
+     * `DELETE /{empty}/subscribed_apps`, which Meta refuses. The screen then
+     * tells the administrator to go to the Meta App Dashboard and remove by
+     * hand a subscription that was never there, which is worse than saying
+     * nothing.
+     */
+    public function test_a_channel_with_no_messaging_account_id_sends_nothing()
+    {
+        $this->bindApiClient(true);
+        $deleted = $this->createTestAccount(['waba_id' => '']);
+
+        $result = $this->deleteChannel($deleted);
+
+        $this->assertSame(
+            0,
+            $this->unsubscribeCalls,
+            'the unsubscribe went out with an empty account id in the path'
+        );
+        $this->assertNull(WhatsAppAccount::find($deleted->id), 'the channel asked for was not deleted');
+    }
+
     /** A channel on an account of its own is still the last one out. */
     public function test_a_channel_alone_on_its_account_still_removes_the_subscription()
     {

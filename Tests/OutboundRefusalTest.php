@@ -111,17 +111,30 @@ class OutboundRefusalTest extends TestCase
     }
 
     /**
-     * Issue #43. Thread::getPerson() reads created_by_user_cached for a note,
-     * so a note without that column renders faceless with the name on the
-     * right. The refusal note always concerns one agent's reply, and that
-     * agent is already resolved to pick the note's user_id.
+     * Issue #43, then #68. Thread::getPerson() reads created_by_user_cached
+     * for a note, so a note without that column renders faceless with the
+     * name on the right, and v2.1.0 filled it with the agent whose reply had
+     * been refused.
+     *
+     * That is the one user it must not be. The core renders a note to its own
+     * author as "you", so the agent read the module's sentence as their own,
+     * which is what #43 was opened about and what #68 finished. The author is
+     * now the installation's, and which user exactly is NoteAuthor's question
+     * and is pinned in NoteAuthorTest. What this test owns is that the column
+     * is filled at all (#55) and that it is not filled with the agent.
      *
      * The test uses an agent of its own rather than the helper's hardcoded
-     * user 1, so the assertion proves the value travels instead of matching
-     * a default by coincidence.
+     * user 1, so the assertion cannot pass by matching a default.
      */
-    public function test_a_refusal_note_is_attributed_to_the_agent_whose_reply_was_refused()
+    public function test_a_refusal_note_is_attributed_to_the_installation_and_not_to_the_agent()
     {
+        // The expectation needs an administrator to exist. On the developer's
+        // own database one does, which would make this pass without proving
+        // anything on a freshly migrated one: with no administrator at all
+        // the chain falls through to the agent and the assertion below would
+        // blame #68 for a missing fixture.
+        $this->makeAdminUser();
+
         $agent = new \App\User();
         $agent->first_name = 'Refused';
         $agent->last_name  = 'Author';
@@ -142,10 +155,19 @@ class OutboundRefusalTest extends TestCase
             ->first();
 
         $this->assertNotNull($note);
-        $this->assertEquals(
+        $this->assertNotNull(
+            $note->created_by_user_id,
+            'a note with no author takes the core print view down with it (#55)'
+        );
+        $this->assertNotEquals(
             $agent->id,
             $note->created_by_user_id,
-            'the refusal note must name the agent whose reply was refused'
+            'the note named the agent it is about, so the core renders it to them as "you" (#68)'
+        );
+        $this->assertEquals(
+            \App\User::ROLE_ADMIN,
+            (int) \App\User::find($note->created_by_user_id)->role,
+            'the refusal note must be signed by an administrator when no author is configured'
         );
     }
 

@@ -51,19 +51,23 @@ class ProcessInboundWebhookTest extends TestCase
         Log::spy();
         $account = $this->createTestAccount();
 
+        // The example was account_alerts until #66 taught the router to
+        // handle it. What this test is about is the wiring, so the field only
+        // has to be one the module really does not read: a webhook family
+        // Meta offers and we ignore on purpose.
         $this->runJob($account, ['entry' => [[
             'id'      => $account->waba_id,
             'changes' => [[
-                'field' => 'account_alerts',
+                'field' => 'business_capability_update',
                 'value' => [
-                    'entity_type' => 'WABA',
+                    'max_daily_conversation_per_phone' => 1000,
                 ],
             ]],
         ]]]);
 
         Log::shouldHaveReceived('info')->withArgs(function ($message, $context = []) {
             return strpos($message, 'not handled') !== false
-                && ($context['field'] ?? null) === 'account_alerts';
+                && ($context['field'] ?? null) === 'business_capability_update';
         })->once();
 
         Log::shouldNotHaveReceived('warning', [
@@ -475,17 +479,25 @@ class ProcessInboundWebhookTest extends TestCase
     }
 
     /**
-     * Issue #43. The reporter asked for the module's automatic notes to look
-     * like a user's note, with an avatar and the name on the left instead of
-     * the right. The core decides both with Thread::getPerson(), which reads
-     * created_by_user_cached for a note, and the module was leaving that
-     * column empty.
+     * Issue #43, then #68. The reporter asked for the module's automatic
+     * notes to look like a user's note, with an avatar and the name on the
+     * left instead of the right. The core decides both with
+     * Thread::getPerson(), which reads created_by_user_cached for a note, and
+     * the module was leaving that column empty.
      *
-     * The note is always about one agent's message, so there is nobody to
-     * invent: the agent who wrote the message that failed to deliver.
+     * Filling it with the agent whose message failed was the first answer and
+     * the wrong one: the core renders a note to its own author as "you", so
+     * that agent read the module's sentence about them as their own. Since
+     * #68 the author is the installation's, which user exactly being
+     * NoteAuthor's question and pinned in NoteAuthorTest. What this test owns
+     * is that the column is filled and that it is not filled with the agent.
      */
-    public function test_a_delivery_failure_note_is_attributed_to_the_agent_whose_message_failed()
+    public function test_a_delivery_failure_note_is_attributed_to_the_installation_and_not_to_the_agent()
     {
+        // An administrator has to exist for the expectation to mean anything;
+        // see the same fixture in OutboundRefusalTest.
+        $this->makeAdminUser();
+
         $agent = new User();
         $agent->first_name = 'Agent';
         $agent->last_name  = 'OfRecord';
@@ -539,10 +551,19 @@ class ProcessInboundWebhookTest extends TestCase
             ->where('body', 'like', '[WhatsApp delivery failed]%')
             ->first();
         $this->assertNotNull($note);
-        $this->assertEquals(
+        $this->assertNotNull(
+            $note->created_by_user_id,
+            'a note with no author takes the core print view down with it (#55)'
+        );
+        $this->assertNotEquals(
             $agent->id,
             $note->created_by_user_id,
-            'the note must name the agent whose message failed, so the core gives it a face'
+            'the note named the agent whose message failed, so the core renders it to them as "you" (#68)'
+        );
+        $this->assertEquals(
+            \App\User::ROLE_ADMIN,
+            (int) \App\User::find($note->created_by_user_id)->role,
+            'the delivery failure note must be signed by an administrator when no author is configured'
         );
     }
 
@@ -1596,14 +1617,18 @@ class ProcessInboundWebhookTest extends TestCase
     /**
      * Payload de Meta amb un status per a un wamid.
      */
-    private function statusPayload(WhatsAppAccount $account, string $wamid, string $status): array
+    /**
+     * @param array $extra the rest of the status object, for the cases that
+     *                     need Meta's error block or its recipient_id
+     */
+    private function statusPayload(WhatsAppAccount $account, string $wamid, string $status, array $extra = []): array
     {
         $payload = $this->inboundPayload($account, 'unused', 'unused', 'unused');
         unset($payload['entry'][0]['changes'][0]['value']['messages']);
-        $payload['entry'][0]['changes'][0]['value']['statuses'] = [[
+        $payload['entry'][0]['changes'][0]['value']['statuses'] = [array_merge([
             'id'     => $wamid,
             'status' => $status,
-        ]];
+        ], $extra)];
 
         return $payload;
     }
@@ -2067,6 +2092,127 @@ class ProcessInboundWebhookTest extends TestCase
         // La fila aliena tampoc no s'ha tocat en el rollback.
         $this->assertEquals(1, DB::table('customer_channel')
             ->where('channel', 100)->where('channel_id', 'telegram-777')->count());
+    }
+
+    /**
+     * Issue #66, the wiring half. The account families are routed from the
+     * job, through the guard that refuses an entry belonging to another WABA,
+     * so the row has to arrive by that path and not only from a direct call
+     * to the router.
+     */
+    public function test_an_account_restriction_arrives_through_the_job()
+    {
+        \Option::set('metawhatsapp.account_events', '1');
+        $account = $this->createTestAccount(['waba_id' => 'waba-through-the-job']);
+
+        $payload = [
+            'object' => 'whatsapp_business_account',
+            'entry'  => [[
+                'id'      => $account->waba_id,
+                'changes' => [[
+                    'field' => 'account_update',
+                    'value' => [
+                        'event'            => 'ACCOUNT_RESTRICTION',
+                        'restriction_info' => [['restriction_type' => 'RESTRICTED_BIZ_INITIATED_MESSAGING']],
+                    ],
+                ]],
+            ]],
+        ];
+
+        $this->runJob($account, $payload);
+
+        $row = \Modules\MetaWhatsApp\Models\AccountEvent::where('account_id', $account->id)->first();
+        $this->assertNotNull($row, 'the restriction never reached the event log through the job');
+        $this->assertEquals('error', $row->severity);
+    }
+
+    /**
+     * And the guard still holds for the new families: an entry from another
+     * WhatsApp account must not be filed against this one, which is the
+     * check that exists because these payloads carry no metadata to resolve
+     * the channel from.
+     */
+    public function test_an_account_restriction_from_another_waba_is_discarded()
+    {
+        \Option::set('metawhatsapp.account_events', '1');
+        $account = $this->createTestAccount(['waba_id' => 'waba-ours']);
+
+        $payload = [
+            'object' => 'whatsapp_business_account',
+            'entry'  => [[
+                'id'      => 'waba-somebody-elses',
+                'changes' => [[
+                    'field' => 'account_update',
+                    'value' => ['event' => 'ACCOUNT_RESTRICTION'],
+                ]],
+            ]],
+        ];
+
+        $this->runJob($account, $payload);
+
+        $this->assertEquals(
+            0,
+            \Modules\MetaWhatsApp\Models\AccountEvent::where('account_id', $account->id)->count(),
+            'another account\'s restriction was filed against this channel'
+        );
+    }
+
+    /**
+     * Issue #65, reported by MarkoD on #62 with the line numbers.
+     *
+     * A failed status for a wamid with no row of ours used to end in a
+     * Log::debug and a return. FreeScout's default log level is error
+     * (config/app.php:154), so that line is written nowhere on an ordinary
+     * installation: a message failed, and the failure left no trace in the
+     * conversation, in the log, or in the health panel.
+     *
+     * It is not an exotic case. A message sent before the module was
+     * installed, a message sent from another system on the same number, and
+     * a row an erasure removed all arrive here.
+     *
+     * What is in the line matters as much as the level. Meta's message id is
+     * base64 with the contact's phone number inside it (T02), so it goes in
+     * as the same one-way fingerprint the erasure uses: two failures of the
+     * same message can still be told from two different messages, and the
+     * number cannot be read back out of the log.
+     */
+    public function test_a_failed_status_for_a_message_we_cannot_match_is_logged_where_it_can_be_seen()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+
+        $this->runJob($account, $this->statusPayload($account, 'wamid.unmatched-fail', 'failed', [
+            'recipient_id' => '34611222333',
+            'errors'       => [['code' => 131026, 'title' => 'Message undeliverable']],
+        ]));
+
+        Log::shouldHaveReceived('error')->withArgs(function ($message, $context = []) {
+            return strpos($message, 'unknown') !== false
+                && (string) ($context['error_code'] ?? '') === '131026'
+                && ($context['error_title'] ?? null) === 'Message undeliverable'
+                // The number arrives in the payload twice, as recipient_id
+                // and inside the wamid, and neither may reach the log.
+                && !array_key_exists('recipient_id', $context)
+                && !array_key_exists('wamid', $context)
+                && strpos(json_encode($context), '34611222333') === false
+                && strpos(json_encode($context), 'wamid.unmatched-fail') === false;
+        })->once();
+    }
+
+    /**
+     * And the other half of the same issue, which is what keeps the log
+     * readable: a delivered or read status for a message we cannot match
+     * says nothing is wrong, so it stays as quiet as it was.
+     */
+    public function test_a_delivered_status_for_a_message_we_cannot_match_stays_quiet()
+    {
+        Log::spy();
+        $account = $this->createTestAccount();
+
+        $this->runJob($account, $this->statusPayload($account, 'wamid.unmatched-ok', 'delivered'));
+
+        Log::shouldNotHaveReceived('error');
+        Log::shouldNotHaveReceived('warning');
     }
 
     /**

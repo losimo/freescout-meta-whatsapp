@@ -24,6 +24,13 @@ use Modules\MetaWhatsApp\Support\NoteAuthor;
  * chosen by the administrator, and for the old attribution back when that
  * user is gone.
  *
+ * Issue #68 took the second half back. Falling back to the agent restored
+ * the exact reading this screen exists to remove, and it needed nobody to
+ * change a setting: a deleted placeholder, or a fresh installation that
+ * never opened the screen, was enough. The chain is now the configured user,
+ * then the installation's first administrator by id, then the agent only
+ * where there is no administrator left at all.
+ *
  * The save is exercised through the HTTP door: the form is the only way an
  * administrator reaches the controller, and a test that calls the method
  * directly says nothing about whether the field arrives.
@@ -44,6 +51,32 @@ class NoteAuthorTest extends TestCase
         $user->save();
 
         return $user;
+    }
+
+    /**
+     * One known administrator and nobody else, so a test's expectation is a
+     * fixture rather than a second copy of the query under test.
+     *
+     * The rows that were there are marked deleted and not removed, which is
+     * what FreeScout's own delete does (app/User.php:1475, which leaves the
+     * role alone), and the surrounding transaction puts them back.
+     */
+    private function onlyAdministrator(): User
+    {
+        $this->deleteEveryAdministrator();
+
+        $admin = $this->makeAdminUser();
+        $admin->status = User::STATUS_ACTIVE;
+        $admin->save();
+
+        return $admin;
+    }
+
+    private function deleteEveryAdministrator(): void
+    {
+        User::where('role', User::ROLE_ADMIN)
+            ->where('status', '!=', User::STATUS_DELETED)
+            ->update(['status' => User::STATUS_DELETED]);
     }
 
     /** POST the diagnostics form the way the screen does. */
@@ -119,7 +152,7 @@ class NoteAuthorTest extends TestCase
         $this->assertEquals($chosen->id, NoteAuthor::configuredUserId());
     }
 
-    public function test_the_empty_choice_puts_it_back_to_the_agent()
+    public function test_the_empty_choice_clears_the_setting()
     {
         NoteAuthor::setUserId($this->makeUser('Chosen')->id);
 
@@ -180,7 +213,7 @@ class NoteAuthorTest extends TestCase
         ])->render();
 
         $this->assertStringContainsString('name="note_author"', $rendered);
-        $this->assertStringContainsString(e(__('metawhatsapp::metawhatsapp.note_author_agent')), $rendered);
+        $this->assertStringContainsString(e(__('metawhatsapp::metawhatsapp.note_author_default')), $rendered);
         $this->assertStringContainsString($live->getFullName(), $rendered);
         $this->assertStringNotContainsString(
             $gone->getFullName(),
@@ -191,8 +224,15 @@ class NoteAuthorTest extends TestCase
 
     // ------------------------------------------- the refusal note (#28, #29)
 
-    public function test_with_no_user_chosen_a_refusal_note_still_carries_the_agent()
+    /**
+     * Issue #68. With nothing chosen the note used to carry the agent it is
+     * about, so the agent whose reply had just failed read the module's note
+     * as their own sentence. That is the #43 reading, and it was the default
+     * on every installation that never opened this screen.
+     */
+    public function test_with_no_user_chosen_a_refusal_note_carries_the_first_administrator()
     {
+        $admin   = $this->onlyAdministrator();
         $agent   = $this->makeUser('Refused');
         $account = $this->createTestAccount();
         [$conversation, $thread] = $this->makeRefusedReply($account, $agent);
@@ -201,7 +241,11 @@ class NoteAuthorTest extends TestCase
 
         $note = $this->refusalNote($conversation);
         $this->assertNotNull($note);
-        $this->assertEquals($agent->id, $note->created_by_user_id);
+        $this->assertEquals(
+            $admin->id,
+            $note->created_by_user_id,
+            'the note named the agent it is about, so the core renders it to them as "you" (#43)'
+        );
     }
 
     public function test_a_refusal_note_carries_the_chosen_user_instead_of_the_agent()
@@ -225,12 +269,15 @@ class NoteAuthorTest extends TestCase
     }
 
     /**
-     * The degradation the reporter asked for by name: the placeholder user is
-     * deleted months later, and the notes go back to what they did before the
-     * setting existed rather than pointing at a user who is gone.
+     * Issue #68. The placeholder user is deleted months later. The note used
+     * to go back to the agent it is about, which restored the "you" reading
+     * the setting exists to remove, with nobody changing a setting to cause
+     * it. It now lands where an installation that never configured an author
+     * lands, so the two cases read the same on screen.
      */
-    public function test_a_refusal_note_goes_back_to_the_agent_when_the_chosen_user_was_deleted()
+    public function test_a_refusal_note_falls_back_to_the_first_administrator_when_the_chosen_user_was_deleted()
     {
+        $admin  = $this->onlyAdministrator();
         $agent  = $this->makeUser('Refused');
         $system = $this->makeUser('Systemuser');
         NoteAuthor::setUserId($system->id);
@@ -245,7 +292,7 @@ class NoteAuthorTest extends TestCase
 
         $note = $this->refusalNote($conversation);
         $this->assertNotNull($note, 'the note must survive a chosen user who is gone');
-        $this->assertEquals($agent->id, $note->created_by_user_id);
+        $this->assertEquals($admin->id, $note->created_by_user_id);
     }
 
     // -------------------------------------------- the delivery failure note
@@ -413,11 +460,12 @@ class NoteAuthorTest extends TestCase
     public function test_a_note_that_concerns_no_agent_still_gets_an_author()
     {
         $this->assertNull(NoteAuthor::configuredUserId(), 'the setting leaked from another test');
+        $admin = $this->onlyAdministrator();
 
         $author = NoteAuthor::forNote(null);
 
         $this->assertNotNull($author, 'a note with no author breaks the core print view');
-        $this->assertEquals(User::getSuperAdmin()->id, $author);
+        $this->assertEquals($admin->id, $author);
     }
 
     /** The administrator's choice still wins over the installation's admin. */
@@ -427,5 +475,77 @@ class NoteAuthorTest extends TestCase
         NoteAuthor::setUserId($system->id);
 
         $this->assertEquals($system->id, NoteAuthor::forNote(null));
+    }
+
+    // -------------------------------------- which administrator, exactly (#68)
+
+    /**
+     * Issue #68. "The first administrator" has to answer the same user on
+     * every read, and the core's own expression does not: on 1.8.252
+     * User::getSuperAdmin() is nonDeleted()->where('role', ROLE_ADMIN)
+     * ->first() with no ORDER BY (app/User.php:1077), so which one it returns
+     * is up to the storage engine. MarkoD had it ordered upstream
+     * (freescout-help-desk/freescout@aa8827d), but that ships in the release
+     * after 1.8.252 while this module supports FreeScout from 1.8.234, so the
+     * order is the module's own until the floor passes it.
+     *
+     * Two administrators created in a known order, so the lower id is a
+     * fixture and not a repetition of the query under test.
+     */
+    public function test_the_installation_author_is_the_lowest_id_administrator()
+    {
+        $this->deleteEveryAdministrator();
+
+        $lower  = $this->makeAdminUser();
+        $higher = $this->makeAdminUser();
+        $this->assertLessThan($higher->id, $lower->id, 'the fixture stopped creating ids in order');
+
+        $this->assertEquals($lower->id, NoteAuthor::forNote(null));
+
+        $lower->status = User::STATUS_DELETED;
+        $lower->save();
+
+        $this->assertEquals(
+            $higher->id,
+            NoteAuthor::forNote(null),
+            'a deleted administrator kept signing the notes'
+        );
+    }
+
+    /**
+     * Issue #68. Zero non-deleted administrators is reachable through the
+     * interface alone, which is why the agent stays at the end of the chain
+     * rather than coming out of it:
+     *
+     * 1. two administrators, A and B, and A deletes B. deleteUser() marks the
+     *    status and leaves the role alone (app/User.php:1475).
+     * 2. A opens their own profile, where the role select is rendered for any
+     *    administrator, themselves included (users/profile.blade.php:37-43).
+     * 3. A switches to agent. The guard counts
+     *    User::where('role', ROLE_ADMIN)->count() with no status filter
+     *    (UsersController.php:224), so the deleted B makes it two and the
+     *    change is allowed.
+     *
+     * What the last resort protects is #55: with no author at all, the core's
+     * print view takes the whole conversation down.
+     */
+    public function test_with_no_administrator_left_the_note_carries_the_agent_it_is_about()
+    {
+        $this->deleteEveryAdministrator();
+        $agent = $this->makeUser('Lastresort');
+
+        $this->assertEquals($agent->id, NoteAuthor::forNote($agent->id));
+    }
+
+    /**
+     * And with nobody to name at all the author stays null, because this
+     * module does not invent a user on an installation that has none. The
+     * note is still written: it is the only visible trace of what happened.
+     */
+    public function test_with_no_administrator_and_no_agent_the_author_stays_null()
+    {
+        $this->deleteEveryAdministrator();
+
+        $this->assertNull(NoteAuthor::forNote(null));
     }
 }

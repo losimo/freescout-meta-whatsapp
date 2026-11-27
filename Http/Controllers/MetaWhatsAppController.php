@@ -75,9 +75,11 @@ class MetaWhatsAppController extends Controller
             'debug_retention' => 'required|integer|min:0|max:365',
         ]);
 
-        // Who signs the module's automatic notes (issue #43). Empty means the
-        // agent the note is about, which is the behaviour the module shipped
-        // with and stays the default.
+        // Who signs the module's automatic notes (issues #43 and #68). Empty
+        // means the installation's first administrator, which is the default.
+        // The chain itself belongs to NoteAuthor::forNote(); this screen only
+        // stores the choice, so do not restate the order here where it would
+        // drift.
         //
         // The check is here rather than an `exists:users,id` rule because the
         // answer has to be narrower than a row in that table: FreeScout
@@ -96,7 +98,7 @@ class MetaWhatsAppController extends Controller
         // The dropdown always travels, so an absent field is not somebody
         // choosing the empty option: it is a request that never carried this
         // setting, and clearing it then would undo a choice nobody touched.
-        // An empty value that did arrive does mean "back to the agent".
+        // An empty value that did arrive does mean "back to the default".
         if ($request->has('note_author')) {
             NoteAuthor::setUserId($noteAuthor !== '' ? (int) $noteAuthor : null);
         }
@@ -224,7 +226,21 @@ class MetaWhatsAppController extends Controller
         $generatedToken = bin2hex(random_bytes(32));
         $mailboxes      = $this->availableMailboxes();
         $webhookUrl     = $this->webhookUrl();
-        return view('metawhatsapp::account_form', compact('account', 'generatedToken', 'mailboxes', 'webhookUrl'));
+        // The two #57 conditions are passed here as well, although the
+        // switch is not offered until the channel exists: the view is the
+        // same file, and a variable that only some routes provide is how a
+        // blank screen replaces a warning without anything failing.
+        $coreEmailCopyDisabled          = CoreCompat::coreChatEmailCopyDisabled();
+        $coreEmailCopyMailboxCannotSend = false;
+
+        return view('metawhatsapp::account_form', compact(
+            'account',
+            'generatedToken',
+            'mailboxes',
+            'webhookUrl',
+            'coreEmailCopyDisabled',
+            'coreEmailCopyMailboxCannotSend'
+        ));
     }
 
     public function store(WhatsAppAccountRequest $request)
@@ -356,12 +372,34 @@ class MetaWhatsAppController extends Controller
             : 0;
         $serviceUsageSince = ServiceUsage::monthStart()->format('Y-m-d');
 
+        // Issue #57. The E-mail copy switch below only means anything while
+        // the core offers that feature at all, and two conditions outside
+        // this module can take it away. Both are said next to the switch
+        // rather than acted on: with the core's gate closed there is nothing
+        // for this module to do differently.
+        //
+        // The installation-wide one, which an administrator sets in .env.
+        $coreEmailCopyDisabled = CoreCompat::coreChatEmailCopyDisabled();
+
+        // And the per-channel one. From the release after 1.8.252 the core
+        // also gates the checkbox on `$mailbox->isOutActive()`, which is
+        // false for a mailbox whose outgoing method is SMTP with no server
+        // filled in, and for any mailbox a module's `mailbox.out_active`
+        // filter refuses. A mailbox this module creates sends through PHP
+        // mail, which counts as active with nothing configured, so this is
+        // silent on a channel left as it was made.
+        $coreEmailCopyMailboxCannotSend = $account->mailbox
+            ? !$account->mailbox->isOutActive()
+            : false;
+
         return view('metawhatsapp::account_form', compact(
             'account',
             'webhookUrl',
             'healthSnapshot',
             'serviceMessagesThisMonth',
-            'serviceUsageSince'
+            'serviceUsageSince',
+            'coreEmailCopyDisabled',
+            'coreEmailCopyMailboxCannotSend'
         ));
     }
 

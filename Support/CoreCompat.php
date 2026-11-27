@@ -3,6 +3,7 @@
 namespace Modules\MetaWhatsApp\Support;
 
 use App\Conversation;
+use Illuminate\Support\Facades\Config;
 
 /**
  * What this module expects from FreeScout, and what it does when it does not
@@ -27,6 +28,13 @@ class CoreCompat
      * issues in FreeScout itself.
      */
     const MINIMUM_FREESCOUT = '1.8.234';
+
+    /**
+     * The parameter with which an installation switches the core's chat
+     * e-mail copy off for everybody. Added in the release after 1.8.252,
+     * fed by APP_CHAT_CONVERSATION_REPLY_BY_EMAIL and on by default.
+     */
+    const CORE_CHAT_EMAIL_PARAMETER = 'app.chat_conversation_reply_by_email';
 
     public static function coreVersion(): string
     {
@@ -63,5 +71,33 @@ class CoreCompat
         }
 
         return in_array((int) $conversation->status, $statuses, true);
+    }
+
+    /**
+     * Has this installation switched that feature off for everybody?
+     *
+     * The core gates both halves of it on this parameter: the view that
+     * renders the checkbox (`resources/views/conversations/view.blade.php`)
+     * and the controller block that reads the submitted field into the
+     * thread's meta (`ConversationsController`). With it off there is no
+     * checkbox and no meta, so the channel's own E-mail copy switch has
+     * nothing left to switch and an administrator who turns it on gets
+     * nothing. Reported by MarkoD on issue #57.
+     *
+     * The reason this is a method and not an inline `config()` call: on
+     * 1.8.251 and 1.8.252 the key does not exist, so `config()` answers null,
+     * and null is not the same answer as false. Those are the versions where
+     * the feature is live and the channel switch is the only thing holding
+     * the double send back, so telling an administrator there that the core
+     * has it switched off would be false. Hence `has()` before the value,
+     * which is also exactly what the core's two gates evaluate.
+     *
+     * A key that exists holding null counts as off, deliberately: the core's
+     * own gate is a plain `config()` truth test, so null closes it there too.
+     */
+    public static function coreChatEmailCopyDisabled(): bool
+    {
+        return Config::has(self::CORE_CHAT_EMAIL_PARAMETER)
+            && !Config::get(self::CORE_CHAT_EMAIL_PARAMETER);
     }
 }

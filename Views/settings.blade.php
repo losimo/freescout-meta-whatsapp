@@ -73,6 +73,10 @@
             @endif
 
             @include('metawhatsapp::partials/diagnostics')
+
+            <p class="text-muted small" style="margin-top:25px">
+                {{ __('metawhatsapp::metawhatsapp.trademark_notice') }}
+            </p>
         </div>
     </div>
 </div>

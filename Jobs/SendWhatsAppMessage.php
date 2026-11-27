@@ -11,9 +11,11 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+use Modules\MetaWhatsApp\Support\AgentNotifications;
 use Modules\MetaWhatsApp\Support\DeliveryFailure;
 use Modules\MetaWhatsApp\Support\OutboundFailure;
 use Modules\MetaWhatsApp\Support\OutboundGuard;
+use Modules\MetaWhatsApp\Support\ReadReceipt;
 
 class SendWhatsAppMessage implements ShouldQueue
 {
@@ -38,7 +40,29 @@ class SendWhatsAppMessage implements ShouldQueue
         $this->toPhone   = $toPhone;
     }
 
+    /**
+     * Issue #64. The whole job runs inside AgentNotifications::around(),
+     * which flushes the subscription buffer once the run is over so that a
+     * note this job writes actually reaches the agents subscribed to notes.
+     *
+     * Around the job and not on the last line of run(): the body returns
+     * early on several paths that have just written a note, and failed()
+     * writes one too. What exactly is flushed, what is put back when the run
+     * throws, and why that is not a finally, are all in that class and in
+     * one copy, which is the difference between this and #18, #25, #28, #29.
+     */
     public function handle()
+    {
+        return AgentNotifications::around(
+            function () {
+                return $this->run();
+            },
+            $this->notificationContext()
+        );
+    }
+
+    /** The job itself. Everything it writes is flushed by handle(). */
+    protected function run()
     {
         $account = OutboundGuard::accountForSending(
             $this->accountId,
@@ -53,9 +77,14 @@ class SendWhatsAppMessage implements ShouldQueue
             if (OutboundGuard::refuseIfUnreachable($this->accountId, $this->threadId, $this->toPhone)) {
                 return;
             }
-            $thread = Thread::find($this->threadId);
-            if ($thread) {
-                $this->recordFailure($this->accountId, $thread, 'account_inactive');
+            // And no row when the channel is only switched off, which is
+            // OutboundGuard::refusalLeavesARow(): a row would be what stops
+            // this reply going out when the channel is reconnected.
+            if (OutboundGuard::refusalLeavesARow($this->accountId, OutboundGuard::SUBJECT_MESSAGE)) {
+                $thread = Thread::find($this->threadId);
+                if ($thread) {
+                    $this->recordFailure($this->accountId, $thread, 'account_inactive');
+                }
             }
             return;
         }
@@ -116,7 +145,7 @@ class SendWhatsAppMessage implements ShouldQueue
                 'category'        => WhatsAppMessage::CATEGORY_SERVICE,
                 'status'          => WhatsAppMessage::STATUS_SENT,
             ]);
-            $this->markLastInboundAsRead($account, $thread);
+            ReadReceipt::markLastInbound($this->apiClient($account), $thread->conversation_id);
             return;
         }
 
@@ -158,25 +187,6 @@ class SendWhatsAppMessage implements ShouldQueue
     }
 
     /**
-     * Marca com a llegit l'últim missatge entrant de la conversa (issue
-     * #23). Si no n'hi ha cap (p.ex. l'agent inicia la conversa, o el
-     * missatge entrant s'ha esborrat), simplement no fa res, tal com
-     * demanava el reporter.
-     */
-    protected function markLastInboundAsRead(WhatsAppAccount $account, Thread $thread)
-    {
-        $lastInbound = WhatsAppMessage::where('conversation_id', $thread->conversation_id)
-            ->where('direction', WhatsAppMessage::DIRECTION_INBOUND)
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->first();
-
-        if ($lastInbound && $lastInbound->wamid) {
-            $this->apiClient($account)->markAsRead($lastInbound->wamid);
-        }
-    }
-
-    /**
      * The row, the note and the reopening all live in OutboundFailure, which
      * is shared with the other two outbound jobs (T04). This method stays as
      * the seam each job needs, because what identifies a failed send differs:
@@ -187,7 +197,21 @@ class SendWhatsAppMessage implements ShouldQueue
         OutboundFailure::record($accountId, $thread, $errorCode, $this->toPhone);
     }
 
+    /**
+     * The retries are over, and this writes a note too (#64), through
+     * OutboundFailure, so it needs the same flush as handle().
+     */
     public function failed(\Throwable $e)
+    {
+        AgentNotifications::around(
+            function () use ($e) {
+                $this->runFailed($e);
+            },
+            $this->notificationContext()
+        );
+    }
+
+    protected function runFailed(\Throwable $e)
     {
         Log::error('[MetaWhatsApp] SendWhatsAppMessage failed permanently', [
             'account_id' => $this->accountId,
@@ -211,5 +235,15 @@ class SendWhatsAppMessage implements ShouldQueue
                 $this->recordFailure($this->accountId, $thread, 'transient');
             }
         }
+    }
+
+    /** What the discarded-notifications log line carries for this job. */
+    protected function notificationContext(): array
+    {
+        return [
+            'job'        => static::class,
+            'account_id' => $this->accountId,
+            'thread_id'  => $this->threadId,
+        ];
     }
 }

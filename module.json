@@ -2,6 +2,7 @@
     "name": "MetaWhatsApp",
     "alias": "metawhatsapp",
     "description": "WhatsApp Business channel via Meta Cloud API",
+    "img": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4IiB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCI+CjwhLS0KICBNb2R1bGUgaWNvbi4gVGhlIGZpZWxkIGlzIEZyZWVTY291dCdzIG93biBwcmltYXJ5IGNvbG91ciAoIzAwNzhENyksIG5vdAogIFdoYXRzQXBwJ3MgZ3JlZW4sIGFuZCB0aGUgZ2x5cGggaXMgYSBwbGFpbiB0ZWxlcGhvbmUgaGFuZHNldCwgbm90IFdoYXRzQXBwJ3MKICBtYXJrOiBzZWUgdGhlIFRyYWRlbWFya3Mgc2VjdGlvbiBvZiB0aGUgUkVBRE1FLgoKICBQaG9uZSBnbHlwaDogRm9udCBBd2Vzb21lIEZyZWUgNi43LjIgYnkgRm9udGljb25zLCBJbmMuCiAgaHR0cHM6Ly9mb250YXdlc29tZS5jb20gLSBJY29ucyBsaWNlbnNlZCB1bmRlciBDQyBCWSA0LjAKICBodHRwczovL2NyZWF0aXZlY29tbW9ucy5vcmcvbGljZW5zZXMvYnkvNC4wLwogIENoYW5nZXM6IHJlY29sb3VyZWQgd2hpdGUgYW5kIHBsYWNlZCBvbiBhIHNvbGlkICMwMDc4RDcgZmllbGQuCgogIFRoaXMgZmlsZSBpcyB0aGUgc291cmNlIG9mIHRydXRoLiBtb2R1bGUuanNvbiBjYXJyaWVzIHRoZSBzYW1lIGJ5dGVzIGFzIGEKICBkYXRhIFVSSSwgYmVjYXVzZSBGcmVlU2NvdXQgY29waWVzIG1vZHVsZS5qc29uJ3MgImltZyIgc3RyYWlnaHQgaW50byBzcmM9IiIKICB3aXRob3V0IHJlc29sdmluZyBpdCwgc28gYSByb290LXJlbGF0aXZlIHBhdGggYnJlYWtzIGEgc3ViZm9sZGVyIGluc3RhbGwuCiAgVGVzdHMvSW50ZXJuYWwvUmVncmVzc2lvbkd1YXJkc1Rlc3QucGhwIGZhaWxzIGlmIHRoZSB0d28gZXZlciBkcmlmdCBhcGFydC4KLS0+CjxyZWN0IHdpZHRoPSIxMjgiIGhlaWdodD0iMTI4IiBmaWxsPSIjMDA3OEQ3Ii8+CjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDIxLDIxKSBzY2FsZSgwLjE2Nzk3KSI+PHBhdGggZmlsbD0iI2ZmZmZmZiIgZD0iTTE2NC45IDI0LjZjLTcuNy0xOC42LTI4LTI4LjUtNDcuNC0yMy4ybC04OCAyNEMxMi4xIDMwLjIgMCA0NiAwIDY0QzAgMzExLjQgMjAwLjYgNTEyIDQ0OCA1MTJjMTggMCAzMy44LTEyLjEgMzguNi0yOS41bDI0LTg4YzUuMy0xOS40LTQuNi0zOS43LTIzLjItNDcuNGwtOTYtNDBjLTE2LjMtNi44LTM1LjItMi4xLTQ2LjMgMTEuNkwzMDQuNyAzNjhDMjM0LjMgMzM0LjcgMTc3LjMgMjc3LjcgMTQ0IDIwNy4zTDE5My4zIDE2N2MxMy43LTExLjIgMTguNC0zMCAxMS42LTQ2LjNsLTQwLTk2eiIvPjwvZz4KPC9zdmc+Cg==",
     "keywords": [
         "whatsapp",
         "meta",
@@ -16,7 +17,7 @@
     "files": [
         "start.php"
     ],
-    "version": "3.0.0",
+    "version": "3.1.0",
     "freescout_version": "1.8.234",
     "author": "losimo",
     "license": "AGPL-3.0",

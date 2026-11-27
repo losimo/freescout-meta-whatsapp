@@ -30,7 +30,7 @@ Cinco pasos desde una instalación de FreeScout nueva hasta tener un canal de Wh
 1. **Instala el módulo.** Activa **MetaWhatsApp** desde Manage → Modules (o los tres comandos `artisan` si trabajas desde la línea de comandos). Ver [Instalación](#instalación).
 2. **Prepara Meta.** Necesitas una App de tipo Business con el producto WhatsApp añadido, un número de teléfono registrado, y cuatro valores del App Dashboard: **Phone Number ID**, **ID de la cuenta de mensajes** (el campo que Meta sigue llamando **WABA ID**), **Access Token**, **App Secret**. Ver [Requisitos previos en Meta](#requisitos-previos-en-meta) — en particular, genera un token permanente en lugar del de 24 horas que Meta muestra por defecto.
 3. **Añade el canal en FreeScout.** Manage → WhatsApp → Add account, pega los cuatro valores, guarda. Ver [Configuración del canal → En FreeScout](#en-freescout).
-4. **Apunta Meta hacia el webhook.** Pega la URL del webhook y el verify token que la página de la cuenta te acaba de dar en la pantalla de configuración de Webhook de Meta, y activa el campo `messages`. Si además quieres que se llene el panel de eventos de la cuenta, activa ahí también `message_template_status_update` y `template_category_update`: sin ellos Meta no envía nada y ese panel se queda vacío por mucho que lo activéis en FreeScout. Ver [Configuración del canal → En Meta](#en-meta).
+4. **Apunta Meta hacia el webhook.** Pega la URL del webhook y el verify token que la página de la cuenta te acaba de dar en la pantalla de configuración de Webhook de Meta, y activa el campo `messages`. Si además quieres que se llene el panel de eventos de la cuenta, activa ahí también `message_template_status_update`, `template_category_update`, `account_update`, `account_alerts`, `phone_number_quality_update` y `account_review_update`: sin ellos Meta no envía nada y ese panel se queda vacío por mucho que lo activéis en FreeScout. Ver [Configuración del canal → En Meta](#en-meta).
 5. **Envía un mensaje real** al número y confirma que crea una conversación en FreeScout, luego responde desde FreeScout y confirma que llega al teléfono.
 
 Si el paso 5 no funciona, empieza por [Resolución de problemas](#resolución-de-problemas) y [Cuando no es cosa del módulo](#cuando-no-es-cosa-del-módulo) antes de asumir que el problema es del módulo — un worker de colas detenido, una URL de webhook que no coincide del todo, o un problema de certificado explican la mayoría de incidencias del primer día.
@@ -91,6 +91,21 @@ Queda fuera de alcance:
 - Chatbots, automatizaciones avanzadas o integraciones multicanal compartidas.
 - Vincular un número por el protocolo no oficial de dispositivo acompañante de WhatsApp Web, como hacen algunos clientes de escritorio. No necesita aprobación de la Cloud API, que es justo lo que lo hace tentador, y queda fuera de alcance a propósito: el protocolo está hecho por ingeniería inversa, Meta puede romperlo cuando quiera, y usarlo puede acabar con el número suspendido. En una cuenta personal esa es la apuesta de quien la asume. En la línea de atención de una empresa, una suspensión detiene todas las conversaciones a la vez, así que el módulo no va a correr ese riesgo en su nombre.
 
+## Novedades en la v3.1.0
+
+- **Las notas automáticas del módulo ahora avisan a los agentes que lo habían pedido** (#64). Una respuesta rechazada, un mensaje que Meta dice que no se ha entregado, un envío que falla: la nota aparecía en la conversación y no avisaba a nadie, ni siquiera a un agente suscrito a las notas. También se avisa al agente cuya respuesta ha fallado, que es el aviso que más importa aquí. Reportado con todo el mecanismo por [@MarkoD](https://github.com/MarkoD).
+- **Las reglas de Workflow que reaccionan cuando se añade una nota empezarán a coincidir con las notas del módulo.** Ahora disparamos la acción `conversation.note_added` del core, igual que una nota escrita a mano, así que los demás módulos ven las nuestras como cualquier otra. Si tenéis una regla con ese disparador, revisadla antes de actualizar.
+- **Quién firma una nota automática cambia en las instalaciones que no han elegido a nadie** (#68). Antes era el agente del que habla la nota, y FreeScout muestra una nota a su autor como si la hubiera escrito él, así que el agente leía la frase del módulo como suya. Ahora es el primer administrador de la instalación. El usuario que elijáis en esa opción es también el único que no recibe aviso de estas notas, así que un usuario de marcador llamado Sistema o WhatsApp es la elección correcta, y alguien que trabaja conversaciones no.
+- **El registro de eventos de la cuenta conserva lo que promete su interruptor** (#66): restricciones, infracciones, bloqueos y rehabilitaciones de la cuenta, salida forzada, avisos sobre límites de envío, sobre el estado de cuenta de empresa oficial y sobre una foto de perfil borrada, cambios de caudal por número y la decisión de la revisión de políticas. El texto ya no promete la valoración de calidad de los mensajes, porque Meta no envía ningún webhook con ese valor; ahora dice dónde se puede leer.
+- **Un fallo que Meta reporta de un mensaje que el módulo no puede emparejar ahora se escribe donde se puede ver** (#65). Acababa en una línea de depuración, y el nivel de registro por defecto de FreeScout no escribe depuración, así que un mensaje fallaba y en ningún sitio se decía nada.
+- **Una respuesta rechazada con el canal apagado ya no se pierde por un camino y se conserva por el otro.** Rechazada antes de encolarse, esperaba y salía cuando el canal volvía. Rechazada unos segundos más tarde dentro del job, no se volvía a enviar nunca, y el cliente no recibía ninguna respuesta.
+- **Un acuse de lectura ya no marca un mensaje que el cliente ya había visto contestado**, y en una conversación con dos números de un mismo cliente la respuesta va a la persona que el agente está leyendo. Tres sitios decidían cada uno cuál era el último mensaje entrante, y Meta los entrega desordenados hasta siete días.
+- **El interruptor de copia por correo dice cuándo la instalación tiene esa función apagada para todos** (#57), en lugar de parecer una opción que hace algo.
+- **Un mensaje que llega a la cola con días de retraso ya no abre una ventana que no existe.** Meta no entrega nunca ninguno tan viejo, pero un job reintentado tras un retraso sí, y su marca de tiempo real se tiraba, así que el reloj lo leía como recién llegado: el agente tenía la casilla de respuesta libre en una conversación que Meta tenía cerrada, y la respuesta volvía rechazada. Ahora solo se rechaza una hora que ningún mensaje de WhatsApp puede llevar, porque creerse una marca vieja solo puede cerrar la ventana, que es la verdad.
+- **El borrado quita el número también del nombre del registro del cliente**, que es la copia más visible de todas, y la pantalla ahora dice cuántos de los registros que está a punto de cambiar llevan también otros datos, por ejemplo un contacto importado que resulta que lleva ese número. De esos registros solo se quita la identidad borrada.
+- **La tarjeta del módulo tiene icono** (#63): un auricular blanco sobre el azul de FreeScout. Azul y no el verde de WhatsApp, y un auricular solo y no dentro de un bocadillo, porque esa forma es marca de Meta y el azul dice que esto es un módulo de FreeScout y no un producto de WhatsApp. Pedido por [@MarkoD](https://github.com/MarkoD).
+- Los README y la pantalla de configuración ahora dicen de quién es la marca y que este proyecto no está afiliado a ella.
+
 ## Novedades en la v3.0.0
 
 - **Identificadores que dejan de ser legibles.** Los ids de mensaje de Meta llevan el número de teléfono dentro; ahora una supresión lo sustituye por una huella de un solo sentido, y una migración hace lo mismo con las filas que ya habían borrado versiones anteriores. Por eso se mueve el primer dígito: el significado de datos almacenados ha cambiado. (La pantalla de supresión salió en la v2.2.0.)
@@ -114,12 +129,6 @@ La mayor parte de esta versión sale de 41 tickets que abrió [@MarkoD](https://
 - **El inicio rápido y la página de ajustes ahora dicen qué campos de webhook necesita Meta** antes de que el panel de eventos de la cuenta pueda llenarse (#47). Sin `message_template_status_update` y `template_category_update` activados en Meta, ese interruptor no hace nada y antes tampoco lo decía.
 - El cambio de precios de octubre está escrito como historia y no como aviso, en su propia sección junto a la ventana de 24 horas. La nota del método de pago se queda arriba, más corta: una cuenta sin él deja de tener los mensajes entregados, y ese fallo es silencioso.
 - CONTRIBUTING ahora dice qué significan los números de versión.
-
-## Novedades en la v2.3.0
-
-- **Corrección: los agentes ahora reciben aviso de los mensajes entrantes** (#46). No lo recibían en ninguna versión de este módulo. Ni correo, ni campana, ni aviso del navegador, y nada en el registro que lo dijera. El listener de FreeScout solo guarda el evento en un búfer, y el core vacía ese búfer en dos sitios, ninguno de los cuales corre dentro de un worker de colas, que es donde este módulo procesa los webhooks. Reportado con el diagnóstico completo por [@MarkoD](https://github.com/MarkoD).
-- **Podéis elegir de quién vienen las notas automáticas del módulo** (#43). Dejadlo sin marcar y no cambia nada: la nota lleva el agente del que habla. Elegid un usuario, por ejemplo uno que creéis y llaméis Sistema o WhatsApp, y las notas llevarán ese usuario, lo que evita que FreeScout le enseñe esa nota a un agente como si la hubiera escrito él mismo. Si borráis ese usuario más adelante, las notas vuelven a llevar el agente.
-- El aviso de ventana caducada ya no dice que Meta no admita enviar una plantilla a un contacto del que solo se conoce su ID de WhatsApp. Meta lo acepta como destinatario; este módulo todavía no lo ha construido, y ahora dice cuál de los dos es el límite.
 
 Las versiones anteriores están en la [página de releases](https://github.com/losimo/freescout-meta-whatsapp/releases).
 
@@ -224,7 +233,7 @@ Desde **App Dashboard → WhatsApp → Configuration → Webhook**:
 1. En **Callback URL**, pega la URL del webhook del módulo.
 2. En **Verify Token**, pega el token de verificación generado en FreeScout.
 3. Pulsa **Verify and save**.
-4. En **Webhook fields**, activa como mínimo el campo **messages**.
+4. En **Webhook fields**, activa como mínimo el campo **messages**. Para el registro de eventos de la cuenta, activa ahí también `message_template_status_update`, `template_category_update`, `account_update`, `account_alerts`, `phone_number_quality_update` y `account_review_update`; qué reporta cada uno está en la [matriz de capacidades](docs/capability-matrix.md).
 
 > **Requisito importante**
 >
@@ -304,6 +313,7 @@ Si Meta devuelve el error `190`:
 - la cuenta pasa a estado **Inactivo**,
 - el canal deja de enviar y recibir correctamente,
 - y hay que actualizar el token de acceso desde la edición de la cuenta.
+- Una respuesta que un agente escriba con el canal inactivo **no se descarta**. La conversación recibe una nota que lo dice, y la respuesta sale cuando alguien vuelva a responder en esa conversación con el canal restablecido, así que volver a escribirla enviaría la misma respuesta dos veces.
 
 ### Soporte multimedia (v1.4.0)
 
@@ -325,7 +335,7 @@ El módulo lo detiene por defecto y oculta la casilla. Si quieres esa opción en
 
 Hay dos condiciones. El interruptor solo tiene efecto a partir de FreeScout 1.8.251, y que la copia llegue realmente depende de la configuración de salida de tu instalación y no de nada que haga este módulo. Y una trampa que conviene saber antes de empezar, señalada por [@MarkoD](https://github.com/MarkoD): el formulario del canal solo ofrece buzones sin conexión de correo configurada, así que si quieres asociar WhatsApp a un buzón desde el que también quieras enviar correo, **asócialo primero y configura la conexión después**, o no lo encontrarás en la lista.
 
-El core está añadiendo sus propios controles para la misma casilla. `APP_CHAT_CONVERSATION_REPLY_BY_EMAIL=false` en el `.env` la quita de todas partes, y el resto de la condición es que la conversación no esté en modo Chat, que el cliente tenga dirección de correo y que el buzón tenga la salida activa. Una versión anterior de esta línea decía que la salida activa significaba tener una conexión de correo configurada; no lo significa, y aquí la diferencia importa: el método de salida por defecto de FreeScout es PHP mail, que cuenta como activo sin configurar nada, así que en un buzón de WhatsApp la casilla sí aparece. El interruptor de este módulo es lo que la quita. El cambio está en la rama master de FreeScout a fecha del 25 de noviembre de 2026, posterior a la 1.8.252, así que llegará en la versión siguiente.
+El core está añadiendo sus propios controles para la misma casilla. `APP_CHAT_CONVERSATION_REPLY_BY_EMAIL=false` en el `.env` la quita de todas partes, y el resto de la condición es que la conversación no esté en modo Chat, que el cliente tenga dirección de correo y que el buzón tenga la salida activa. Una versión anterior de esta línea decía que la salida activa significaba tener una conexión de correo configurada; no lo significa, y aquí la diferencia importa: el método de salida por defecto de FreeScout es PHP mail, que cuenta como activo sin configurar nada, así que en un buzón de WhatsApp la casilla sí aparece. El interruptor de este módulo es lo que la quita. El cambio está en la rama master de FreeScout a fecha del 25 de noviembre de 2026, posterior a la 1.8.252, así que llegará en la versión siguiente. Si has desactivado ese parámetro, la configuración del canal ahora lo dice junto a **Copia por correo**, porque con la puerta del core cerrada activar el interruptor no haría nada. Lo mismo se dice cuando el buzón no tiene ningún método de salida activo, que esa puerta también rechaza.
 
 ## Datos personales
 
@@ -342,7 +352,7 @@ Estas limitaciones son conocidas y aceptadas dentro del alcance actual de funcio
 - Hasta 5 plantillas configuradas estáticamente por cuenta, o cualquier plantilla APPROVED obtenida en vivo mediante el selector dinámico (con variables `{{n}}`); sin sincronización/caché automática de la lista estática desde el catálogo de Meta.
 - El envío de la plantilla de recuperación es siempre **manual**, iniciado por un agente desde el banner de la conversación; no hay reintento automático fuera de ventana.
 - Los estados `delivered` y `read` se actualizan en la base de datos del módulo; solo el `read` se muestra visualmente (vía el indicador nativo "abierto" del thread) — el `delivered` no se muestra en la conversación.
-- Si Meta agrupa varios eventos en un solo envío de webhook, cada uno se encamina según lo que realmente es: un mensaje se atribuye por su propio número de teléfono y se descarta si nombra uno distinto, mientras que un hecho de nivel de cuenta (estado de plantilla, calidad, restricciones) llega a todos los canales activos de la WABA a la que pertenece, y se descarta si nombra otra WABA. En la práctica Meta suele enviar webhooks separados por número, pero conviene tenerlo presente con varios números bajo la misma App.
+- Si Meta agrupa varios eventos en un solo envío de webhook, cada uno se encamina según lo que realmente es: un mensaje se atribuye por su propio número de teléfono y se descarta si nombra uno distinto, mientras que un hecho de nivel de cuenta llega a todos los canales activos de la WABA a la que pertenece, y se descarta si nombra otra WABA. Un hecho de un solo número de teléfono de la empresa, como un cambio de caudal o una alerta que nombra ese número, va al canal que es su propietario, también si lo tenéis apagado, porque de quién es un número es una pregunta de identidad. En la práctica Meta suele enviar webhooks separados por número, pero conviene tenerlo presente con varios números bajo la misma App.
 - En modo chat, el core de FreeScout puede generar **borradores vacíos** en la conversación por el autoguardado del editor; son inocuos y se pueden descartar manualmente.
 - El **buzón técnico** del canal sigue siendo visible en **Gestionar → Buzones**.
 - El webhook no implementa rate limiting propio; la barrera principal es la firma HMAC.
@@ -419,3 +429,15 @@ Los tests trabajan contra la base de datos de la instalación con rollback por t
 ## Licencia
 
 AGPL-3.0, igual que FreeScout.
+
+## Marcas
+
+WhatsApp y Meta son marcas de Meta Platforms, Inc. Este módulo es un proyecto
+independiente, no está afiliado a Meta Platforms, Inc. ni cuenta con su
+respaldo, y usa esos nombres solo para decir a qué servicio se conecta.
+
+## Créditos
+
+El auricular del icono del módulo es de Font Awesome Free 6.7.2, de
+Fonticons, Inc., con licencia [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+Lo hemos recoloreado de blanco y puesto sobre un campo azul de FreeScout.

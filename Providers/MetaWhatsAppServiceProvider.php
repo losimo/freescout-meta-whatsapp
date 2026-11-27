@@ -543,14 +543,6 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Encua l'enviament WhatsApp de cada reply pendent d'una conversa chat.
-     *
-     * TriggerAction serialitza els paràmetres com a array pla: els models
-     * arriben com a snapshot del moment del reply, NO re-hidratats. Tot el
-     * que és decisiu (estat del thread) es re-consulta fresc de BD aquí i
-     * al job.
-     */
-    /**
      * Primer reply que de debò hauria sortit, rellegit de BD. Mateix filtre
      * que el bucle d'enviament: notes internes i threads retirats amb undo
      * no compten.
@@ -570,7 +562,38 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
         return null;
     }
 
+    /**
+     * Encua l'enviament WhatsApp de cada reply pendent d'una conversa chat.
+     *
+     * TriggerAction serialitza els paràmetres com a array pla: els models
+     * arriben com a snapshot del moment del reply, NO re-hidratats. Tot el
+     * que és decisiu (estat del thread) es re-consulta fresc de BD aquí i
+     * al job.
+     *
+     * Inside AgentNotifications::around(), for the same reason the jobs are
+     * (#64), and the reason is this hook's own transport. The core fires
+     * `chat_conversation.send_reply` through Helper::backgroundAction()
+     * (app/Listeners/SendReplyToCustomer.php:89), which dispatches the
+     * App\Jobs\TriggerAction job with the undo delay, so this method runs
+     * inside a queue worker and not in the request that wrote the reply. The
+     * first version of the #64 fix got that wrong and left the commonest
+     * refusal of all, a channel switched off, writing a note that notified
+     * nobody. Worse than nobody, in fact: a registered event sits in a
+     * static buffer until the next job of ours on that worker flushes it
+     * along with its own.
+     */
     protected function handleOutboundReplies($conversation, $replies)
+    {
+        return \Modules\MetaWhatsApp\Support\AgentNotifications::around(
+            function () use ($conversation, $replies) {
+                return $this->dispatchOutboundReplies($conversation, $replies);
+            },
+            ['hook' => 'chat_conversation.send_reply', 'mailbox_id' => $conversation->mailbox_id ?? null]
+        );
+    }
+
+    /** The hook itself. Everything it writes is flushed by the wrapper above. */
+    protected function dispatchOutboundReplies($conversation, $replies)
     {
         $account = WhatsAppAccount::where('mailbox_id', $conversation->mailbox_id)->first();
         if (!$account) {
@@ -616,10 +639,9 @@ class MetaWhatsAppServiceProvider extends ServiceProvider
         }
 
         // Destinatari: últim inbound de la conversa; fallback customer_channel.
-        $lastInbound = \Modules\MetaWhatsApp\Models\WhatsAppMessage::where('conversation_id', $conversation->id)
-            ->where('direction', \Modules\MetaWhatsApp\Models\WhatsAppMessage::DIRECTION_INBOUND)
-            ->orderBy('id', 'desc')
-            ->first();
+        // Through the model, so that the number a reply goes to and the
+        // window the agent was shown cannot be decided by different rows.
+        $lastInbound = \Modules\MetaWhatsApp\Models\WhatsAppMessage::lastInbound($conversation->id);
         $phone = $lastInbound->contact_phone ?? null;
 
         if (!$phone) {

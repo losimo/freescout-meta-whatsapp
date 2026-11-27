@@ -35,8 +35,14 @@
                                 'messages'    => $receipt['messages'],
                                 'channels'    => $receipt['channel_rows'],
                                 'records'     => $receipt['records'],
+                                'names'       => $receipt['names'],
+                                'placeholder' => __('metawhatsapp::metawhatsapp.erased_contact_name'),
                                 'date'        => now()->format('Y-m-d H:i'),
                             ]) }}
+@if(!empty($receipt['records_other_data']))
+
+{{ __('metawhatsapp::metawhatsapp.erasure_records_other_data', ['count' => $receipt['records_other_data']]) }}
+@endif
 
 {{ __('metawhatsapp::metawhatsapp.erasure_receipt_kept') }}
 
@@ -103,9 +109,25 @@
                                 <th>{{ __('metawhatsapp::metawhatsapp.erasure_col_channel_rows') }}</th>
                                 <td>{{ $summary['channel_rows'] }}</td>
                             </tr>
+                            {{-- The count on its own was not enough to decide
+                                 with. It includes records this module never
+                                 created, because the column it searches is the
+                                 one Customer::byPhone() searches and a number
+                                 left on anybody's record goes on resolving to
+                                 this person. So the administrator is told how
+                                 many of them hold other data as well, which is
+                                 the question they are really asking: whether
+                                 one of these is their own imported contact. --}}
                             <tr>
                                 <th>{{ __('metawhatsapp::metawhatsapp.erasure_col_records') }}</th>
-                                <td>{{ $summary['records'] }}</td>
+                                <td>
+                                    {{ $summary['records'] }}
+                                    @if(!empty($summary['records_other_data']))
+                                        <div class="help-block" style="margin:0">
+                                            {{ __('metawhatsapp::metawhatsapp.erasure_records_other_data', ['count' => $summary['records_other_data']]) }}
+                                        </div>
+                                    @endif
+                                </td>
                             </tr>
                         </tbody>
                     </table>

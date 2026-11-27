@@ -73,6 +73,16 @@ class PersonalDataErasure
                 }
             }
 
+            // And a record whose whole name is the identifier, which is the
+            // one place it still sits after the v3.0.0 screen has run: that
+            // version took the number off the rows, the links and the phone
+            // list and left the name, and without this the screen would
+            // answer "nothing held" about a number that is on the customer
+            // list in plain sight.
+            foreach (self::namedAfter($search) as $name) {
+                $found[] = $name;
+            }
+
             $merged = array_values(array_unique(array_merge($held, $found)));
             if (count($merged) === count($held)) {
                 break;
@@ -96,6 +106,9 @@ class PersonalDataErasure
         }
 
         $rows = self::rowsFor($identifiers);
+
+        $phonesHeld = self::phoneIdentifiers($identifiers);
+        $records    = self::recordsHolding($identifiers, $phonesHeld);
 
         $conversationIds = $rows->pluck('conversation_id')->filter()->unique()->values();
         $liveConversations = $conversationIds->isEmpty()
@@ -123,7 +136,8 @@ class PersonalDataErasure
             // with the channel deleted there are no message rows left, and a
             // screen reporting only those said there was nothing here.
             'channel_rows'   => self::contactLinks($identifiers)->count(),
-            'records'        => count(self::recordsHolding($identifiers)),
+            'records'            => count($records),
+            'records_other_data' => self::recordsHoldingOtherData($records, $identifiers, $phonesHeld),
         ];
     }
 
@@ -148,6 +162,11 @@ class PersonalDataErasure
             // carries it, are the columns this routine has just emptied.
             $phones    = self::phoneIdentifiers($identifiers);
             $recordIds = self::recordsHolding($identifiers, $phones);
+
+            // Before anything is taken off them, for the same reason as the
+            // two lines above: afterwards every one of these records would
+            // look like it holds nothing else.
+            $recordsOtherData = self::recordsHoldingOtherData($recordIds, $identifiers, $phones);
 
             // Row by row and not one mass update, because the new
             // identifier is derived from the old one and so differs per
@@ -178,7 +197,9 @@ class PersonalDataErasure
 
             // Last, because recordsHolding() reads the links above to decide
             // which of these identifiers is a phone number.
-            $records = self::cleanCustomerRecords($recordIds, $phones, $identifiers);
+            $customerRecords = self::cleanCustomerRecords($recordIds, $phones, $identifiers);
+            $records         = $customerRecords['records'];
+            $names           = $customerRecords['names'];
 
             // How many and when, never who. The log is the one place
             // erasure does not reach, so a log line naming the person
@@ -187,13 +208,19 @@ class PersonalDataErasure
                 'messages'     => $messages,
                 'channel_rows' => $channelRows,
                 'records'      => $records,
+                'names'        => $names,
             ]);
 
             return [
-                'identifiers'  => $identifiers,
-                'messages'     => $messages,
-                'channel_rows' => $channelRows,
-                'records'      => $records,
+                'identifiers'        => $identifiers,
+                'messages'           => $messages,
+                'channel_rows'       => $channelRows,
+                'records'            => $records,
+                'names'              => $names,
+                // Counted before the cleaning, with the same call the screen
+                // made, so the two figures can be compared. Afterwards the
+                // answer would be about what is left on the record.
+                'records_other_data' => $recordsOtherData,
             ];
         });
     }
@@ -243,9 +270,19 @@ class PersonalDataErasure
 
     /**
      * Customer records whose own columns still carry one of these
-     * identifiers, which this module is the one that put there.
+     * identifiers, whoever put them there.
      *
-     * Two columns, both written by us. `customers.phones` gets the number
+     * Not only the records this module wrote, and that is deliberate rather
+     * than an oversight: `customers.phones` is the column
+     * `Customer::byPhone()` searches, so a number left on anybody's record
+     * goes on resolving to this person and the erasure would be incomplete
+     * in the one way that matters for a module whose whole job is resolving
+     * a number to a customer. An administrator's own imported contact can
+     * be one of these, which is why the screen counts separately the ones
+     * that hold other data as well (recordsHoldingOtherData), and why only
+     * the erased identifiers are taken off them.
+     *
+     * Two columns. `customers.phones` gets the number
      * when the module creates the customer and when a number change moves
      * one, and it is the column `Customer::byPhone()` searches, so a number
      * left there goes on resolving to this person. `customers.channel_id`
@@ -280,7 +317,96 @@ class PersonalDataErasure
             $ids[(int) $id] = true;
         }
 
+        // And the name, which is a third place the identifier sits and the
+        // only one that survives a run of the earlier version of this
+        // screen. That is why it is searched rather than migrated: a
+        // migration cannot tell a record whose name is a number because it
+        // was erased from one whose name is a number because the person
+        // still writes every day, while asking for this identifier again
+        // says which one is meant.
+        foreach (self::namedAfterIds($identifiers) as $id) {
+            $ids[(int) $id] = true;
+        }
+
         return array_keys($ids);
+    }
+
+    /**
+     * How many of those records hold something besides this identity.
+     *
+     * The administrator needs this before the button, because the figure
+     * beside it includes records this module never created: an imported
+     * contact that happens to carry the number is reached like any other
+     * (see recordsHolding, which explains why it has to be).
+     *
+     * "Written by this module" is not a question the data can answer. When
+     * an inbound message lands on a record that already existed, the core's
+     * own addChannel() puts the same channel flag on it as on a record the
+     * module created, and an agent can rename either one. What the data does
+     * answer is whether the record holds anything else: another number, an
+     * e-mail address, or a name somebody typed. That is also the question
+     * the administrator is really asking, which is whether they are looking
+     * at their own CRM contact.
+     *
+     * The same figure is reported before and after, so the receipt can be
+     * compared with the screen.
+     */
+    protected static function recordsHoldingOtherData(array $recordIds, array $identifiers, array $phones): int
+    {
+        if (empty($recordIds)) {
+            return 0;
+        }
+
+        $count = 0;
+
+        foreach (Customer::whereIn('id', $recordIds)->get() as $customer) {
+            if (self::holdsOtherData($customer, $identifiers, $phones)) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    /** One record, the same three questions. */
+    protected static function holdsOtherData(Customer $customer, array $identifiers, array $phones): bool
+    {
+        foreach ($customer->getPhones() as $phone) {
+            $value = isset($phone['value']) ? (string) $phone['value'] : '';
+
+            if ($value === '') {
+                continue;
+            }
+
+            $erased = false;
+            foreach ($phones as $identifier) {
+                if (CustomerMatcher::sameNumber($value, $identifier)) {
+                    $erased = true;
+                    break;
+                }
+            }
+
+            if (!$erased) {
+                return true;
+            }
+        }
+
+        if ($customer->emails()->count() > 0) {
+            return true;
+        }
+
+        // Either name, not the first one: an imported contact filed under a
+        // surname alone used to answer that it held nothing but this
+        // identity, which is the opposite of true and the one question this
+        // figure exists to answer.
+        //
+        // A name nobody typed is the identifier itself, which is what this
+        // module writes, so that one says nothing about the record holding
+        // more.
+        $hasName = trim((string) $customer->first_name) !== ''
+            || trim((string) $customer->last_name) !== '';
+
+        return $hasName && !self::nameIsIdentifier($customer, $identifiers);
     }
 
     /**
@@ -297,13 +423,14 @@ class PersonalDataErasure
      * customer when there is one, so it keeps meaning what the core means by
      * it, and emptied when there is not.
      */
-    protected static function cleanCustomerRecords(array $recordIds, array $phones, array $identifiers): int
+    protected static function cleanCustomerRecords(array $recordIds, array $phones, array $identifiers): array
     {
         if (empty($recordIds)) {
-            return 0;
+            return ['records' => 0, 'names' => 0];
         }
 
         $cleaned = 0;
+        $renamed = 0;
 
         foreach (Customer::whereIn('id', $recordIds)->get() as $customer) {
             $changed = false;
@@ -312,6 +439,13 @@ class PersonalDataErasure
                 if (CustomerMatcher::removePhone($customer, $phone)) {
                     $changed = true;
                 }
+            }
+
+            if (self::nameIsIdentifier($customer, $identifiers)) {
+                $customer->first_name = __('metawhatsapp::metawhatsapp.erased_contact_name');
+                $customer->last_name  = '';
+                $changed              = true;
+                $renamed++;
             }
 
             if (in_array((int) $customer->channel, [WhatsAppAccount::CHANNEL, WhatsAppAccount::CHANNEL_BSUID], true)
@@ -330,7 +464,92 @@ class PersonalDataErasure
             }
         }
 
-        return $cleaned;
+        return ['records' => $cleaned, 'names' => $renamed];
+    }
+
+    /**
+     * Is this record's whole name one of the identifiers being erased?
+     *
+     * This page used to say that a name was never ours to rewrite, because
+     * the module cannot tell a record it created from one that already
+     * existed under an e-mail with a WhatsApp channel added to it. That is
+     * true in general and false in the one case that matters: when the name
+     * is literally the identifier being erased, this module is the only
+     * thing that could have written it, since naming a new customer after
+     * the number or the business-scoped id is what it does. Any other name
+     * is somebody's work and is left exactly as it is, surname included,
+     * which is why a surname means this is not ours.
+     *
+     * It matters because the name is the most visible copy of all: it shows
+     * in the customer list, in search results and on every conversation in
+     * the list, while the places the erasure already reached are columns
+     * nobody reads directly.
+     *
+     * What follows is the query that applies that rule.
+     *
+     * Records whose whole name is one of these identifiers, by the same rule
+     * nameIsIdentifier() applies row by row: no surname, because the module
+     * writes the identifier as the whole name and never a surname.
+     *
+     * One query for both callers on purpose. The screen must not report a
+     * record as holding the identity if the erasure is then going to leave
+     * its name alone, and the only way to be sure of that is for the search
+     * and the rename to ask the same question.
+     *
+     * Trimmed on both halves of that question, which it was not: the query
+     * asked for the name as written while nameIsIdentifier() trimmed before
+     * comparing, so a name carrying stray whitespace, a typo or an import,
+     * was found by neither the screen nor the erasure, and the number stayed
+     * visible as the label on the record. MySQL ignores trailing spaces when
+     * it compares strings, so it was the leading ones that got through.
+     *
+     * The two are still not identical and the difference is worth writing
+     * down rather than claiming away: MySQL's TRIM() strips spaces, while
+     * PHP's trim() also strips tabs, newlines and null bytes. A first name
+     * that begins with a tab is still reached by neither. Closing that in
+     * SQL costs three nested REPLACE() calls on every row of the table, and
+     * what it buys is a case nothing in this module or in FreeScout writes;
+     * an import that produced one would be visible in the customer list.
+     *
+     * TRIM() in the column means no index on this one, and that is the right
+     * trade here: it runs twice on a screen an administrator opens by hand,
+     * against a table scan the erasure itself then writes to anyway.
+     */
+    protected static function namedAfterQuery(array $identifiers)
+    {
+        return Customer::whereIn(DB::raw('TRIM(first_name)'), $identifiers)
+            ->where(function ($query) {
+                $query->whereNull('last_name')->orWhereRaw("TRIM(last_name) = ''");
+            });
+    }
+
+    /** @return string[] */
+    protected static function namedAfter(array $identifiers): array
+    {
+        return self::namedAfterQuery($identifiers)
+            ->distinct()
+            ->pluck('first_name')
+            ->filter()
+            ->map(function ($name) {
+                return (string) $name;
+            })
+            ->values()
+            ->all();
+    }
+
+    /** @return int[] */
+    protected static function namedAfterIds(array $identifiers): array
+    {
+        return self::namedAfterQuery($identifiers)->pluck('id')->all();
+    }
+
+    protected static function nameIsIdentifier(Customer $customer, array $identifiers): bool
+    {
+        if (trim((string) $customer->last_name) !== '') {
+            return false;
+        }
+
+        return in_array(trim((string) $customer->first_name), $identifiers, true);
     }
 
     protected static function rowsFor(array $identifiers)

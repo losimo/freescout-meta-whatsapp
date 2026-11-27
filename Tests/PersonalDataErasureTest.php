@@ -341,7 +341,7 @@ class PersonalDataErasureTest extends TestCase
         \Queue::fake();
         \Eventy::action('chat_conversation.send_reply', $conversation, collect([$thread]), $conversation->customer);
 
-        \Queue::assertNothingPushed();
+        $this->assertNothingSentToMeta();
     }
 
     /**
@@ -818,5 +818,323 @@ class PersonalDataErasureTest extends TestCase
                 ->where('channel_id', '+34611000008')->exists(),
             'a merge removed the channel row'
         );
+    }
+
+    /**
+     * What happens when the person comes back.
+     *
+     * Albert's reading of the right, and the one this behaviour matches: a
+     * person asks for erasure so that we cannot contact them, and if it is
+     * they who write to us afterwards, that is a new exchange they started.
+     * The ICO puts the same thing in terms of scope: the right applies to the
+     * data held when the request arrives and not to data created later.
+     *
+     * So the module neither refuses the message nor hands the person their
+     * old history back. The identifiers are gone, nothing matches, and a
+     * fresh customer and a fresh conversation are what the next message
+     * makes. The old record keeps the number as its visible name, which this
+     * module wrote and does not rewrite, and docs/personal-data.md says so
+     * on the receipt rather than here.
+     */
+    public function test_a_person_who_writes_again_after_an_erasure_starts_from_nothing()
+    {
+        $account = $this->createTestAccount();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.gone-before', '34611777001', 'first message'));
+        $before         = WhatsAppMessage::where('wamid', 'wamid.gone-before')->first();
+        $oldConversation = \App\Conversation::find($before->conversation_id);
+        $oldCustomerId   = $oldConversation->customer_id;
+
+        PersonalDataErasure::erase('+34611777001');
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.gone-after', '34611777001', 'i am back'));
+        $after = WhatsAppMessage::where('wamid', 'wamid.gone-after')->first();
+
+        $this->assertNotNull($after, 'the message of someone who had been erased was not filed at all');
+        $this->assertNotEquals(
+            $oldCustomerId,
+            \App\Conversation::find($after->conversation_id)->customer_id,
+            'the new message was filed under the record the erasure had just emptied'
+        );
+        $this->assertNotEquals(
+            $before->conversation_id,
+            $after->conversation_id,
+            'the new message reopened the erased conversation, handing the person their old history back'
+        );
+        $this->assertEquals(
+            1,
+            \App\Thread::where('conversation_id', $after->conversation_id)->count(),
+            'the conversation the returning person landed in carries more than their new message'
+        );
+    }
+
+    /**
+     * And the identifiers really are what stops the match, rather than luck:
+     * the same message filed before the erasure does reuse the record.
+     */
+    public function test_the_same_message_before_an_erasure_does_reuse_the_record()
+    {
+        $account = $this->createTestAccount();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.kept-first', '34611777002', 'first message'));
+        $first = WhatsAppMessage::where('wamid', 'wamid.kept-first')->first();
+
+        $this->runJob($account, $this->inboundPayload($account, 'wamid.kept-second', '34611777002', 'and another'));
+        $second = WhatsAppMessage::where('wamid', 'wamid.kept-second')->first();
+
+        $this->assertEquals(
+            $first->conversation_id,
+            $second->conversation_id,
+            'two messages from one number land in different conversations, so the test above proves nothing'
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // The name, which is the most visible copy of the identity
+    // -----------------------------------------------------------------
+
+    protected function marker(): string
+    {
+        return __('metawhatsapp::metawhatsapp.erased_contact_name');
+    }
+
+    protected function customerNamed(string $name, ?string $surname = null): \App\Customer
+    {
+        $customer = new \App\Customer();
+        $customer->first_name = $name;
+        if ($surname !== null) {
+            $customer->last_name = $surname;
+        }
+        $customer->save();
+
+        return $customer;
+    }
+
+    /**
+     * The case this exists for: the module names a customer it creates after
+     * the number, so after an erasure the number was still the label on the
+     * customer list, in search results and on every conversation in the
+     * list, under a receipt that had just said the identity was gone.
+     */
+    public function test_a_record_whose_whole_name_is_the_erased_number_is_renamed()
+    {
+        $account  = $this->createTestAccount();
+        $this->row($account, ['contact_phone' => '+34611000031']);
+        $customer = $this->customerNamed('+34611000031');
+        $customer->addChannel(WhatsAppAccount::CHANNEL, '+34611000031');
+
+        $receipt = PersonalDataErasure::erase('+34611000031');
+
+        $this->assertEquals($this->marker(), $customer->fresh()->first_name, 'the number is still the visible name');
+        $this->assertEquals(1, $receipt['names'], 'the receipt does not count the record it renamed');
+    }
+
+    /**
+     * The screen says how many of the records it is about to change hold
+     * something besides this identity.
+     *
+     * The erasure reaches every record that carries the number, and not only
+     * the ones the module wrote, because the column it searches is the one
+     * Customer::byPhone() searches: a number left on somebody else's record
+     * goes on resolving to this person, so the erasure would be incomplete
+     * in the one way that matters here. The cost is that an administrator's
+     * own contact can be one of them, and the number they see before the
+     * button never said so.
+     *
+     * "Written by the module" is not a question the data can answer. When an
+     * inbound message lands on a record that already existed, the core's own
+     * addChannel() puts the same channel flag on it as on a record the module
+     * created, and an agent can rename either. What the data does answer is
+     * whether the record holds anything else: another number, an e-mail, or
+     * a name somebody typed. That is the one that tells an administrator
+     * whether they are looking at their own CRM contact.
+     */
+    public function test_the_screen_counts_the_records_that_hold_other_data_too()
+    {
+        $account = $this->createTestAccount();
+        $this->row($account, ['contact_phone' => '+34611000041']);
+
+        // What the module writes: the number as the name, and nothing else.
+        $ours = $this->customerNamed('+34611000041');
+        $ours->addChannel(WhatsAppAccount::CHANNEL, '+34611000041');
+
+        // What an administrator writes: a person, with a second number.
+        $theirs = $this->customerNamed('Imported', 'Contact');
+        $theirs->setPhones([
+            ['value' => '+34611000041', 'type' => \App\Customer::PHONE_TYPE_WORK],
+            ['value' => '+34655000099', 'type' => \App\Customer::PHONE_TYPE_MOBILE],
+        ]);
+        $theirs->save();
+
+        $summary = PersonalDataErasure::summary('+34611000041');
+
+        $this->assertEquals(2, $summary['records'], 'the screen did not reach both records');
+        $this->assertEquals(
+            1,
+            $summary['records_other_data'],
+            'the screen did not say that one of the records it is about to change holds other data'
+        );
+
+        $receipt = PersonalDataErasure::erase('+34611000041');
+
+        $this->assertEquals(1, $receipt['records_other_data'], 'the receipt does not say it either');
+
+        // And what it did to that record: the erased number only.
+        $kept = array_column($theirs->fresh()->getPhones(), 'value');
+        $this->assertEquals(['+34655000099'], $kept, 'the erasure took a number it was not asked about');
+        $this->assertEquals('Imported', $theirs->fresh()->first_name, 'a name somebody typed was renamed');
+    }
+
+    /**
+     * A record can hold a name without holding a first name.
+     *
+     * The figure asked only about the first name, so an imported contact
+     * filed under a surname alone answered "this record is only this
+     * identity" and the screen reported none of the matched records as
+     * somebody else's. That is the one question the figure exists to answer,
+     * and the button after it cannot be undone.
+     */
+    public function test_a_record_with_only_a_surname_counts_as_holding_other_data()
+    {
+        $account = $this->createTestAccount();
+        $this->row($account, ['contact_phone' => '+34611000043']);
+
+        $imported = $this->customerNamed('', 'Garcia');
+        $imported->setPhones([['value' => '+34611000043', 'type' => \App\Customer::PHONE_TYPE_WORK]]);
+        $imported->save();
+
+        $summary = PersonalDataErasure::summary('+34611000043');
+
+        $this->assertEquals(1, $summary['records'], 'the record was not reached at all');
+        $this->assertEquals(
+            1,
+            $summary['records_other_data'],
+            'a surname somebody typed was not counted as other data on the record'
+        );
+    }
+
+    /**
+     * The search and the rename have to ask the same question, and the
+     * question is about the name with its edges trimmed."""
+     *
+     * A record reachable only by its name is the case the search exists for:
+     * the file says so a few lines above the query, because a run of the
+     * earlier version of this screen left exactly those behind. The search
+     * asked the database for the name as written while the rename trimmed
+     * before comparing, so a name with stray whitespace, from a typo or an
+     * import, was found by neither the screen nor the erasure: the number
+     * stayed visible as the label in the customer list under a receipt that
+     * said the identity was gone.
+     */
+    public function test_a_record_named_after_the_number_with_stray_whitespace_is_still_reached()
+    {
+        $account = $this->createTestAccount();
+        $this->row($account, ['contact_phone' => '+34611000037']);
+
+        // Nothing but the name points at the identifier: no phone entry on
+        // the record and no contact link, which is the shape left over from
+        // the earlier version of this screen.
+        $customer = $this->customerNamed(' +34611000037 ');
+
+        $summary = PersonalDataErasure::summary('+34611000037');
+        $this->assertEquals(
+            1,
+            $summary['records'],
+            'the screen did not count a record whose name is the number it is about to erase'
+        );
+
+        $receipt = PersonalDataErasure::erase('+34611000037');
+
+        $this->assertEquals(
+            $this->marker(),
+            $customer->fresh()->first_name,
+            'the number is still the visible name on the record'
+        );
+        $this->assertEquals(1, $receipt['names'], 'the receipt does not count the record it renamed');
+    }
+
+    /** The same for the other shape the module writes, a business-scoped id. */
+    public function test_a_record_named_after_a_business_scoped_id_is_renamed()
+    {
+        $account  = $this->createTestAccount();
+        $this->row($account, ['contact_user_id' => 'BSUID-NAMED']);
+        $customer = $this->customerNamed('BSUID-NAMED');
+        $customer->addChannel(WhatsAppAccount::CHANNEL_BSUID, 'BSUID-NAMED');
+
+        PersonalDataErasure::erase('BSUID-NAMED');
+
+        $this->assertEquals($this->marker(), $customer->fresh()->first_name);
+    }
+
+    /**
+     * And the limit, which is the whole reason this is safe to do: a name
+     * somebody typed is theirs, and renaming it would be this module
+     * overwriting an agent's work on a record it may never have created.
+     */
+    public function test_a_name_somebody_typed_is_left_alone()
+    {
+        $account  = $this->createTestAccount();
+        $this->row($account, ['contact_phone' => '+34611000032']);
+        $customer = $this->customerNamed('Marta Puig');
+        $customer->addChannel(WhatsAppAccount::CHANNEL, '+34611000032');
+
+        $receipt = PersonalDataErasure::erase('+34611000032');
+
+        $this->assertEquals('Marta Puig', $customer->fresh()->first_name, 'a name an agent wrote was overwritten');
+        $this->assertEquals(0, $receipt['names'], 'the receipt claims a rename that did not happen');
+    }
+
+    /**
+     * A surname means the record is not one of ours: the module writes the
+     * identifier as the whole name and never a surname, so anything there
+     * came from somewhere else and the first name is not ours to judge.
+     */
+    public function test_a_number_with_a_surname_beside_it_is_left_alone()
+    {
+        $account  = $this->createTestAccount();
+        $this->row($account, ['contact_phone' => '+34611000033']);
+        $customer = $this->customerNamed('+34611000033', 'Puig');
+        $customer->addChannel(WhatsAppAccount::CHANNEL, '+34611000033');
+
+        PersonalDataErasure::erase('+34611000033');
+
+        $this->assertEquals('+34611000033', $customer->fresh()->first_name, 'a record with a surname was renamed');
+    }
+
+    /**
+     * And the search and the rename have to ask the same question. A record
+     * with a surname is not ours to rename, so the screen must not report it
+     * as something it holds, or the receipt would promise a rename that
+     * never arrives.
+     */
+    public function test_a_record_with_a_surname_is_not_even_reported_as_held()
+    {
+        $this->customerNamed('+34611000035', 'Puig');
+
+        $this->assertNull(
+            PersonalDataErasure::summary('+34611000035'),
+            'the screen reports holding a record whose name it is going to leave exactly as it is'
+        );
+    }
+
+    /**
+     * Records that v3.0.0 erased keep the name, and no migration can reach
+     * them: a migration cannot tell a name that is a number because the
+     * person was erased from a name that is a number because they write
+     * every day. Asking for the identifier again says which one is meant,
+     * so the search looks at the name too and a second run finishes the job.
+     */
+    public function test_asking_again_reaches_a_record_the_earlier_version_left_named()
+    {
+        $customer = $this->customerNamed('+34611000034');
+
+        // The state v3.0.0 left behind: no message rows, no channel link, no
+        // phone on the record, and the number still the name.
+        $receipt = PersonalDataErasure::erase('+34611000034');
+
+        $this->assertEquals($this->marker(), $customer->fresh()->first_name);
+        $this->assertEquals(1, $receipt['names']);
+        $this->assertEquals(0, $receipt['messages'], 'the fixture is not the already-erased state it claims to be');
+        $this->assertEquals(0, $receipt['channel_rows'], 'the fixture is not the already-erased state it claims to be');
     }
 }

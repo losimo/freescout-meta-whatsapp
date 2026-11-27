@@ -205,6 +205,8 @@ return [
     'email_copy_title'            => 'E-mail copy',
     'email_copy_enable'           => 'Let agents also send a reply to the customer by e-mail',
     'email_copy_enable_help'      => 'Off by default. FreeScout offers a checkbox on replies written outside Chat Mode, and it arrives already ticked, so an agent who does not notice it sends the same answer twice: once over WhatsApp and once by e-mail. With this off, the module stops that copy and hides the checkbox. Turn it on if you want that choice available on this channel; the checkbox then works as FreeScout intends, and it is still ticked by default, so tell your agents. The switch only has an effect on FreeScout 1.8.251 and later, and whether the copy actually arrives is your installation\'s outbound mail setup, not this module\'s.',
+    'email_copy_core_disabled'    => 'FreeScout itself is running with APP_CHAT_CONVERSATION_REPLY_BY_EMAIL off, so it renders no checkbox and sends no copy whatever this switch says, and turning it on here changes nothing while that stays so. If you have just changed that line, a cached configuration holds the old value until it is rebuilt.',
+    'email_copy_mailbox_cannot_send' => 'This mailbox has no active outgoing method, so from the FreeScout release after 1.8.252 the checkbox will not appear even with this switched on. On 1.8.251 and 1.8.252 it still appears, and the copy is then handed to a mail setup that cannot send it.',
     'usage_title'            => 'Service messages',
     'usage_enable'           => 'Count the service messages sent from FreeScout',
     'usage_enable_help'      => 'From 1 October 2026 Meta bills the service messages sent inside the 24-hour customer window, with a monthly allowance per business phone number. This counter only sees what left through FreeScout, so if this number is also used elsewhere, the real total at Meta is higher.',
@@ -224,7 +226,7 @@ return [
 
     // Account events: the optional record of what Meta has reported about the account.
     'account_events_title'    => 'Account events',
-    'account_events_help'     => 'What Meta has reported about your account: template status changes, quality ratings, restrictions. Nothing here identifies a customer. Records older than 90 days are removed.',
+    'account_events_help'       => 'What Meta has reported about your account: template status and category changes, account restrictions, violations and bans, alerts about messaging limits and the business profile, throughput changes per number, and the policy review decision. Nothing here identifies a customer. Records older than 90 days are removed.',
     'account_events_empty'    => 'Nothing recorded. Either nothing has happened or the record is switched off.',
     'account_events_when'     => 'When',
     'account_events_type'     => 'Event',
@@ -233,15 +235,15 @@ return [
     'account_events_link'     => 'Account events',
     'account_events_channel'  => 'Channel',
     'account_events_enable'      => 'Record what Meta reports about the account',
-    'account_events_enable_help' => 'Template status changes, category changes (which set a template\'s price), quality ratings and restrictions, kept for 90 days and readable from the link below. Account facts only: nothing about any customer is recorded here. Off unless you want it. One thing this switch cannot do on its own: Meta only sends these if `message_template_status_update` and `template_category_update` are enabled in your app\'s webhook configuration, alongside `messages`. We cannot see from here whether they are, so if the log stays empty that is the first place to look.',
+    'account_events_enable_help' => 'Template status changes, category changes (which set a template\'s price), account restrictions, violations and bans, alerts about messaging limits, Official Business Account status and the business profile photo, throughput and messaging limit changes per number, and the policy review decision. Kept for 90 days and readable from the link below. Account facts only: nothing about any customer is recorded here. Off unless you want it. Not the messaging quality rating, the green, yellow and red one: Meta sends no webhook for it at all, so it can only be read in the WhatsApp Manager or asked for through the API. One thing this switch cannot do on its own: Meta only sends these if `message_template_status_update`, `template_category_update`, `account_update`, `account_alerts`, `phone_number_quality_update` and `account_review_update` are enabled in your app\'s webhook configuration, alongside `messages`. We cannot see from here whether they are, so if the log stays empty that is the first place to look.',
 
     // Author of the module's automatic notes (issue #43). The note is about an
     // agent, and FreeScout writes "you" when the author is the person reading,
     // so by default the agent is told in their own voice something the module
     // wrote about them.
     'note_author'          => 'Automatic notes written by',
-    'note_author_agent'    => 'The agent the note is about',
-    'note_author_help'     => 'By default an automatic note carries the agent it concerns, and FreeScout shows it to that agent as if they had written it themselves. Pick a user here, for example one you create and call System or WhatsApp, and the notes carry that user instead; delete it later and they go back to the agent. Before you create one: it is an ordinary FreeScout user, so it can be assigned conversations and will get notification email unless you clear its subscriptions, and the change only applies to notes written from now on.',
+    'note_author_default'  => 'The first administrator',
+    'note_author_help'     => 'By default an automatic note is written by the installation\'s first administrator, and FreeScout shows a note to its own author as "you", so that administrator reads these notes as sentences they wrote themselves, and is notified about them like anybody else. Pick a user here, for example one you create and call System or WhatsApp, and the notes carry that user instead; delete it later and they go back to the first administrator. Two things about the user you pick: it is not notified about the module\'s notes, the way FreeScout never notifies whoever adds a note, so choose a placeholder rather than somebody who works conversations; and it is an ordinary FreeScout user otherwise, so it can be assigned conversations and will get the rest of its notification email unless you clear its subscriptions. The change only applies to notes written from now on.',
     'note_author_unknown'  => 'That user does not exist, so nothing was saved.',
 
     // Environment checks: things that stop the module working and are not the
@@ -284,19 +286,22 @@ return [
     'erasure_col_orphaned'                 => 'Records whose conversation is gone',
     'erasure_col_channel_rows'             => 'Contact links',
     'erasure_col_records'                  => 'Customer records carrying the number',
+    'erasure_records_other_data' => 'Records that hold other data as well: :count. Only this identity is taken off them, and everything else on the record is left as it is.',
     'erasure_erase_button'                 => 'Erase what we hold',
     'erasure_erase_help'                   => 'This cannot be undone, and it covers every record for this person, not a selection.',
     'erasure_confirm'                      => 'Erase the WhatsApp identity from every record of this person? This cannot be undone.',
     'erasure_receipt_title'                => 'Proof of erasure',
     'erasure_receipt_warning'              => 'This is shown once and is stored nowhere. Copy it or take a screenshot now: leaving this screen loses it for good.',
     'erasure_nothing_to_erase'             => 'There was nothing left to erase under that identifier.',
-    'erasure_receipt_removed'              => 'Removed on :date: this WhatsApp identity (:identifiers) from :messages message record(s), :channels contact channel record(s), and :records customer record(s).',
+    'erasure_receipt_removed'              => 'Removed on :date: this WhatsApp identity (:identifiers) from :messages message record(s), :channels contact channel record(s), and :records customer record(s), :names of which had the identity as their whole name and now read ":placeholder".',
+    'erased_contact_name'                  => 'Erased contact',
     'erasure_receipt_kept'                 => 'Kept, and made unreadable: each of Meta\'s message identifiers is replaced by a one-way fingerprint of itself. A redelivery from Meta still cannot recreate this person, and the identifier the fingerprint came from can no longer be read from this module\'s own records.',
     'erasure_receipt_remains_intro'        => 'Outside this module\'s reach, and where each is removed:',
     'erasure_receipt_remains_conversations' => 'The conversations and their contents stay in FreeScout, with the phone number in each conversation title and in each message sender; remove them by deleting those conversations in FreeScout.',
-    'erasure_receipt_remains_customer'     => 'The name on the customer record is still there, and it is the phone number itself whenever nobody has renamed the contact, so it shows in every conversation list. It is left alone because renaming a record is the administrator\'s decision and FreeScout\'s own edit form does it; the number is removed from the record\'s phone list and channel fields, which that form cannot reach.',
+    'erasure_receipt_remains_customer'     => 'The customer record itself is never deleted, and a name that is anything other than the erased identity is left exactly as it is: renaming a contact is the administrator’s decision and FreeScout’s own edit form does it. What this screen does rename is a record whose whole name was the identity itself, because that name is one this module wrote when it created the record, and it is the most visible copy of all; those are counted above.',
     'erasure_receipt_remains_queue'        => 'Webhook payloads that ended up in FreeScout\'s failed job queue may contain the message text; clear them from the queue.',
     'erasure_receipt_remains_debuglog'     => 'If detailed logging has ever been on, the module\'s debug log holds the full text of the messages and the phone numbers. Its retention only deletes old files while logging is running, so files from a window you have since switched off stay until someone removes them from the server by hand, and a retention of 0 keeps every file forever.',
     'erasure_receipt_remains_portfolios'   => 'If this person wrote from two different Meta portfolios without ever revealing their number, this cannot be resolved from the module\'s side: there is no record connecting the two, so only the side you identified could ever be erased.',
     'new_conversation_refused'             => 'A WhatsApp conversation can only be started by the customer, so this mailbox has no new-conversation form. Reply inside an existing conversation, or send an approved template if the 24-hour window has closed.',
+    'trademark_notice'                     => 'WhatsApp and Meta are trademarks of Meta Platforms, Inc. This module is an independent project, not affiliated with or endorsed by Meta Platforms, Inc., and it uses those names only to say which service it connects to.',
 ];

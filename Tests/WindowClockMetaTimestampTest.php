@@ -172,6 +172,56 @@ class WindowClockMetaTimestampTest extends TestCase
         );
     }
 
+    /**
+     * A genuine timestamp is used however old it is, and the reason is which
+     * way each mistake fails.
+     *
+     * The floor used to be seven days, because that is how long Meta retries
+     * a delivery our server refused, so nothing genuine arrives older than
+     * that **from Meta**. The queue it arrives into is ours, though: a job
+     * that exhausted its retries sits in `failed_jobs` until somebody runs
+     * `queue:retry`, and a worker can be stopped over a long break. Then the
+     * real timestamp is older than seven days, the floor threw it away,
+     * `lastInboundAt()` fell back to `created_at`, which is the moment the
+     * row was finally written, and the window read as **open** on a
+     * conversation Meta has long closed. The agent writes a free-form reply
+     * and Meta refuses it with 131047.
+     *
+     * Trusting an old timestamp can only close the window, which is the
+     * truth here and the safe direction: the agent is offered the template
+     * picker. Throwing it away opens a window that is not there, and that
+     * failure is silent until somebody reads the note. So the floor now
+     * rejects only what cannot be a real time for a WhatsApp message at all,
+     * and an old one is believed.
+     */
+    public function test_a_genuine_timestamp_from_a_backlogged_queue_is_still_used()
+    {
+        $account = $this->createTestAccount();
+
+        $sentAt  = now()->subDays(9);
+        $payload = $this->inboundPayload($account, 'wamid.t10h', '34611222333', 'Hola');
+        $payload['entry'][0]['changes'][0]['value']['messages'][0]['timestamp'] = (string) $sentAt->timestamp;
+        $this->runJob($account, $payload);
+
+        $msg = WhatsAppMessage::where('wamid', 'wamid.t10h')->first();
+        $this->assertNotNull($msg, 'the message was not stored at all');
+        $this->assertNotNull(
+            $msg->meta_sent_at,
+            'a real timestamp was thrown away because our own queue was behind, so the window clock'
+                . ' now reads from created_at and believes the window is open'
+        );
+        $this->assertEquals(
+            $sentAt->toDateTimeString(),
+            $msg->meta_sent_at->toDateTimeString(),
+            'the stored time is not the one Meta sent'
+        );
+        $this->assertTrue(
+            WhatsAppMessage::windowExpired($msg->conversation_id, $account),
+            'the window was reported open on a message Meta sent nine days ago, so the agent writes'
+                . ' a free-form reply and Meta refuses it with 131047'
+        );
+    }
+
     /** A value that is not a number at all, in any of its shapes. */
     public function test_a_timestamp_that_is_not_a_number_is_not_trusted()
     {

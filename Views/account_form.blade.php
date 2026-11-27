@@ -185,6 +185,12 @@
                                 {{ __('metawhatsapp::metawhatsapp.email_copy_enable') }}
                             </label>
                         </div>
+                        @if ($coreEmailCopyDisabled)
+                            <p style="margin-bottom:4px"><span class="text-warning">&#9888; {{ __('metawhatsapp::metawhatsapp.email_copy_core_disabled') }}</span></p>
+                        @endif
+                        @if ($coreEmailCopyMailboxCannotSend)
+                            <p style="margin-bottom:4px"><span class="text-warning">&#9888; {{ __('metawhatsapp::metawhatsapp.email_copy_mailbox_cannot_send') }}</span></p>
+                        @endif
                         <p class="help-block">{{ __('metawhatsapp::metawhatsapp.email_copy_enable_help') }}</p>
                     </div>
                 </div>

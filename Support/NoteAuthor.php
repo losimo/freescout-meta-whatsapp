@@ -19,14 +19,32 @@ use App\User;
  * "System" or "WhatsApp", and for the old rendering back when that user is
  * gone.
  *
+ * Issue #68 took that last part back, and MarkoD is the reason: the agent
+ * fallback restored the exact reading this setting exists to remove, and it
+ * did so without anyone changing a setting. A deleted placeholder was
+ * enough, and so was an installation that never opened the screen. So the
+ * agent came out of the middle of the chain and the installation's first
+ * administrator took its place.
+ *
  * One setting for the whole instance and not one per channel: who signs an
  * automatic note is a question about the installation, not about a phone
  * number, and an administrator who had to answer it once per channel would
  * eventually answer it differently by accident.
  *
- * Unset stays the default. An administrator who never opens this screen
- * keeps exactly the behaviour they have today, and nothing invents a user
- * on their behalf.
+ * Unset stays the default, and since #68 that default is the installation's
+ * first administrator rather than the agent. Nothing is invented even so: an
+ * installation with no administrator at all gets no user made up for it,
+ * which is where the chain ends in null.
+ *
+ * Issue #64 gave the chosen user a second property, and it is the reason the
+ * help text asks for a placeholder rather than a colleague: the module's note
+ * notifications leave that user out. They are attributed to it
+ * (AgentNotifications::noteAdded() passes configuredUserId() as the event's
+ * "caused by"), and the core drops whoever an event is attributed to from its
+ * own recipients, exactly as it does for a person who adds a note by hand. So
+ * an agent chosen here keeps working conversations and stops being told about
+ * the module's notes on them. With nothing chosen the attribution is null,
+ * which excludes nobody, and the agent whose reply just failed is told.
  */
 class NoteAuthor
 {
@@ -36,9 +54,17 @@ class NoteAuthor
     /**
      * The user id a note must carry.
      *
+     * The order is the administrator's choice, then the installation's first
+     * administrator, then the agent the note is about. The agent is last and
+     * not second on purpose (#68): a note signed by the agent whose reply
+     * failed is rendered to them as "you", which is what #43 was opened to
+     * remove, so the module reaches for it only where the two above it are
+     * both empty.
+     *
      * @param int|null $concernsUserId the agent the note is about
      *
-     * @return int|null null only on an installation with no administrator
+     * @return int|null null only where there is no administrator and the
+     *                  note concerns no agent either
      */
     public static function forNote(?int $concernsUserId): ?int
     {
@@ -48,11 +74,13 @@ class NoteAuthor
             return $configured;
         }
 
-        if ($concernsUserId) {
-            return $concernsUserId;
+        $installation = self::installationAuthorId();
+
+        if ($installation !== null) {
+            return $installation;
         }
 
-        return self::installationAuthorId();
+        return $concernsUserId ?: null;
     }
 
     /**
@@ -66,11 +94,21 @@ class NoteAuthor
      * on null. The non-print path goes through conversations/thread_by, which
      * handles it, which is why the defect only showed when printing.
      *
-     * getSuperAdmin() and not user id 1, which the report proposed: nothing
-     * in FreeScout creates that id, an administrator can be demoted later,
-     * and a deleted user keeps their row. The core's own expression is the
-     * first non-deleted administrator, and it is what the core itself falls
-     * back to when it needs to act as the installation.
+     * The first non-deleted administrator, and not user id 1 which the report
+     * proposed: nothing in FreeScout creates that id, an administrator can be
+     * demoted later, and a deleted user keeps their row. It is also the user
+     * the core itself falls back to when it needs to act as the installation.
+     *
+     * The query is the module's own rather than User::getSuperAdmin(), and
+     * the difference is the ORDER BY. On 1.8.252 getSuperAdmin() is
+     * nonDeleted()->where('role', ROLE_ADMIN)->first() with no ordering
+     * (app/User.php:1077), so which administrator signs a note is up to the
+     * storage engine and can change under the same data. MarkoD had that
+     * fixed upstream (freescout-help-desk/freescout@aa8827d), but it ships in
+     * the release after 1.8.252 and this module supports FreeScout from
+     * 1.8.234, so ordering here gives the same answer on every version the
+     * module runs on, and the same answer as the core once the floor passes
+     * that release. Then this can go back to getSuperAdmin().
      *
      * The cost is real and was stated in the issue before taking it: a note
      * attributed to a real administrator is rendered by the core as "you" to
@@ -78,24 +116,40 @@ class NoteAuthor
      * in the first place (#43). The person who pays it is also the person who
      * can set a different author, which is what makes it the right trade.
      *
-     * Null stays possible, because an installation with no administrator at
-     * all is not ours to invent a user for. The note is still written: it
-     * carries the only visible trace of what happened.
+     * Null stays possible, because an installation with no administrator and
+     * a note that concerns no agent leaves nobody to name, and this module
+     * does not invent a user for it. The note is still written: it carries
+     * the only visible trace of what happened.
+     *
+     * Zero non-deleted administrators is not a hand-edited database, which
+     * is worth knowing before anyone simplifies this away. It is reachable
+     * through the interface in three steps: deleting a user marks the status
+     * and leaves the role (app/User.php:1475), the role select is rendered on
+     * an administrator's own profile (users/profile.blade.php:37-43), and the
+     * guard against the last administrator demoting themselves counts rows
+     * with no status filter (UsersController.php:224), so a deleted
+     * administrator makes the count two.
      */
     protected static function installationAuthorId(): ?int
     {
-        $admin = User::getSuperAdmin();
+        $id = User::nonDeleted()
+            ->where('role', User::ROLE_ADMIN)
+            ->orderBy('id')
+            ->value('id');
 
-        return $admin ? $admin->id : null;
+        return $id ? (int) $id : null;
     }
 
     /**
      * The configured user when it can still be used, or null.
      *
-     * A user that has since been deleted answers null, which is what sends
-     * the note back to the agent it concerns. That is the degradation the
-     * reporter asked for by name, and it is not the same case as the
-     * setting never having been touched, even though both end up here.
+     * A user that has since been deleted answers null, so the note falls
+     * through to the installation's first administrator, which is also where
+     * an installation that never touched the setting lands. The two cases
+     * stay distinct in the code and read the same on screen, which is the
+     * point: an administrator who deletes the placeholder gets the default
+     * back rather than a user who is gone, and not the "you" rendering the
+     * setting exists to remove (#68).
      *
      * @return int|null
      */

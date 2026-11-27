@@ -94,10 +94,11 @@
                  the account events checkbox just above, so this partial can
                  still be rendered on its own in a test with only $debug.
 
-                 The first option is the behaviour from before this dropdown
-                 existed, and it is also what shows as selected when the chosen
-                 user has been deleted since: the list only offers live users,
-                 so the screen shows what actually happens in a conversation. --}}
+                 The first option is the default, the installation's first
+                 administrator (#68), and it is also what shows as selected
+                 when the chosen user has been deleted since: the list only
+                 offers live users, so the screen shows what actually happens
+                 in a conversation. --}}
             @php($noteAuthorSelected = \Modules\MetaWhatsApp\Support\NoteAuthor::configuredUserId())
             <h4>{{ __('metawhatsapp::metawhatsapp.diagnostics_section_notes') }}</h4>
 
@@ -105,7 +106,7 @@
                 <label class="col-sm-4 control-label">{{ __('metawhatsapp::metawhatsapp.note_author') }}</label>
                 <div class="col-sm-8">
                     <select name="note_author" class="form-control" style="max-width:320px">
-                        <option value="">{{ __('metawhatsapp::metawhatsapp.note_author_agent') }}</option>
+                        <option value="">{{ __('metawhatsapp::metawhatsapp.note_author_default') }}</option>
                         @foreach(\Modules\MetaWhatsApp\Support\NoteAuthor::selectableUsers() as $noteAuthorUser)
                             <option value="{{ $noteAuthorUser->id }}"
                                 {{ $noteAuthorSelected === (int) $noteAuthorUser->id ? 'selected' : '' }}>

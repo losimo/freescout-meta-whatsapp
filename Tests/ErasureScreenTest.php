@@ -74,6 +74,44 @@ class ErasureScreenTest extends TestCase
         $this->assertStringContainsString('+34611100002', $response->getContent());
     }
 
+    /**
+     * Through the door, because the figure is only worth anything if the
+     * administrator reads it before pressing the button.
+     *
+     * The record count on this screen includes records this module never
+     * created: the column it searches is the one Customer::byPhone()
+     * searches, so a number left on anybody's record goes on resolving to
+     * this person. The line says how many of them hold other data as well,
+     * which is how an administrator spots their own imported contact among
+     * them.
+     */
+    public function test_the_screen_warns_when_a_record_holds_other_data_as_well()
+    {
+        $account = $this->createTestAccount();
+        $this->heldRow($account, '+34611100021');
+
+        $imported = new \App\Customer();
+        $imported->first_name = 'Imported';
+        $imported->last_name  = 'Contact';
+        $imported->save();
+        $imported->setPhones([
+            ['value' => '+34611100021', 'type' => \App\Customer::PHONE_TYPE_WORK],
+            ['value' => '+34655100099', 'type' => \App\Customer::PHONE_TYPE_MOBILE],
+        ]);
+        $imported->save();
+
+        $response = $this->actingAs($this->makeAdminUser())
+            ->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class)
+            ->post($this->url('/meta-whatsapp/erasure/search'), ['identifier' => '+34611100021']);
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString(
+            e(__('metawhatsapp::metawhatsapp.erasure_records_other_data', ['count' => 1])),
+            $response->getContent(),
+            'the screen counted the record but never said it holds other data too'
+        );
+    }
+
     public function test_the_search_says_nothing_held_for_an_identifier_never_seen_at_all()
     {
         $response = $this->actingAs($this->makeAdminUser())

@@ -193,8 +193,45 @@ class WhatsAppMessage extends Model
      */
     public static function lastInboundAt(int $conversationId): ?string
     {
+        $last = static::lastInbound($conversationId);
+        if (!$last) {
+            return null;
+        }
+
+        $at = $last->meta_sent_at ?: $last->created_at;
+
+        return $at ? $at->toDateTimeString() : null;
+    }
+
+    /**
+     * And the message itself, for everything that needs the row rather than
+     * the time: which message to mark as read, and which number a reply goes
+     * to.
+     *
+     * One rule for all of them, which is what this method is for. There used
+     * to be three: this one ordered by Meta's time, the read receipt by
+     * `created_at`, and the reply's recipient by `id`. Two inbound messages
+     * are enough to make them disagree and Meta hands you that for free,
+     * because a delivery it retries arrives after one that never failed, so
+     * the row written last is not the message sent last. The read receipt
+     * then ticked a message the customer had already seen answered, and on a
+     * conversation holding two numbers the reply went to whichever row this
+     * module's worker happened to write last.
+     *
+     * `id` breaks the tie, for rows that share a time to the second.
+     *
+     * Deliberately not what the agent's screen shows: a thread carries the
+     * moment the row was written and nothing reorders it, so with deliveries
+     * out of order the last thread in the conversation is not this message.
+     * Choosing by Meta's time answers the question both callers actually
+     * ask, which is what the customer last sent.
+     */
+    public static function lastInbound(int $conversationId)
+    {
         return static::where('conversation_id', $conversationId)
             ->where('direction', static::DIRECTION_INBOUND)
-            ->max(\DB::raw('COALESCE(meta_sent_at, created_at)'));
+            ->orderByDesc(\DB::raw('COALESCE(meta_sent_at, created_at)'))
+            ->orderByDesc('id')
+            ->first();
     }
 }

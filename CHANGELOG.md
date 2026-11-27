@@ -4,6 +4,61 @@ Every release, oldest at the bottom, a few lines each. This file is the complete
 and is never pruned; the "What's new" sections in the READMEs tell the recent ones
 properly, for someone deciding whether to update. Kept current at every release.
 
+## 3.1.0 (2026-11-27)
+
+The second digit moves because of what an agent notices: the module's
+automatic notes now reach the people who asked to be told about notes, which
+they never did in any version. Nothing an administrator configured changes,
+no stored data changes meaning, and the FreeScout floor stays at 1.8.234.
+
+One thing to look at before updating if you use Workflows: the module now
+fires the core's `conversation.note_added` action, so a rule that reacts to a
+note being added will start matching the module's notes.
+
+Most of this release comes from the five issues [@MarkoD](https://github.com/MarkoD)
+opened after reading the 3.0.0 code, plus the items the 3.0.0 branch review
+deferred and what three review passes over this work turned up.
+
+### Notifications
+
+- **Fix**: every note this module writes notified nobody (#64). A refused reply, a message Meta reported as undelivered, a send that failed: the note appeared in the conversation and no bell, e-mail or browser push said so, not even for an agent subscribed to "a note is added to a conversation". The core fires its note event from `Thread::create()`, and this module builds the note row by hand, so neither that event nor `conversation.note_added` ever ran.
+- The event is registered by the module rather than by firing `UserAddedNote`, and attributed to the configured note author instead of to whoever signs the note. That is MarkoD's direction and it decides one case the obvious implementation gets wrong: the core leaves whoever an event is attributed to out of its own notification, so firing the event as it stood would have told everybody except the one agent whose reply had just failed.
+- The flush has no equivalent in the core for a queue worker. Registering an event only appends to a static buffer, and the core empties it in two places that never run in a worker, which was #46. Every entry point of the module that can write a note now runs inside one place that flushes it: the three send jobs including the path that runs when their retries are over, the inbound job, and the reply hook.
+- **Fix**: the reply hook was missed by the first version of that fix, and it is the commonest refusal of all. The core fires `chat_conversation.send_reply` through a queued job, not in the request that wrote the reply, so a reply refused with the channel switched off wrote its note and told nobody. The guard that should have caught it was asking which folder a file lives in; it asks about reach now.
+- A note is told about once its row is certain. Two of the module's four notes are written inside a transaction for reasons of their own, so the core is told after the work is over and only if the row survived, and a listener that throws can no longer take the remaining notifications with it.
+- **Fix**: with no note author chosen, an automatic note was signed by the agent it is about (#68), which FreeScout renders to that agent as if they had written it, and that reading is what the setting exists to remove. The first administrator signs it now. MarkoD found this and it is also why the chosen user, which is the one user left out of these notifications, should be a placeholder rather than somebody who works conversations.
+
+### What Meta reports about the account
+
+- **Fix**: the account events switch promised a record of quality ratings and restrictions, and the router handled two fields, both about templates (#66). Everything else was dropped, so an administrator who turned the switch on for that sentence got an empty screen. Four families are handled now: account restrictions, violations, bans and reinstatements and offboarding; alerts about messaging limits, Official Business Account status and a deleted profile photo; throughput changes per number; and the policy review decision. Each with its own severity rule, since the same field carries the ban and the reinstatement.
+- The promise of quality ratings is gone from the help text rather than fulfilled, because it cannot be: Meta sends no webhook carrying the messaging quality rating at all. `phone_number_quality_update`, whatever its name suggests, reports a phone number's throughput level. The text now says where the rating can be read instead. Checked against a dated snapshot of Meta's own reference pages.
+- A fact about one number is filed on the channel that owns that number, resolved from the payload and matched against every channel of the account including switched-off ones. The free text Meta sends with an alert is deliberately not stored; the alert type says what happened without it.
+- **Fix**: a failure Meta reported for a message this module cannot match ended in a debug line, and FreeScout's default log level is error, so it was written nowhere (#65). It is an error now, and the message identifier goes in as a one-way fingerprint, since Meta's identifiers carry the phone number inside them.
+
+### Replies
+
+- **Fix**: a reply refused while the channel was switched off was kept on one path and lost on the other. Refused before dispatching it waited and went out when the channel came back; refused seconds later inside the job it was never sent again, because the failed row it wrote is also what tells the dispatcher the reply has been dealt with. One decision answers that for all three jobs now.
+- **Fix**: three places each decided which inbound message was the last one, by Meta's time, by row date and by row id. Meta retries a delivery it cannot make for up to seven days, so the row written last is not the message sent last: a read receipt ticked a message the customer had already seen answered, and on a conversation holding two of a customer's numbers the reply went to whichever row the worker wrote last.
+- **New**: the E-mail copy switch says when the installation has that feature switched off for everybody, or when the mailbox has no active outgoing method (#57), instead of looking like a setting that does something.
+- **Fix**: a message whose timestamp was older than seven days had that timestamp thrown away, and the window clock then read it as having just arrived. Meta never delivers one that old, but our own queue can: a job waiting in `failed_jobs` until somebody retries it, or a worker stopped over a long break, arrived with a real time that was discarded, so the window read as open on a conversation Meta had long closed and the agent's free-form reply came back as a 131047. The floor now rejects only a time no WhatsApp message can carry, which is what the original defect was, a value read with a bare cast coming out as 1970. Believing an old time can only close the window, which is the truth when it is real and the conservative answer when it is not. Found by the last review before publishing; it shipped in 3.0.0.
+
+### The right of erasure
+
+- **New**: the erasure takes the identity off the customer record's name as well, which is the most visible copy of all: it shows in the customer list, in search results and against every conversation in the list. Only a name that is the identifier itself, which is the one this module writes when it creates a customer; any other name is somebody's work and stays as it is.
+- **New**: the screen says how many of the records it is about to change hold other data as well, such as an imported contact that happens to carry the number. The erasure reaches every record holding the number, because that is the column FreeScout resolves a number by, and only the erased identity comes off those records.
+- **Fix**: a record whose name carried the number with stray whitespace was found by neither the screen nor the erasure, so the number stayed visible as the label under a receipt saying the identity was gone.
+
+### Appearance and the trademark
+
+- **New**: the module card has an icon (#63), a white handset on FreeScout blue. Blue rather than WhatsApp green, and a handset on its own rather than one inside a speech bubble: that shape is Meta's trademark, and the blue says this is a FreeScout module and not a WhatsApp product. The glyph is Font Awesome Free, recoloured, with the attribution the licence asks for in the file and in the READMEs.
+- **New**: the READMEs and the settings screen name the trademark owner and say that this project is not affiliated with them, which was written nowhere before.
+
+### Internal
+
+- **Fix**: deleting a channel with no Messaging account id on it sent an unsubscribe with an empty id in the path, and the screen then asked the administrator to remove by hand, in Meta's dashboard, a subscription that had never existed. Reachable on a legacy or hand-edited row.
+- The four note writers became one, with the three fields that encode #43, #55 and the assignee mirror written down beside it, and a guard that fails if a second writer appears.
+- New guards: every entry point that can write a note sits inside a flush, nothing outside one place touches the notification buffer, the router's handled webhook families and the event log's field whitelists are the same set, and no docblock is left documenting nothing.
+
 ## 3.0.0 (2026-11-25)
 
 The first digit moves for one reason and it is not the size of the list below: **the meaning of stored data changed.** Answering a right-of-erasure request now rewrites Meta's message identifiers in this module's own table, and a migration does the same to rows erased by earlier versions. Nothing an administrator configured changes, and the FreeScout floor stays at 1.8.234.

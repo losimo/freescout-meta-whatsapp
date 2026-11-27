@@ -7,7 +7,6 @@ use App\Customer;
 use App\CustomerChannel;
 use App\Events\CustomerCreatedConversation;
 use App\Events\CustomerReplied;
-use App\Subscription;
 use App\Thread;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,6 +17,8 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
 use Modules\MetaWhatsApp\Models\WhatsAppMessage;
 use Modules\MetaWhatsApp\Services\WhatsAppApiClient;
+use Modules\MetaWhatsApp\Support\AgentNotifications;
+use Modules\MetaWhatsApp\Support\ConversationNote;
 use Modules\MetaWhatsApp\Support\ConversationReopen;
 use Modules\MetaWhatsApp\Support\CoreCompat;
 use Modules\MetaWhatsApp\Support\CustomerMatcher;
@@ -31,6 +32,17 @@ use Modules\MetaWhatsApp\Support\WhatsAppTextFormatter;
 
 class ProcessInboundWebhook implements ShouldQueue
 {
+    /**
+     * Before this, no message can have been sent through this API at all.
+     *
+     * WhatsApp's Business API opened in 2018 and the Cloud API this module
+     * speaks in 2022, so a timestamp older than this is garbage rather than
+     * history. Deliberately a long way below either date: the value is here
+     * to catch a cast gone wrong, and every day it does not reject is a day
+     * of real backlog it cannot throw away.
+     */
+    const EARLIEST_POSSIBLE_MESSAGE = '2018-01-01 00:00:00';
+
     use Dispatchable, InteractsWithQueue, Queueable;
 
     // El backoff entre reintents el gestiona el worker (Laravel 5.5).
@@ -59,99 +71,55 @@ class ProcessInboundWebhook implements ShouldQueue
         $this->payload   = $payload;
     }
 
+    /**
+     * Issue #46. The core listener (App\Listeners\SendNotificationToUsers)
+     * does not notify anyone: it only appends the event to Subscription's
+     * static buffer, and core flushes that buffer in exactly two places, the
+     * TerminateHandler middleware and the FetchEmails command. Neither one
+     * runs in a queue worker, so every event this job registered used to die
+     * in the worker's memory and no agent ever heard about an inbound
+     * message.
+     *
+     * The flush, the restore on an exception and the reasoning for both used
+     * to live here. They moved to AgentNotifications when #64 needed the same
+     * discipline in the three outbound jobs, so there is one copy of it
+     * rather than four.
+     *
+     * One thing to know about the shape: the flush is around the job and not
+     * inside firePostEvents(), which runs inside DB::transaction() where a
+     * flush would dispatch notifications for a transaction that can still
+     * roll back. It is also once per run and not per message, which is what
+     * FetchEmails does, so several messages for the same conversation
+     * coalesce into one notification instead of one per message.
+     */
     public function handle()
+    {
+        return AgentNotifications::around(
+            function () {
+                return $this->run();
+            },
+            ['job' => static::class, 'account_id' => $this->accountId]
+        );
+    }
+
+    protected function run()
     {
         $account = WhatsAppAccount::with('mailbox')->find($this->accountId);
         if (!$account || !$account->is_active) {
             Log::warning('[MetaWhatsApp] ProcessInboundWebhook: account missing or inactive', [
                 'account_id' => $this->accountId,
             ]);
-            // No flush on this path on purpose: nothing above this line can
-            // register a subscription event, so there is nothing of ours in
-            // the buffer. If something else is in there it belongs to
-            // whatever ran before us in this worker process, and flushing or
-            // clearing another job's events is not ours to decide.
+            // Nothing above this line can register a subscription event, so
+            // this path flushes nothing: around() only flushes when the run
+            // added something of its own, which is how another job's events
+            // in the same worker process are left alone.
             return;
         }
 
         Log::info('[MetaWhatsApp] Processing inbound webhook', ['account_id' => $account->id]);
         MetaWhatsAppLogger::debugData('[MetaWhatsApp] Inbound webhook payload', ['account_id' => $account->id, 'payload' => $this->payload]);
 
-        // Whatever is in the buffer before we start is not ours. The buffer is
-        // static and lives as long as the worker process, so a job that ran
-        // before us in the same process could have left something in it. The
-        // early-return path above says that flushing or clearing another job's
-        // events is not ours to decide, and the failure path below has to obey
-        // the same rule rather than clear the lot.
-        $preexisting = Subscription::$occurred_events;
-
-        try {
-            $this->processPayload($account);
-        } catch (\Throwable $e) {
-            // Issue #46, failure half. The buffer is a static array, so it is
-            // NOT rolled back with the transaction that registered into it.
-            // An exception thrown inside the DB::transaction() of
-            // processMessage() after firePostEvents() has run (another
-            // module's listener on conversation.created_by_customer, a failed
-            // commit) leaves an event in there for a conversation or thread
-            // that no longer exists.
-            //
-            // Not a finally: flushing after a rollback is worse than not
-            // flushing. On a reopened conversation the row survives the
-            // rollback and only the new thread disappears, so processEvents()
-            // would pick the previous thread and notify the whole mailbox
-            // about a message the agents already read, three times over
-            // because the job retries.
-            //
-            // Accepted case: when a batch carries several messages and a
-            // later one throws, the events already registered by the earlier,
-            // committed ones are discarded with it, and the retry will not
-            // register them again (the wamid is already stored, so they are a
-            // no-op). Those agents get no notification for messages that are
-            // in their mailbox. It is the quieter of the two failures, and it
-            // needs both a multi-message batch and an exception to happen at
-            // all.
-            // And it says so. A dropped notification that leaves no trace is
-            // the same shape of defect as the one this whole change fixes:
-            // something reaches the mailbox and nobody is told.
-            //
-            // The number is buffer entries, and it is named that way because
-            // it is not a count of messages: Subscription::registerEvent()
-            // appends a second EVENT_TYPE_UPDATED entry for every event that
-            // is not NEW, so one customer reply leaves two. Reporting it as
-            // "notifications" would be off by roughly double. Entries only,
-            // never the events themselves, which would put a customer's
-            // conversation in the log for no operational gain.
-            $ours = count(Subscription::$occurred_events) - count($preexisting);
-            if ($ours > 0) {
-                Log::warning('[MetaWhatsApp] Inbound batch failed: agent notifications discarded', [
-                    'account_id'       => $account->id,
-                    'buffered_entries' => $ours,
-                    'error'            => $e->getMessage(),
-                ]);
-            }
-
-            // Only what we added. registerEvent() appends, so everything past
-            // the point we started is ours and the rest goes back untouched.
-            Subscription::$occurred_events = $preexisting;
-            throw $e;
-        }
-
-        // Issue #46. The core listener (App\Listeners\SendNotificationToUsers)
-        // does not notify anyone: it only appends to Subscription's static
-        // buffer, and core flushes that buffer in exactly two places, the
-        // TerminateHandler middleware and the FetchEmails command. Neither one
-        // runs in a queue worker, so every event our job registered used to
-        // die in the worker's memory and no agent ever heard about an inbound
-        // message.
-        //
-        // Here and not inside firePostEvents(): that runs inside
-        // DB::transaction(), and flushing there would dispatch notifications
-        // for a transaction that can still roll back. Here and not per
-        // message: this is also where FetchEmails flushes, once per run, so
-        // several messages for the same conversation coalesce into one
-        // notification instead of one per message.
-        Subscription::processEvents();
+        $this->processPayload($account);
     }
 
     protected function processPayload(WhatsAppAccount $account)
@@ -992,9 +960,6 @@ class ProcessInboundWebhook implements ShouldQueue
     }
 
     /**
-     * Formata una reacció (emoji) a un missatge previ com a text.
-     */
-    /**
      * Formata una reacció, citant un extracte del missatge al qual reacciona
      * (issue #14) quan el podem localitzar per message_id. Sense això, al fil
      * de la conversa no queda clar a quin missatge es refereix la reacció.
@@ -1607,18 +1572,21 @@ class ProcessInboundWebhook implements ShouldQueue
         foreach ($conversations->groupBy('mailbox_id') as $perMailbox) {
             $conversation = $perMailbox->sortByDesc('created_at')->first();
 
-            $note                     = new Thread();
-            $note->conversation_id    = $conversation->id;
-            $note->user_id            = $conversation->user_id;
-            $note->created_by_user_id = NoteAuthor::forNote(null);
-            $note->type               = Thread::TYPE_NOTE;
-            $note->status             = $conversation->status;
-            $note->state              = Thread::STATE_PUBLISHED;
-            $note->body               = '[WhatsApp] ' . __('metawhatsapp::metawhatsapp.contact_number_changed');
-            $note->source_via         = Thread::PERSON_USER;
-            $note->source_type        = Thread::SOURCE_TYPE_WEB;
-            $note->customer_id        = $conversation->customer_id;
-            $note->save();
+            // Without reopening, deliberately: a number change needs
+            // nobody to come back, and putting a finished conversation back
+            // in the queue for it would be noise.
+            //
+            // And without notifying, for the same reason and one more (#64):
+            // this runs on a status payload with no customer message behind
+            // it, so notifying would send one notification per affected
+            // conversation, closed ones included.
+            ConversationNote::write(
+                $conversation,
+                '[WhatsApp] ' . __('metawhatsapp::metawhatsapp.contact_number_changed'),
+                null,
+                [],
+                false
+            );
         }
     }
 
@@ -1658,8 +1626,33 @@ class ProcessInboundWebhook implements ShouldQueue
             return null;
         }
 
-        if ($at->lt(now()->subDays(7))) {
-            Log::warning('[MetaWhatsApp] Inbound message timestamp is older than any delivery can be, ignored for the window clock', [
+        // Only what cannot be a real time for a WhatsApp message at all,
+        // and the floor is this low on purpose. It used to be seven days,
+        // because that is how long Meta retries a delivery our server
+        // refused, so nothing genuine arrives older than that from Meta. The
+        // queue it arrives into is ours, though: a job that exhausted its
+        // retries waits in failed_jobs until somebody runs queue:retry, and
+        // a worker can be stopped over a long break. The real timestamp was
+        // thrown away in both cases, meta_sent_at was left null, and
+        // lastInboundAt() fell back to created_at, the moment the row was
+        // finally written, so the window read as open on a conversation Meta
+        // had long closed and the agent's free-form reply came back as a
+        // 131047.
+        //
+        // Which way each mistake fails is the whole argument. Believing an
+        // old time can only close the window, which is the truth when the
+        // time is real and the conservative answer when it is not: the agent
+        // is offered the template picker. Discarding it opens a window that
+        // is not there, and that failure is silent until somebody reads the
+        // note. So the only values rejected here are the ones no WhatsApp
+        // message can carry, which is what the original defect was: a value
+        // read with a bare (int) cast came out as 1970.
+        // Parsed rather than handed to lt() as a string. Carbon 1.35 does
+        // accept one and answers correctly, which is how this first went in,
+        // but a date comparison that leans on a string being coerced is a
+        // thing that changes under an upgrade without failing loudly.
+        if ($at->lt(\Carbon\Carbon::parse(self::EARLIEST_POSSIBLE_MESSAGE))) {
+            Log::warning('[MetaWhatsApp] Inbound message timestamp predates WhatsApp itself, ignored for the window clock', [
                 'account_id' => $this->accountId,
             ]);
 
@@ -1737,18 +1730,18 @@ class ProcessInboundWebhook implements ShouldQueue
             return '#' . $id;
         }, $this->otherMatchedCustomerIds));
 
-        $note                       = new Thread();
-        $note->conversation_id      = $conversation->id;
-        $note->user_id              = $conversation->user_id;
-        $note->created_by_user_id   = NoteAuthor::forNote(null);
-        $note->type                 = Thread::TYPE_NOTE;
-        $note->status               = $conversation->status;
-        $note->state                = Thread::STATE_PUBLISHED;
-        $note->body                 = '[WhatsApp] ' . __('metawhatsapp::metawhatsapp.customer_matched_several', ['ids' => $ids]);
-        $note->source_via           = Thread::PERSON_USER;
-        $note->source_type          = Thread::SOURCE_TYPE_WEB;
-        $note->customer_id          = $conversation->customer_id;
-        $note->save();
+        // No notification of its own (#64): this note is written in the same
+        // job run as the customer's message, which registers its own event,
+        // and the core sends one notification per conversation and user per
+        // flush. The agent opens the conversation for the message and the
+        // note is there.
+        ConversationNote::write(
+            $conversation,
+            '[WhatsApp] ' . __('metawhatsapp::metawhatsapp.customer_matched_several', ['ids' => $ids]),
+            null,
+            [],
+            false
+        );
 
         $this->otherMatchedCustomerIds = [];
     }
@@ -1797,7 +1790,40 @@ class ProcessInboundWebhook implements ShouldQueue
             ->where('account_id', $account->id)
             ->first();
         if (!$record) {
-            // Missatge anterior al mòdul o d'un altre sistema: best-effort.
+            if ($newStatus === 'failed') {
+                // Issue #65, reported by MarkoD on #62. A failure for a
+                // message with no row of ours used to end in the debug line
+                // below, and FreeScout's default log level is error
+                // (config/app.php:154), so on an ordinary installation it was
+                // written nowhere: a message failed and nothing anywhere said
+                // so, not the conversation, not the log, not the health panel.
+                // There is no conversation to show it on either, which is what
+                // makes the log the only place left.
+                //
+                // Three ordinary ways to get here: a message sent before the
+                // module was installed, a message sent from another system on
+                // the same number, and a row an erasure removed.
+                //
+                // The identifier goes in as the same one-way fingerprint the
+                // erasure writes, and not raw: Meta's message id is base64
+                // with the contact's phone number inside it (T02), and
+                // recipient_id is that number in plain. The fingerprint still
+                // tells two failures of one message from failures of two.
+                Log::error('[MetaWhatsApp] Failed status for an unknown wamid, with no conversation to show it on', [
+                    'account_id'          => $account->id,
+                    'error_code'          => (string) ($status['errors'][0]['code'] ?? ''),
+                    'error_title'         => trim((string) ($status['errors'][0]['title'] ?? '')),
+                    'message_fingerprint' => WhatsAppMessage::erasedWamid($wamid),
+                ]);
+
+                return;
+            }
+
+            // A delivered or read status for a message we cannot match says
+            // nothing is wrong, so it stays as quiet as it has always been:
+            // the commonest cause is a message that predates the module, and
+            // an installation would get one of these for every status of
+            // every message it ever sent from another system.
             Log::debug('[MetaWhatsApp] Status for unknown wamid', ['account_id' => $account->id]);
             return;
         }
@@ -2002,19 +2028,17 @@ class ProcessInboundWebhook implements ShouldQueue
             ? ($failedThread->created_by_user_id ?: $failedThread->user_id)
             : null;
 
-        $thread = new Thread();
-        $thread->conversation_id = $conversation->id;
-        $thread->user_id         = $conversation->user_id;
-        $thread->created_by_user_id = NoteAuthor::forNote($agentId ?: null);
-        $thread->type            = Thread::TYPE_NOTE;
-        $thread->status          = $conversation->status;
-        $thread->state           = Thread::STATE_PUBLISHED;
-        $thread->body            = '[WhatsApp delivery failed] ' . $identifier . ' '
-            . __('metawhatsapp::metawhatsapp.async_delivery_failed', ['error' => $label ?: '-']);
-        $thread->source_via      = Thread::PERSON_USER;
-        $thread->source_type     = Thread::SOURCE_TYPE_WEB;
-        $thread->customer_id     = $conversation->customer_id;
-        $thread->save();
+        // Meta reported the message as undelivered, so somebody has to come
+        // back to it: it notifies (#64), like the refusals and unlike the
+        // number-change note.
+        ConversationNote::write(
+            $conversation,
+            '[WhatsApp delivery failed] ' . $identifier . ' '
+                . __('metawhatsapp::metawhatsapp.async_delivery_failed', ['error' => $label ?: '-']),
+            $agentId ?: null,
+            [],
+            true
+        );
 
         $record->failure_noted_at = now();
         $record->save();

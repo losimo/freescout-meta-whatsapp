@@ -8,6 +8,7 @@ use App\Mailbox;
 use App\Thread;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Modules\MetaWhatsApp\Models\WhatsAppAccount;
+use Modules\MetaWhatsApp\Support\CoreCompat;
 
 /**
  * The reply must not leave by two doors at once.
@@ -225,6 +226,276 @@ class CoreChatEmailCopyTest extends TestCase
         $this->assertTrue(
             defined(Thread::class.'::META_CHAT_SEND_EMAIL'),
             'the core still renders the e-mail copy checkbox but renamed the flag this module unsets'
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // The switch against conditions outside this module (#57, MarkoD)
+    // -----------------------------------------------------------------
+
+    protected function coreParameterKey(): string
+    {
+        return substr(CoreCompat::CORE_CHAT_EMAIL_PARAMETER, strlen('app.'));
+    }
+
+    /** The installation's copy of the core parameter, null included. */
+    protected function coreParameterValue($value): void
+    {
+        $app = config('app');
+        $app[$this->coreParameterKey()] = $value;
+        config(['app' => $app]);
+    }
+
+    /**
+     * And the state the development container is really in, which is why it
+     * cannot be left implicit: the day this container moves to a core that
+     * has the parameter, a test that relied on today's absence would quietly
+     * start checking something else instead. It needs its own method because
+     * the config repository's `has()` answers true for a key that exists
+     * holding null, so absence cannot be expressed by setting a value.
+     */
+    protected function coreParameterAbsent(): void
+    {
+        $app = config('app');
+        unset($app[$this->coreParameterKey()]);
+        config(['app' => $app]);
+    }
+
+    protected function channelForm(WhatsAppAccount $account)
+    {
+        return $this->actingAs($this->makeAdminUser())
+            ->get($this->url('/meta-whatsapp/settings/' . $account->id . '/edit'));
+    }
+
+    /** As the page carries it: Blade escapes these, apostrophes included. */
+    protected function screenText(string $key): string
+    {
+        return e(__('metawhatsapp::metawhatsapp.' . $key));
+    }
+
+    /**
+     * With the core's gate shut there is no checkbox and no meta, so the
+     * switch promises something the installation has taken away. Said on the
+     * screen rather than acted on: there is nothing for the module to do
+     * differently.
+     */
+    public function test_the_form_warns_when_the_installation_switched_the_copy_off()
+    {
+        $account = $this->createTestAccount();
+        $this->coreParameterValue(false);
+
+        $response = $this->channelForm($account);
+
+        // The status assertion carries the next one: an error page does not
+        // mention the parameter either.
+        $response->assertStatus(200);
+        $this->assertStringContainsString(
+            $this->screenText('email_copy_core_disabled'),
+            $response->getContent(),
+            'the switch is offered as if it worked on an installation whose core has the feature off'
+        );
+    }
+
+    /** The core's own default, where the switch means exactly what it says. */
+    public function test_the_form_says_nothing_when_the_parameter_is_on()
+    {
+        $account = $this->createTestAccount();
+        $this->coreParameterValue(true);
+
+        $response = $this->channelForm($account);
+
+        $response->assertStatus(200);
+        $this->assertStringNotContainsString(
+            $this->screenText('email_copy_core_disabled'),
+            $response->getContent(),
+            'an installation that offers the feature is told its core has it switched off'
+        );
+    }
+
+    /**
+     * And the version that matters most, because it is what people are
+     * running today: on 1.8.251 and 1.8.252 the parameter does not exist, the
+     * feature is live, and this switch is the only thing standing between an
+     * unaware agent and the double send. A warning there would be false.
+     */
+    public function test_the_form_says_nothing_when_the_core_has_no_such_parameter()
+    {
+        $account = $this->createTestAccount();
+        $this->coreParameterAbsent();
+
+        $response = $this->channelForm($account);
+
+        $response->assertStatus(200);
+        $this->assertStringNotContainsString(
+            $this->screenText('email_copy_core_disabled'),
+            $response->getContent(),
+            'a core with no such parameter is reported as having switched the feature off'
+        );
+    }
+
+    /**
+     * The third state, written down because the guard treats it like `false`
+     * and nothing else records that choice: a key that exists holding null.
+     * It counts as off because the core's own gate is a plain truth test on
+     * the same value, so null closes the checkbox there too.
+     */
+    public function test_a_parameter_holding_null_counts_as_off()
+    {
+        $account = $this->createTestAccount();
+        $this->coreParameterValue(null);
+
+        $response = $this->channelForm($account);
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString(
+            $this->screenText('email_copy_core_disabled'),
+            $response->getContent(),
+            'a parameter holding null is read as the feature being available'
+        );
+    }
+
+    /**
+     * Shown whichever way the switch is set, because the whole point is to
+     * tell an administrator that turning it on would achieve nothing.
+     */
+    public function test_the_warning_does_not_wait_for_the_switch_to_be_on()
+    {
+        $account = $this->createTestAccount();
+        $account->allow_core_email_copy = true;
+        $account->save();
+        $this->coreParameterValue(false);
+
+        $response = $this->channelForm($account);
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString(
+            $this->screenText('email_copy_core_disabled'),
+            $response->getContent(),
+            'the warning is withheld from a channel that has the copy allowed, which is the one that needs it'
+        );
+    }
+
+    /**
+     * And where it is said, which is the whole of what this change is for.
+     * Without this, the paragraph could move to the top of the form or into
+     * the usage block and every other test here would stay green while
+     * nobody reading the switch saw it.
+     */
+    public function test_the_warning_is_said_next_to_the_switch()
+    {
+        $account = $this->createTestAccount();
+        $this->coreParameterValue(false);
+
+        $response = $this->channelForm($account);
+        $response->assertStatus(200);
+        $html = $response->getContent();
+
+        $field   = strpos($html, 'name="allow_core_email_copy"');
+        $warning = strpos($html, $this->screenText('email_copy_core_disabled'));
+        $help    = strpos($html, $this->screenText('email_copy_enable_help'));
+
+        $this->assertNotFalse($field, 'the switch is no longer on the channel form');
+        $this->assertNotFalse($warning, 'the warning is not on the form at all');
+        $this->assertNotFalse($help, 'the help text of the switch is not where it was');
+        $this->assertTrue(
+            $field < $warning && $warning < $help,
+            'the warning is no longer between the switch and its help text, so it reads as being about something else'
+        );
+    }
+
+    /**
+     * And that it reads as a warning. This looks like styling and is not: the
+     * first attempt wrote `class="help-block text-warning"`, and in the core
+     * stylesheet `.help-block` sets a colour (`public/css/bootstrap.css`
+     * line 2931) after `.text-warning` does (line 1365), same specificity,
+     * so the later rule won and the warning came out in exactly the same grey
+     * as the help text underneath it. Nothing failed; it just stopped looking
+     * like a warning.
+     */
+    public function test_the_warning_is_not_dressed_as_ordinary_help_text()
+    {
+        $account = $this->createTestAccount();
+        $this->coreParameterValue(false);
+
+        $html    = $this->channelForm($account)->getContent();
+        $warning = strpos($html, $this->screenText('email_copy_core_disabled'));
+        $this->assertNotFalse($warning, 'the warning is not on the form at all');
+
+        $opening = substr($html, max(0, $warning - 200), min(200, $warning));
+        $this->assertStringContainsString('text-warning', $opening, 'the warning is not marked as one');
+        $this->assertStringNotContainsString(
+            'help-block',
+            $opening,
+            'the warning carries help-block, whose colour wins over text-warning, so it renders as plain help text'
+        );
+    }
+
+    /**
+     * The field stays editable, and this is the test for a decision rather
+     * than for a mechanism. A disabled checkbox is not submitted, and
+     * `update()` reads this one as `(bool) $request->input(...)` on every
+     * save, so disabling it would turn an administrator's stored choice off
+     * the next time they saved the channel for an unrelated reason, with
+     * nothing on the screen to tell them.
+     */
+    public function test_the_warning_leaves_the_switch_usable()
+    {
+        $account = $this->createTestAccount();
+        $this->coreParameterValue(false);
+
+        $response = $this->channelForm($account);
+        $response->assertStatus(200);
+
+        preg_match('/<input[^>]*name="allow_core_email_copy"[^>]*>/', $response->getContent(), $field);
+        $this->assertNotEmpty($field, 'the switch is no longer on the channel form at all');
+        $this->assertStringNotContainsString(
+            'disabled',
+            $field[0],
+            'the switch is disabled, so the next save of this channel would silently clear it'
+        );
+    }
+
+    /**
+     * The other condition outside this module, and the one that is genuinely
+     * per-channel. From the release after 1.8.252 the core also gates that
+     * checkbox on `$mailbox->isOutActive()`, which is false for a mailbox
+     * whose outgoing method is SMTP with no server filled in. Same defect as
+     * the parameter above: a switch that cannot do anything.
+     */
+    public function test_a_mailbox_that_cannot_send_mail_is_said_so()
+    {
+        $account = $this->createTestAccount();
+        $mailbox = $account->mailbox;
+        $mailbox->out_method = Mailbox::OUT_METHOD_SMTP;
+        $mailbox->out_server = '';
+        $mailbox->save();
+
+        $response = $this->channelForm($account);
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString(
+            $this->screenText('email_copy_mailbox_cannot_send'),
+            $response->getContent(),
+            'a channel whose mailbox cannot send mail is offered the switch as if it worked'
+        );
+    }
+
+    /**
+     * And silent on a channel left as this module made it, which is the
+     * common case: those mailboxes send through PHP mail, and that counts as
+     * active with nothing configured.
+     */
+    public function test_a_mailbox_as_the_module_made_it_is_not_warned_about()
+    {
+        $account = $this->createTestAccount();
+
+        $response = $this->channelForm($account);
+
+        $response->assertStatus(200);
+        $this->assertStringNotContainsString(
+            $this->screenText('email_copy_mailbox_cannot_send'),
+            $response->getContent(),
+            'a mailbox that sends through PHP mail is reported as unable to send'
         );
     }
 }

@@ -31,6 +31,18 @@ class AccountEventLog
     const ALLOWED_DETAILS = [
         'message_template_status_update' => ['event', 'template', 'language', 'reason'],
         'template_category_update'       => ['stage', 'template', 'language', 'from', 'to'],
+        // Issue #66. Every one of these is a value Meta documents as an
+        // enumeration, or a date it writes itself. The free text that arrives
+        // with an account alert is not here on purpose: Meta documents eight
+        // sentences for it today and the next revision can document others,
+        // and the alert type already says what happened. The same rule keeps
+        // entity_id out, which is either a portfolio id or a phone number id
+        // and tells an administrator nothing they cannot see on the row's own
+        // channel.
+        'account_update'                 => ['event', 'restriction_types', 'violation_type', 'ban_state', 'ban_date'],
+        'account_alerts'                 => ['entity_type', 'alert_type', 'alert_severity', 'alert_status'],
+        'phone_number_quality_update'    => ['event', 'old_limit', 'current_limit', 'max_daily_conversations_per_business'],
+        'account_review_update'          => ['decision'],
     ];
 
     public static function isEnabled(): bool

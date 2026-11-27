@@ -180,4 +180,29 @@ class AccountEventLogTest extends TestCase
         $this->assertNotNull($event, 'The event itself is still recorded; only its fields are dropped.');
         $this->assertEquals('[]', $event->details);
     }
+
+    /**
+     * Every family the router handles declares its fields, and nothing
+     * declares fields it never writes.
+     *
+     * The two halves are in different files and the failure is silent in both
+     * directions. A handler with no whitelist stores its type and an empty
+     * details column, which looks on screen like an event that carried no
+     * information; a whitelist with no handler is the shape of #66, where the
+     * help text promised families that arrived and were dropped.
+     */
+    public function test_every_handled_webhook_family_declares_its_fields()
+    {
+        $handled  = array_keys(\Modules\MetaWhatsApp\Support\WebhookEventRouter::SCOPE);
+        $declared = array_keys(AccountEventLog::ALLOWED_DETAILS);
+
+        sort($handled);
+        sort($declared);
+
+        $this->assertEquals(
+            $handled,
+            $declared,
+            'the router and the event log disagree about which webhook families this module handles'
+        );
+    }
 }
